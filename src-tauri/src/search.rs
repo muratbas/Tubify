@@ -52,7 +52,7 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
     let mut tracks = Vec::new();
 
     // Helper closure to parse a musicResponsiveListItemRenderer
-    let mut parse_mrlir = |mrlir: &serde_json::Value| -> Option<Track> {
+    let parse_mrlir = |mrlir: &serde_json::Value| -> Option<Track> {
         let video_id = mrlir
             .pointer("/playlistItemData/videoId")
             .or_else(|| {
