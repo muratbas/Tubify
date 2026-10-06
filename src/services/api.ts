@@ -1,6 +1,5 @@
-import type { Track, StreamInfo } from "../types/music";
+import type { Track, StreamInfo, UserProfile, Playlist } from "../types/music";
 
-// Check if running within a Tauri desktop webview
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export async function searchMusic(query: string): Promise<Track[]> {
@@ -16,7 +15,6 @@ export async function searchMusic(query: string): Promise<Track[]> {
     }
   }
 
-  // Fallback to dev server API
   const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
   if (!res.ok) {
     const errorText = await res.text();
@@ -37,7 +35,6 @@ export async function getStreamUrl(id: string): Promise<StreamInfo> {
     }
   }
 
-  // Fallback to dev server API
   const res = await fetch(`/api/stream?id=${encodeURIComponent(id)}`);
   if (!res.ok) {
     const errorText = await res.text();
@@ -56,4 +53,121 @@ export async function getClientVersion(): Promise<string> {
     }
   }
   return "Tubify v0.1.0 (Web/Dev Mode)";
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<UserProfile>("get_user_profile");
+    } catch (e) {
+      console.warn("Tauri invoke error", e);
+    }
+  }
+
+  const res = await fetch("/api/auth/status");
+  if (res.ok) {
+    return await res.json();
+  }
+  return { is_authenticated: false };
+}
+
+export async function openGoogleLogin(): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("open_google_login");
+    return;
+  }
+  window.open(
+    "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F",
+    "_blank"
+  );
+}
+
+export async function checkLoginStatus(): Promise<UserProfile> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<UserProfile>("check_login_status");
+  }
+  return await getUserProfile();
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_external_url", { url });
+      return;
+    } catch {
+      // Fallback
+    }
+  }
+  window.open(url, "_blank");
+}
+
+export async function saveGoogleCookie(cookie: string): Promise<UserProfile> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<UserProfile>("save_google_cookie", { cookie });
+  }
+
+  const res = await fetch("/api/auth/save-cookie", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cookie }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Giriş doğrulanamadı");
+  }
+  return await res.json();
+}
+
+export async function logoutGoogle(): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("logout_google");
+    return;
+  }
+  await fetch("/api/auth/logout", { method: "POST" });
+}
+
+export async function getYtLikedSongs(): Promise<Track[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<Track[]>("get_yt_liked_songs");
+  }
+
+  const res = await fetch("/api/auth/liked");
+  if (!res.ok) {
+    throw new Error("Beğenilen şarkılar yüklenemedi. Lütfen giriş yaptığınızdan emin olun.");
+  }
+  return await res.json();
+}
+
+export async function getYtPlaylists(): Promise<Playlist[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<Playlist[]>("get_yt_playlists");
+  }
+
+  const res = await fetch("/api/auth/playlists");
+  if (!res.ok) {
+    throw new Error("Çalma listeleri yüklenemedi");
+  }
+  return await res.json();
+}
+
+export async function toggleYtLike(videoId: string, like: boolean): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("toggle_yt_like", { videoId, like });
+    return;
+  }
+
+  await fetch("/api/auth/like", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ videoId, like }),
+  });
 }
