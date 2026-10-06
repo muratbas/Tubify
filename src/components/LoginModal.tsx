@@ -1,6 +1,7 @@
 import { useState, useEffect, type FC } from "react";
 import { X, Globe, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, ShieldCheck, Copy, Check } from "lucide-react";
 import { openGoogleLogin, saveGoogleCookie, checkLoginStatus, openExternalUrl } from "../services/api";
+import { useTheme } from "../context/ThemeContext";
 import type { UserProfile } from "../types/music";
 
 interface LoginModalProps {
@@ -10,6 +11,9 @@ interface LoginModalProps {
 }
 
 export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
   const [activeTab, setActiveTab] = useState<"webview" | "cookie">("webview");
   const [cookieInput, setCookieInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -108,38 +112,64 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-[#0e131d] border border-emerald-500/30 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 select-none">
+      <div
+        className={`relative w-full max-w-lg rounded-2xl p-6 shadow-2xl border transition-colors space-y-5 ${
+          isLight
+            ? "bg-[#ffffff] border-[#e5e7eb] text-[#111111]"
+            : "bg-[#0c0c0c] border-[#262626] text-slate-100"
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div
+          className={`flex items-center justify-between pb-3 border-b ${
+            isLight ? "border-[#e5e7eb]" : "border-[#1c1c1c]"
+          }`}
+        >
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-2 rounded-xl bg-[#ff0000]/10 text-[#ff0000] border border-[#ff0000]/20">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">Google & YouTube Music Girişi</h3>
-              <p className="text-xs text-slate-400">Beğenilenler ve çalma listeleriniz doğrudan eşitlenir</p>
+              <h3 className={`font-bold text-base ${isLight ? "text-[#111111]" : "text-white"}`}>
+                Google & YouTube Music Girişi
+              </h3>
+              <p className={`text-xs ${isLight ? "text-[#6b7280]" : "text-[#888888]"}`}>
+                Beğenilenler ve çalma listeleriniz doğrudan eşitlenir
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className={`p-1 rounded-lg transition-colors cursor-pointer ${
+              isLight
+                ? "text-[#6b7280] hover:text-[#111111] hover:bg-[#f3f4f6]"
+                : "text-slate-400 hover:text-white hover:bg-[#1a1a1a]"
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex rounded-xl bg-[#141b29] p-1 border border-slate-800">
+        <div
+          className={`flex rounded-xl p-1 border ${
+            isLight ? "bg-[#f3f4f6] border-[#e5e7eb]" : "bg-[#141414] border-[#222222]"
+          }`}
+        >
           <button
             onClick={() => {
               setActiveTab("webview");
               setError(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === "webview"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                ? isLight
+                  ? "bg-white text-black shadow-sm font-bold"
+                  : "bg-[#252525] text-white shadow-sm font-bold"
+                : isLight
+                ? "text-[#6b7280] hover:text-[#111111]"
+                : "text-[#888888] hover:text-white"
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
@@ -150,10 +180,14 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
               setActiveTab("cookie");
               setError(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === "cookie"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                ? isLight
+                  ? "bg-white text-black shadow-sm font-bold"
+                  : "bg-[#252525] text-white shadow-sm font-bold"
+                : isLight
+                ? "text-[#6b7280] hover:text-[#111111]"
+                : "text-[#888888] hover:text-white"
             }`}
           >
             <KeyRound className="w-3.5 h-3.5" />
@@ -163,14 +197,14 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
 
         {/* Feedback Alerts */}
         {error && (
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{success}</span>
           </div>
@@ -178,10 +212,20 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
 
         {/* Tab 1: Webview Login */}
         {activeTab === "webview" && (
-          <div className="space-y-4 text-xs text-slate-300">
-            <div className="bg-[#121824] p-3.5 rounded-xl border border-slate-800 space-y-2">
-              <p className="font-semibold text-white">Nasıl Çalışır?</p>
-              <ul className="list-disc list-inside space-y-1 text-slate-400 text-[11px]">
+          <div className="space-y-4 text-xs">
+            <div
+              className={`p-3.5 rounded-xl border space-y-2 ${
+                isLight ? "bg-[#f9fafb] border-[#e5e7eb]" : "bg-[#141414] border-[#222222]"
+              }`}
+            >
+              <p className={`font-semibold ${isLight ? "text-[#111111]" : "text-white"}`}>
+                Nasıl Çalışır?
+              </p>
+              <ul
+                className={`list-disc list-inside space-y-1 text-[11px] ${
+                  isLight ? "text-[#6b7280]" : "text-[#888888]"
+                }`}
+              >
                 <li>Google'ın resmi giriş sayfası bağımsız bir pencerede açılır.</li>
                 <li>Şifreniz veya 2 Adımlı Doğrulamanız asla kaydedilmez.</li>
                 <li>Giriş tamamlandığında Tubify oturumu otomatik algılar ve pencere kapanır.</li>
@@ -192,16 +236,24 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
               <button
                 onClick={handleOpenLoginWindow}
                 disabled={isLoading}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#ff0000] hover:bg-[#e60000] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg shadow-red-600/20"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin stroke-black" /> : <ExternalLink className="w-4 h-4" />}
-                Google ile Giriş Penceresini Aç
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin stroke-white" />
+                ) : (
+                  <ExternalLink className="w-4 h-4" />
+                )}
+                Giriş Penceresini Aç
               </button>
 
               <button
                 onClick={handleRefreshStatus}
                 disabled={isLoading}
-                className="py-2.5 px-4 bg-[#1b2333] hover:bg-[#253046] text-slate-200 font-semibold rounded-xl border border-slate-700 transition-all text-xs cursor-pointer"
+                className={`py-2.5 px-4 font-semibold rounded-xl border transition-all text-xs cursor-pointer ${
+                  isLight
+                    ? "bg-[#ffffff] hover:bg-[#f3f4f6] text-[#374151] border-[#d1d5db]"
+                    : "bg-[#1b1b1b] hover:bg-[#252525] text-slate-200 border-[#333333]"
+                }`}
               >
                 Oturumu Doğrula
               </button>
@@ -212,26 +264,36 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
         {/* Tab 2: Manual Cookie Paste */}
         {activeTab === "cookie" && (
           <div className="space-y-3.5 text-xs">
-            <div className="bg-[#121824] p-3 rounded-xl border border-slate-800 space-y-2 text-[11px] text-slate-300">
+            <div
+              className={`p-3 rounded-xl border space-y-2 text-[11px] ${
+                isLight ? "bg-[#f9fafb] border-[#e5e7eb] text-[#374151]" : "bg-[#141414] border-[#222222] text-[#888888]"
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-white">Tarayıcınızdan 10 Saniyede Bağlanın:</span>
+                <span className={`font-semibold ${isLight ? "text-[#111111]" : "text-white"}`}>
+                  Tarayıcınızdan 10 Saniyede Bağlanın:
+                </span>
                 <button
                   type="button"
                   onClick={() => openExternalUrl("https://music.youtube.com")}
-                  className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+                  className="flex items-center gap-1 text-[#ff0000] hover:underline font-semibold cursor-pointer"
                 >
                   <ExternalLink className="w-3 h-3" />
                   YouTube Music'i Aç
                 </button>
               </div>
-              <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px]">
-                <li>Tarayıcınızda (Chrome/Edge) YouTube Music açıkken <b>F12</b> &gt; <b>Console</b> sekmesini açın.</li>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Tarayıcınızda YouTube Music açıkken <b>F12</b> &gt; <b>Console</b> sekmesini açın.</li>
                 <li className="flex items-center gap-2 flex-wrap">
                   Şu kodu konsola yapıştırıp Enter'a basın:
                   <button
                     type="button"
                     onClick={handleCopySnippet}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-emerald-300 font-mono text-[10px] border border-slate-700 hover:bg-slate-700 cursor-pointer"
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[10px] border cursor-pointer ${
+                      isLight
+                        ? "bg-[#ffffff] text-[#ff0000] border-[#d1d5db] hover:bg-[#f3f4f6]"
+                        : "bg-[#202020] text-[#ff0000] border-[#333333] hover:bg-[#2a2a2a]"
+                    }`}
                   >
                     {copiedSnippet ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
                     copy(document.cookie)
@@ -246,14 +308,22 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
               value={cookieInput}
               onChange={(e) => setCookieInput(e.target.value)}
               placeholder="SAPISID=...; __Secure-3PAPISID=...; LOGIN_INFO=..."
-              className="w-full bg-[#121824] border border-slate-800 focus:border-emerald-500/50 rounded-xl p-3 text-slate-200 text-xs font-mono placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+              className={`w-full border rounded-xl p-3 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#ff0000] ${
+                isLight
+                  ? "bg-[#ffffff] border-[#d1d5db] text-[#111111] placeholder-[#9ca3af]"
+                  : "bg-[#141414] border-[#2a2a2a] text-slate-200 placeholder-[#666666]"
+              }`}
             />
             <button
               onClick={handleSaveCookie}
               disabled={isLoading || !cookieInput.trim()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#ff0000] hover:bg-[#e60000] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg shadow-red-600/20"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin stroke-black" /> : <KeyRound className="w-4 h-4" />}
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin stroke-white" />
+              ) : (
+                <KeyRound className="w-4 h-4" />
+              )}
               Çerez ile Hesabı Bağla
             </button>
           </div>

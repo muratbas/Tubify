@@ -6,10 +6,13 @@ import { PlaylistView } from "./components/PlaylistView";
 import { PlayerBar } from "./components/PlayerBar";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
 import { LoginModal } from "./components/LoginModal";
+import { SettingsModal } from "./components/SettingsModal";
+import { useTheme } from "./context/ThemeContext";
 import {
   searchMusic,
   getStreamUrl,
   getUserProfile,
+  logoutGoogle,
   getYtLikedSongs,
   getYtPlaylists,
   getPlaylistTracks,
@@ -141,6 +144,9 @@ const INITIAL_LISTEN_AGAIN: Track[] = [
 ];
 
 export function App() {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
   // Navigation View: "home" | "playlist" | "search"
   const [currentView, setCurrentView] = useState<"home" | "playlist" | "search">("home");
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | { id: "liked"; title: string; description?: string } | null>(null);
@@ -165,6 +171,8 @@ export function App() {
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"account" | "appearance" | "window">("account");
   const [likedSongs, setLikedSongs] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
@@ -275,6 +283,27 @@ export function App() {
   const handleLoginSuccess = (profile: UserProfile) => {
     setUserProfile(profile);
     loadUserData();
+  };
+
+  const handleOpenSettings = (tab: "account" | "appearance" | "window" = "account") => {
+    setSettingsInitialTab(tab);
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutGoogle();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    setUserProfile({ is_authenticated: false });
+    setLikedSongs([]);
+    setPlaylists([]);
+    setLikedTrackIds(new Set());
+    if (selectedPlaylist?.id === "liked") {
+      setSelectedPlaylist(null);
+      setCurrentView("home");
+    }
   };
 
   // Play a track
@@ -456,7 +485,11 @@ export function App() {
   const activePlaylistTracks = selectedPlaylist?.id === "liked" ? likedSongs : playlistTracks;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#030303] text-white overflow-hidden select-none font-sans">
+    <div
+      className={`flex flex-col h-screen w-screen overflow-hidden select-none font-sans transition-colors ${
+        isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+      }`}
+    >
       {/* 1. Custom Title Bar matching Screenshot 1 & 2 */}
       <TitleBar
         searchQuery={searchQuery}
@@ -469,14 +502,7 @@ export function App() {
         onSearchSubmit={handleSearchSubmit}
         userProfile={userProfile}
         onOpenLogin={() => setIsLoginModalOpen(true)}
-        activeTrack={activeTrack}
-        activeTabTitle={
-          currentView === "playlist"
-            ? selectedPlaylist?.title || "Playlist"
-            : currentView === "search"
-            ? `Arama: ${searchQuery}`
-            : "Home"
-        }
+        onOpenSettings={handleOpenSettings}
       />
 
       {/* 2. Main Middle Workspace: Sidebar + Dynamic Content View */}
@@ -492,7 +518,11 @@ export function App() {
         />
 
         {/* Right: Dynamic Views (Home, Playlist Detail, or Search) */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#030303] relative">
+        <main
+          className={`flex-1 flex flex-col h-full overflow-hidden relative transition-colors ${
+            isLight ? "bg-[#fafbfc]" : "bg-[#030303]"
+          }`}
+        >
           {playbackError && (
             <div className="mx-6 mt-3 p-3 rounded-xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-300 text-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -535,21 +565,35 @@ export function App() {
 
           {/* VIEW 2: Search View */}
           {currentView === "search" && (
-            <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-8 space-y-6 pb-24">
+            <div
+              className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-8 space-y-6 pb-24 transition-colors ${
+                isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white tracking-tight">
+                <h2
+                  className={`text-2xl font-bold tracking-tight ${
+                    isLight ? "text-[#111111]" : "text-white"
+                  }`}
+                >
                   "{searchQuery}" Sonuçları
                 </h2>
                 <button
                   onClick={() => setCurrentView("home")}
-                  className="text-xs text-[#888] hover:text-white"
+                  className={`text-xs transition-colors cursor-pointer ${
+                    isLight ? "text-[#6b7280] hover:text-[#111111]" : "text-[#888] hover:text-white"
+                  }`}
                 >
                   Ana Sayfaya Dön
                 </button>
               </div>
 
               {isSearching ? (
-                <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-3">
+                <div
+                  className={`py-24 flex flex-col items-center justify-center gap-3 ${
+                    isLight ? "text-[#6b7280]" : "text-slate-400"
+                  }`}
+                >
                   <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
                   <p className="text-xs">YouTube Music aranıyor...</p>
                 </div>
@@ -558,12 +602,16 @@ export function App() {
                   {searchError}
                 </div>
               ) : searchResults.length === 0 ? (
-                <div className="py-24 text-center text-slate-500 space-y-2">
+                <div
+                  className={`py-24 text-center space-y-2 ${
+                    isLight ? "text-[#6b7280]" : "text-slate-500"
+                  }`}
+                >
                   <p className="text-sm">Sonuç bulunamadı.</p>
                   <p className="text-xs">Lütfen farklı bir şarkı veya sanatçı adı deneyin.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-[#181818]">
+                <div className={`divide-y ${isLight ? "divide-[#e5e7eb]" : "divide-[#181818]"}`}>
                   {searchResults.map((track, idx) => {
                     const isActive = activeTrack?.id === track.id;
                     const isLiked = likedTrackIds.has(track.id);
@@ -573,11 +621,21 @@ export function App() {
                         key={`search-${track.id}-${idx}`}
                         onClick={() => playTrack(track)}
                         className={`flex items-center justify-between p-3 rounded-xl transition-all group cursor-pointer ${
-                          isActive ? "bg-[#202020]" : "hover:bg-[#141414]"
+                          isActive
+                            ? isLight
+                              ? "bg-[#f3f4f6]"
+                              : "bg-[#202020]"
+                            : isLight
+                            ? "hover:bg-[#f3f4f6]"
+                            : "hover:bg-[#141414]"
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-[#222] shrink-0">
+                          <div
+                            className={`relative w-12 h-12 rounded-lg overflow-hidden shrink-0 ${
+                              isLight ? "bg-[#e5e7eb]" : "bg-[#222]"
+                            }`}
+                          >
                             {track.thumbnail ? (
                               <img
                                 src={track.thumbnail}
@@ -597,12 +655,20 @@ export function App() {
                           <div className="min-w-0">
                             <h4
                               className={`text-xs font-bold truncate ${
-                                isActive ? "text-[#ff0000]" : "text-white"
+                                isActive
+                                  ? "text-[#ff0000]"
+                                  : isLight
+                                  ? "text-[#111111]"
+                                  : "text-white"
                               }`}
                             >
                               {track.title}
                             </h4>
-                            <p className="text-[11px] text-[#888888] truncate mt-0.5">
+                            <p
+                              className={`text-[11px] truncate mt-0.5 ${
+                                isLight ? "text-[#6b7280]" : "text-[#888888]"
+                              }`}
+                            >
                               {track.artist}
                             </p>
                           </div>
@@ -614,7 +680,11 @@ export function App() {
                               e.stopPropagation();
                               handleToggleLike(track);
                             }}
-                            className="p-1.5 text-[#666] hover:text-[#ff0000] transition-colors cursor-pointer"
+                            className={`p-1.5 transition-colors cursor-pointer ${
+                              isLight
+                                ? "text-[#9ca3af] hover:text-[#ff0000]"
+                                : "text-[#666] hover:text-[#ff0000]"
+                            }`}
                           >
                             <Heart
                               className={`w-4 h-4 ${
@@ -622,7 +692,11 @@ export function App() {
                               }`}
                             />
                           </button>
-                          <span className="text-xs font-mono text-[#777]">
+                          <span
+                            className={`text-xs font-mono ${
+                              isLight ? "text-[#6b7280]" : "text-[#777]"
+                            }`}
+                          >
                             {track.duration || "3:30"}
                           </span>
                         </div>
@@ -691,6 +765,21 @@ export function App() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* 6. Settings Modal (Account, Appearance, Window) */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        initialTab={settingsInitialTab}
+        userProfile={userProfile}
+        likedSongsCount={likedSongs.length}
+        playlistsCount={playlists.length}
+        onLogout={handleLogout}
+        onOpenLogin={() => {
+          setIsSettingsModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState, type FC } from "react";
 import { Play, Pause, Shuffle, Repeat, Heart, Clock3, Music2, Search, ArrowLeft } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 import type { Track, Playlist } from "../types/music";
 
 interface PlaylistViewProps {
@@ -31,6 +32,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   isLoadingTracks,
   onBackToHome,
 }) => {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
   const [filterQuery, setFilterQuery] = useState("");
   const isLikedPlaylist = playlist.id === "liked" || playlist.id === "LM";
 
@@ -44,13 +48,25 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   });
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none bg-[#030303]">
+    <div
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none transition-colors ${
+        isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+      }`}
+    >
       {/* Top Hero Banner (Screenshot 2 Match) */}
-      <div className="relative p-8 pb-6 bg-gradient-to-b from-[#3a0d14] via-[#1c080b] to-[#030303] flex flex-col gap-6">
+      <div
+        className={`relative p-8 pb-6 flex flex-col gap-6 transition-colors ${
+          isLight
+            ? "bg-gradient-to-b from-[#ffebee] via-[#fff5f6] to-[#fafbfc]"
+            : "bg-gradient-to-b from-[#3a0d14] via-[#1c080b] to-[#030303]"
+        }`}
+      >
         {onBackToHome && (
           <button
             onClick={onBackToHome}
-            className="flex items-center gap-1.5 text-xs text-[#888] hover:text-white transition-colors cursor-pointer w-fit"
+            className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer w-fit ${
+              isLight ? "text-[#6b7280] hover:text-[#111111]" : "text-[#888] hover:text-white"
+            }`}
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Geri Dön</span>
@@ -61,17 +77,23 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
           {/* Cover Art */}
           <div className="shrink-0 shadow-2xl">
             {isLikedPlaylist ? (
-              <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#730018] flex items-center justify-center shadow-2xl shadow-red-950/60 border border-white/10">
+              <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#730018] flex items-center justify-center shadow-2xl shadow-red-950/30 border border-white/20">
                 <Heart className="w-24 h-24 text-white fill-white drop-shadow-md" />
               </div>
             ) : "thumbnail" in playlist && playlist.thumbnail ? (
               <img
                 src={playlist.thumbnail}
                 alt={playlist.title}
-                className="w-48 h-48 rounded-2xl object-cover shadow-2xl border border-white/10 bg-[#1a1a1a]"
+                className={`w-48 h-48 rounded-2xl object-cover shadow-2xl border ${
+                  isLight ? "border-[#e5e7eb] bg-[#e5e7eb]" : "border-white/10 bg-[#1a1a1a]"
+                }`}
               />
             ) : (
-              <div className="w-48 h-48 rounded-2xl bg-[#1c1c1c] border border-white/10 flex items-center justify-center">
+              <div
+                className={`w-48 h-48 rounded-2xl border flex items-center justify-center ${
+                  isLight ? "bg-[#f3f4f6] border-[#e5e7eb]" : "bg-[#1c1c1c] border-white/10"
+                }`}
+              >
                 <Music2 className="w-20 h-20 text-[#ff0000]" />
               </div>
             )}
@@ -79,13 +101,25 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
           {/* Details */}
           <div className="flex flex-col gap-2 min-w-0">
-            <span className="text-[11px] font-bold tracking-widest uppercase text-slate-300">
+            <span
+              className={`text-[11px] font-bold tracking-widest uppercase ${
+                isLight ? "text-[#dc2626]" : "text-slate-300"
+              }`}
+            >
               PLAYLIST
             </span>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-sm truncate">
+            <h1
+              className={`text-4xl md:text-5xl font-black tracking-tight drop-shadow-sm truncate ${
+                isLight ? "text-[#111111]" : "text-white"
+              }`}
+            >
               {isLikedPlaylist ? "Liked Songs" : playlist.title}
             </h1>
-            <p className="text-xs text-[#aaaaaa] font-medium flex items-center gap-2">
+            <p
+              className={`text-xs font-medium flex items-center gap-2 ${
+                isLight ? "text-[#6b7280]" : "text-[#aaaaaa]"
+              }`}
+            >
               <span>YouTube Music</span>
               <span>•</span>
               <span>{tracks.length}+ songs</span>
@@ -113,7 +147,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             onClick={onToggleShuffle}
             className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-semibold transition-all cursor-pointer ${
               isShuffle
-                ? "bg-white text-black border-white shadow-sm"
+                ? "bg-black text-white border-black shadow-sm"
+                : isLight
+                ? "bg-[#ffffff] text-[#111111] border-[#d1d5db] hover:bg-[#f3f4f6]"
                 : "bg-[#181818] text-white border-[#303030] hover:bg-[#222222]"
             }`}
           >
@@ -123,7 +159,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
           {/* Loop Pill Button */}
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#303030] bg-[#181818] hover:bg-[#222222] text-white text-xs font-semibold transition-all cursor-pointer"
+            className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-semibold transition-all cursor-pointer ${
+              isLight
+                ? "bg-[#ffffff] text-[#111111] border-[#d1d5db] hover:bg-[#f3f4f6]"
+                : "bg-[#181818] text-white border-[#303030] hover:bg-[#222222]"
+            }`}
           >
             <Repeat className="w-3.5 h-3.5" />
             <span>Loop</span>
@@ -131,13 +171,21 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
           {/* Search within playlist */}
           <div className="ml-auto relative">
-            <Search className="w-3.5 h-3.5 text-[#666] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search
+              className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
+                isLight ? "text-[#9ca3af]" : "text-[#666]"
+              }`}
+            />
             <input
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
               placeholder="Search in playlist..."
-              className="h-8 pl-8 pr-3 bg-[#161616] border border-[#2b2b2b] rounded-full text-xs text-white placeholder-[#666] focus:outline-none focus:border-[#444] w-48"
+              className={`h-8 pl-8 pr-3 border rounded-full text-xs focus:outline-none w-48 ${
+                isLight
+                  ? "bg-[#ffffff] border-[#d1d5db] text-[#111111] placeholder-[#9ca3af] focus:border-[#9ca3af]"
+                  : "bg-[#161616] border-[#2b2b2b] text-white placeholder-[#666] focus:border-[#444]"
+              }`}
             />
           </div>
         </div>
@@ -146,19 +194,33 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
       {/* Tracklist Table (Spotify Style!) */}
       <div className="px-8 pb-20">
         {isLoadingTracks ? (
-          <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
+          <div
+            className={`py-20 flex flex-col items-center justify-center gap-3 ${
+              isLight ? "text-[#6b7280]" : "text-slate-400"
+            }`}
+          >
             <div className="w-8 h-8 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
             <p className="text-xs">Şarkılar yükleniyor...</p>
           </div>
         ) : displayTracks.length === 0 ? (
-          <div className="py-20 text-center text-slate-500 space-y-2">
+          <div
+            className={`py-20 text-center space-y-2 ${
+              isLight ? "text-[#6b7280]" : "text-slate-500"
+            }`}
+          >
             <p className="text-sm font-medium">Bu listede henüz şarkı bulunamadı.</p>
-            <p className="text-xs text-slate-600">Aramayı kullanarak yeni parçalar ekleyebilirsiniz.</p>
+            <p className="text-xs">Aramayı kullanarak yeni parçalar ekleyebilirsiniz.</p>
           </div>
         ) : (
           <div className="w-full">
             {/* Table Header */}
-            <div className="grid grid-cols-[40px_1fr_1fr_60px_60px] gap-4 px-4 py-2 text-[11px] font-semibold text-[#888888] border-b border-[#202020] uppercase tracking-wider">
+            <div
+              className={`grid grid-cols-[40px_1fr_1fr_60px_60px] gap-4 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b ${
+                isLight
+                  ? "text-[#6b7280] border-[#e5e7eb]"
+                  : "text-[#888888] border-[#202020]"
+              }`}
+            >
               <span>#</span>
               <span>Name</span>
               <span>Album</span>
@@ -169,7 +231,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             </div>
 
             {/* Table Rows */}
-            <div className="divide-y divide-[#121212] pt-1">
+            <div className={`divide-y pt-1 ${isLight ? "divide-[#f3f4f6]" : "divide-[#121212]"}`}>
               {displayTracks.map((track, idx) => {
                 const isActive = activeTrack?.id === track.id;
                 const isLiked = likedTrackIds.has(track.id);
@@ -179,23 +241,35 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     key={`${track.id}-${idx}`}
                     onDoubleClick={() => onPlayTrack(track)}
                     className={`grid grid-cols-[40px_1fr_1fr_60px_60px] gap-4 items-center px-4 py-2 rounded-xl transition-colors group cursor-pointer ${
-                      isActive ? "bg-[#222222]" : "hover:bg-[#161616]"
+                      isActive
+                        ? isLight
+                          ? "bg-[#f3f4f6]"
+                          : "bg-[#222222]"
+                        : isLight
+                        ? "hover:bg-[#f3f4f6]"
+                        : "hover:bg-[#161616]"
                     }`}
                   >
                     {/* Index or Play icon on hover */}
-                    <div className="text-xs font-semibold text-[#777] flex items-center">
+                    <div
+                      className={`text-xs font-semibold flex items-center ${
+                        isLight ? "text-[#9ca3af]" : "text-[#777]"
+                      }`}
+                    >
                       <span className="group-hover:hidden">{isActive && isPlaying ? "▶" : idx + 1}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onPlayTrack(track);
                         }}
-                        className="hidden group-hover:flex w-6 h-6 items-center justify-center text-white hover:scale-110 transition-transform"
+                        className={`hidden group-hover:flex w-6 h-6 items-center justify-center hover:scale-110 transition-transform ${
+                          isLight ? "text-black" : "text-white"
+                        }`}
                       >
                         {isActive && isPlaying ? (
-                          <Pause className="w-3.5 h-3.5 fill-white" />
+                          <Pause className="w-3.5 h-3.5 fill-current" />
                         ) : (
-                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                         )}
                       </button>
                     </div>
@@ -209,24 +283,42 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                           className="w-10 h-10 rounded-md object-cover shrink-0 bg-[#222]"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-md bg-[#222] flex items-center justify-center shrink-0">
+                        <div
+                          className={`w-10 h-10 rounded-md flex items-center justify-center shrink-0 ${
+                            isLight ? "bg-[#e5e7eb]" : "bg-[#222]"
+                          }`}
+                        >
                           <Music2 className="w-4 h-4 text-[#ff0000]" />
                         </div>
                       )}
                       <div className="min-w-0">
                         <p
                           className={`text-xs font-semibold truncate ${
-                            isActive ? "text-[#ff0000]" : "text-white group-hover:text-white"
+                            isActive
+                              ? "text-[#ff0000]"
+                              : isLight
+                              ? "text-[#111111]"
+                              : "text-white"
                           }`}
                         >
                           {track.title}
                         </p>
-                        <p className="text-[11px] text-[#888888] truncate">{track.artist}</p>
+                        <p
+                          className={`text-[11px] truncate ${
+                            isLight ? "text-[#6b7280]" : "text-[#888888]"
+                          }`}
+                        >
+                          {track.artist}
+                        </p>
                       </div>
                     </div>
 
                     {/* Album */}
-                    <div className="text-xs text-[#888888] truncate">
+                    <div
+                      className={`text-xs truncate ${
+                        isLight ? "text-[#6b7280]" : "text-[#888888]"
+                      }`}
+                    >
                       {track.album || "—"}
                     </div>
 
@@ -237,7 +329,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                           e.stopPropagation();
                           onToggleLike(track);
                         }}
-                        className="p-1 text-[#666] hover:text-[#ff0000] transition-colors cursor-pointer"
+                        className={`p-1 transition-colors cursor-pointer ${
+                          isLight ? "text-[#9ca3af] hover:text-[#ff0000]" : "text-[#666] hover:text-[#ff0000]"
+                        }`}
                       >
                         <Heart
                           className={`w-4 h-4 transition-transform active:scale-125 ${
@@ -248,7 +342,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     </div>
 
                     {/* Duration */}
-                    <div className="text-xs text-[#777777] text-right font-mono">
+                    <div
+                      className={`text-xs text-right font-mono ${
+                        isLight ? "text-[#6b7280]" : "text-[#777777]"
+                      }`}
+                    >
                       {track.duration || "3:24"}
                     </div>
                   </div>
