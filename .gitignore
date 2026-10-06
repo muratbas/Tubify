@@ -1,0 +1,51 @@
+# Node / Frontend Dependencies & Build Output
+node_modules/
+dist/
+dist-ssr/
+build/
+*.local
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Rust & Tauri Build Artifacts
+target/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+src-tauri/bin/*.exe
+bin/*.exe
+*.exe
+
+# Local Database & Storage
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+storage/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Configurations
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
