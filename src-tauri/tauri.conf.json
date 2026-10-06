@@ -12,13 +12,14 @@
   "app": {
     "windows": [
       {
-        "title": "Tubify - Lightweight Music",
+        "title": "Tubify",
         "label": "main",
-        "width": 1100,
-        "height": 720,
-        "minWidth": 460,
-        "minHeight": 320,
-        "center": true
+        "width": 1280,
+        "height": 800,
+        "minWidth": 850,
+        "minHeight": 550,
+        "center": true,
+        "decorations": false
       }
     ],
     "security": {

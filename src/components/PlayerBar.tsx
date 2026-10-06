@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import type { FC, ChangeEvent } from "react";
 import {
   Play,
   Pause,
@@ -11,7 +11,8 @@ import {
   Shuffle,
   Repeat,
   Loader2,
-  Music,
+  Music2,
+  Heart,
 } from "lucide-react";
 import type { Track, PlaybackStatus } from "../types/music";
 
@@ -23,7 +24,9 @@ interface PlayerBarProps {
   volume: number;
   isMuted: boolean;
   isMiniPlayer: boolean;
-  streamFormat?: string;
+  isLiked?: boolean;
+  isShuffle?: boolean;
+  isRepeat?: boolean;
   onPlayPause: () => void;
   onNext: () => void;
   onPrev: () => void;
@@ -31,6 +34,9 @@ interface PlayerBarProps {
   onVolumeChange: (vol: number) => void;
   onToggleMute: () => void;
   onToggleMiniPlayer: () => void;
+  onToggleLike?: () => void;
+  onToggleShuffle?: () => void;
+  onToggleRepeat?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -48,7 +54,9 @@ export const PlayerBar: FC<PlayerBarProps> = ({
   volume,
   isMuted,
   isMiniPlayer,
-  streamFormat,
+  isLiked = false,
+  isShuffle = false,
+  isRepeat = false,
   onPlayPause,
   onNext,
   onPrev,
@@ -56,167 +64,179 @@ export const PlayerBar: FC<PlayerBarProps> = ({
   onVolumeChange,
   onToggleMute,
   onToggleMiniPlayer,
+  onToggleLike,
+  onToggleShuffle,
+  onToggleRepeat,
 }) => {
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
+  const handleSeekChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    onSeek(val);
+  };
+
   return (
-    <div className="h-24 bg-[#0d1117]/95 backdrop-blur-md border-t border-[#1e2638] px-6 flex items-center justify-between select-none z-40 relative">
-      {/* 1. Track Info (Left) */}
-      <div className="flex items-center gap-4 w-1/4 min-w-[200px]">
+    <div className="h-[76px] bg-[#0c0c0c] border-t border-[#1c1c1c] px-5 flex items-center justify-between select-none z-40 relative shrink-0">
+      {/* 0. Top Full-Width Interactive Seek Bar (Screenshot Match) */}
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#222222] hover:h-2 transition-all group cursor-pointer">
+        <div
+          className="h-full bg-[#ff0000] relative group-hover:bg-[#ff2222]"
+          style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+        >
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity" />
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={duration || 100}
+          step={0.5}
+          value={currentTime}
+          onChange={handleSeekChange}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </div>
+
+      {/* 1. Track Info & Like Button (Left - Screenshot Match) */}
+      <div className="flex items-center gap-3 w-1/4 min-w-[200px]">
         {track ? (
           <>
-            <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#161d2b] flex-shrink-0 shadow-md border border-[#1e2638]">
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#1a1a1a] shrink-0 border border-[#252525] shadow-sm">
               {track.thumbnail ? (
                 <img src={track.thumbnail} alt={track.title} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500">
-                  <Music className="w-6 h-6" />
+                <div className="w-full h-full flex items-center justify-center text-[#ff0000]">
+                  <Music2 className="w-5 h-5" />
                 </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm font-semibold text-white truncate" title={track.title}>
+              <h4 className="text-xs font-bold text-white truncate" title={track.title}>
                 {track.title}
               </h4>
-              <p className="text-xs text-slate-400 truncate mt-0.5" title={track.artist}>
+              <p className="text-[11px] text-[#888888] truncate mt-0.5" title={track.artist}>
                 {track.artist}
               </p>
-              {streamFormat && (
-                <span className="inline-block mt-1 text-[9px] uppercase tracking-wider font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {streamFormat} CDN
-                </span>
-              )}
             </div>
+            {onToggleLike && (
+              <button
+                onClick={onToggleLike}
+                title={isLiked ? "Beğenilenlerden Kaldır" : "Beğen"}
+                className="p-1 text-[#666666] hover:text-[#ff0000] transition-colors cursor-pointer active:scale-125 shrink-0"
+              >
+                <Heart
+                  className={`w-4 h-4 ${
+                    isLiked ? "text-[#ff0000] fill-[#ff0000]" : "hover:scale-110"
+                  }`}
+                />
+              </button>
+            )}
           </>
         ) : (
-          <div className="text-xs text-slate-500 italic">Çalınan şarkı yok</div>
+          <div className="text-xs text-[#555555] italic">Çalınan şarkı yok</div>
         )}
       </div>
 
-      {/* 2. Controls & Progress (Center) */}
-      <div className="flex flex-col items-center gap-2 max-w-xl w-2/4">
-        {/* Playback Buttons */}
-        <div className="flex items-center gap-4">
-          <button
-            className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-            title="Karışık (Shuffle)"
-          >
-            <Shuffle className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={onPrev}
-            disabled={!track}
-            className="text-slate-300 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Önceki Şarkı"
-          >
-            <SkipBack className="w-5 h-5 fill-current" />
-          </button>
-
-          <button
-            onClick={onPlayPause}
-            disabled={!track}
-            className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black flex items-center justify-center shadow-lg shadow-emerald-500/20 transform transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={isPlaying ? "Durdur" : "Oynat"}
-          >
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin stroke-black" />
-            ) : isPlaying ? (
-              <Pause className="w-5 h-5 fill-black stroke-black" />
-            ) : (
-              <Play className="w-5 h-5 fill-black stroke-black ml-0.5" />
-            )}
-          </button>
-
-          <button
-            onClick={onNext}
-            disabled={!track}
-            className="text-slate-300 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Sonraki Şarkı"
-          >
-            <SkipForward className="w-5 h-5 fill-current" />
-          </button>
-
-          <button
-            className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-            title="Tekrar (Repeat)"
-          >
-            <Repeat className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Seek Bar */}
-        <div className="w-full flex items-center gap-3 text-[11px] font-mono text-slate-400">
-          <span className="w-9 text-right">{formatTime(currentTime)}</span>
-          <div className="relative flex-1 group py-1 flex items-center cursor-pointer">
-            <div className="w-full bg-[#1e2638] h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-emerald-400 group-hover:bg-emerald-300 h-full rounded-full transition-all duration-75"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <input
-              type="range"
-              min="0"
-              max={duration || 100}
-              step="1"
-              value={currentTime}
-              onChange={(e) => onSeek(Number(e.target.value))}
-              disabled={!track || duration === 0}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            />
-          </div>
-          <span className="w-9">{formatTime(duration)}</span>
-        </div>
-      </div>
-
-      {/* 3. Extra Tools & Volume (Right) */}
-      <div className="flex items-center justify-end gap-5 w-1/4 min-w-[200px]">
-        {/* Mini-Player Toggle */}
+      {/* 2. Playback Controls (Center - Screenshot Match) */}
+      <div className="flex items-center gap-4">
+        {/* Shuffle */}
         <button
-          onClick={onToggleMiniPlayer}
-          className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 ${
-            isMiniPlayer
-              ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-              : "bg-[#161d2b] text-slate-300 border-[#222c40] hover:text-white hover:border-slate-600"
+          onClick={onToggleShuffle}
+          title="Karıştır"
+          className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+            isShuffle ? "text-[#ff0000]" : "text-[#777777] hover:text-white"
           }`}
-          title="Mini-Player / HUD Modu (Always on Top)"
         >
-          <Maximize2 className="w-3.5 h-3.5" />
-          <span className="font-medium hidden lg:inline">Mini HUD</span>
+          <Shuffle className="w-4 h-4" />
         </button>
 
-        {/* Volume Slider */}
-        <div className="flex items-center gap-2">
+        {/* Previous */}
+        <button
+          onClick={onPrev}
+          disabled={!track}
+          title="Önceki"
+          className="p-1.5 text-[#aaaaaa] hover:text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 cursor-pointer"
+        >
+          <SkipBack className="w-4 h-4 fill-current" />
+        </button>
+
+        {/* Play / Pause Circular Button in YouTube Red */}
+        <button
+          onClick={onPlayPause}
+          disabled={!track && !isLoading}
+          className="w-11 h-11 rounded-full bg-[#ff0000] hover:bg-[#e60000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
+        >
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isPlaying ? (
+            <Pause className="w-5 h-5 fill-white" />
+          ) : (
+            <Play className="w-5 h-5 fill-white ml-0.5" />
+          )}
+        </button>
+
+        {/* Next */}
+        <button
+          onClick={onNext}
+          disabled={!track}
+          title="Sonraki"
+          className="p-1.5 text-[#aaaaaa] hover:text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 cursor-pointer"
+        >
+          <SkipForward className="w-4 h-4 fill-current" />
+        </button>
+
+        {/* Repeat */}
+        <button
+          onClick={onToggleRepeat}
+          title="Tekrarla"
+          className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+            isRepeat ? "text-[#ff0000]" : "text-[#777777] hover:text-white"
+          }`}
+        >
+          <Repeat className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* 3. Time, HUD Mode & Volume (Right - Screenshot Match) */}
+      <div className="flex items-center justify-end gap-3.5 w-1/4 min-w-[200px]">
+        {/* Timestamp */}
+        <span className="text-[11px] font-mono text-[#888888] select-none">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </span>
+
+        {/* HUD Mini-Player for Gaming */}
+        <button
+          onClick={onToggleMiniPlayer}
+          title="Mini HUD Oyuncu Modu"
+          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            isMiniPlayer
+              ? "text-[#ff0000] bg-[#222]"
+              : "text-[#777777] hover:text-white hover:bg-[#1a1a1a]"
+          }`}
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+
+        {/* Volume */}
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onToggleMute}
-            className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-            title={isMuted ? "Sesi Aç" : "Sesi Kapat"}
+            className="p-1 text-[#888888] hover:text-white transition-colors cursor-pointer"
           >
             <VolumeIcon className="w-4 h-4" />
           </button>
-          <div className="relative w-20 group flex items-center">
-            <div className="w-full bg-[#1e2638] h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-slate-300 group-hover:bg-emerald-400 h-full rounded-full transition-all"
-                style={{ width: `${isMuted ? 0 : volume * 100}%` }}
-              />
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => onVolumeChange(Number(e.target.value))}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-            />
-          </div>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={isMuted ? 0 : volume}
+            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+            className="w-18 h-1 bg-[#282828] accent-[#ff0000] rounded-lg appearance-none cursor-pointer"
+          />
         </div>
       </div>
     </div>

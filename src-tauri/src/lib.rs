@@ -80,6 +80,32 @@ async fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener().open_url(&url, None::<&str>).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_playlist_tracks(playlist_id: String) -> Result<Vec<Track>, String> {
+    auth::fetch_playlist_tracks(&playlist_id).await
+}
+
+#[tauri::command]
+fn minimize_window(window: tauri::Window) {
+    let _ = window.minimize();
+}
+
+#[tauri::command]
+fn toggle_maximize_window(window: tauri::Window) {
+    if let Ok(is_max) = window.is_maximized() {
+        if is_max {
+            let _ = window.unmaximize();
+        } else {
+            let _ = window.maximize();
+        }
+    }
+}
+
+#[tauri::command]
+fn close_window(window: tauri::Window) {
+    let _ = window.close();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load previously saved session if exists
@@ -96,10 +122,14 @@ pub fn run() {
             logout_google,
             get_yt_liked_songs,
             get_yt_playlists,
+            get_playlist_tracks,
             toggle_yt_like,
             open_google_login,
             check_login_status,
-            open_external_url
+            open_external_url,
+            minimize_window,
+            toggle_maximize_window,
+            close_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tubify tauri application");

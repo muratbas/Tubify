@@ -171,3 +171,44 @@ export async function toggleYtLike(videoId: string, like: boolean): Promise<void
     body: JSON.stringify({ videoId, like }),
   });
 }
+
+export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<Track[]>("get_playlist_tracks", { playlistId });
+  }
+  return [];
+}
+
+export async function minimizeWindow(): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("minimize_window");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+export async function toggleMaximizeWindow(): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("toggle_maximize_window");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+export async function closeWindow(): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("close_window");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}

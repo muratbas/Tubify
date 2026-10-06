@@ -107,7 +107,7 @@ fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Client,
 
     headers.insert(
         reqwest::header::USER_AGENT,
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             .parse()
             .map_err(|e| format!("{}", e))?,
     );
@@ -119,17 +119,28 @@ fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Client,
         reqwest::header::REFERER,
         "https://music.youtube.com/".parse().map_err(|e| format!("{}", e))?,
     );
-    headers.insert(
-        reqwest::header::COOKIE,
-        cookie.parse().map_err(|e| format!("{}", e))?,
-    );
+    if let Ok(val) = origin.parse() {
+        headers.insert("X-Origin", val);
+    }
+    if let Ok(val) = "67".parse() {
+        headers.insert("X-YouTube-Client-Name", val);
+    }
+    if let Ok(val) = "1.20240401.01.00".parse() {
+        headers.insert("X-YouTube-Client-Version", val);
+    }
+
+    let clean_cookie = cookie.replace('\r', "").replace('\n', "");
+    if !clean_cookie.trim().is_empty() {
+        if let Ok(c_val) = clean_cookie.parse() {
+            headers.insert(reqwest::header::COOKIE, c_val);
+        }
+    }
 
     if let Some(sid) = sapisid {
         let auth_val = generate_sapisid_hash(sid, origin);
-        headers.insert(
-            reqwest::header::AUTHORIZATION,
-            auth_val.parse().map_err(|e| format!("{}", e))?,
-        );
+        if let Ok(a_val) = auth_val.parse() {
+            headers.insert(reqwest::header::AUTHORIZATION, a_val);
+        }
     }
 
     let client = reqwest::Client::builder()
@@ -144,7 +155,6 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
     let sapisid = extract_sapisid(raw_cookie);
     let (client, _) = build_client(raw_cookie, sapisid.as_deref())?;
 
-    // Validate by querying FEmusic_home
     let url = "https://music.youtube.com/youtubei/v1/browse";
     let payload = serde_json::json!({
         "context": {
@@ -170,8 +180,7 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
         .await
         .map_err(|e| format!("JSON ayrıştırma hatası: {}", e))?;
 
-    // Extract user profile name or avatar if available in response
-    let mut name = Some("YouTube Music Kullanıcısı".to_string());
+    let name = Some("Google Hesabım".to_string());
     let mut avatar_url = None;
 
     if let Some(avatar) = json
@@ -184,7 +193,6 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
         avatar_url = Some(avatar.to_string());
     }
 
-    // Try finding account avatar
     if let Some(av) = json
         .pointer("/topbar/musicAppHeaderRenderer/avatar/thumbnails")
         .and_then(|v| v.as_array())
@@ -193,7 +201,6 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
         .and_then(|u| u.as_str())
     {
         avatar_url = Some(av.to_string());
-        name = Some("Google Hesabım".to_string());
     }
 
     let profile = UserProfile {
@@ -231,10 +238,152 @@ pub fn get_current_user_profile() -> UserProfile {
     }
 }
 
+pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
+    let video_id = mrlir
+        .pointer("/playlistItemData/videoId")
+        .or_else(|| {
+            mrlir.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
+        })
+        .or_else(|| {
+            mrlir.pointer("/doubleTapEndpoint/watchEndpoint/videoId")
+        })
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string())?;
+
+    let title = mrlir
+        .pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown Title")
+        .to_string();
+
+    let mut artist = "Unknown Artist".to_string();
+    if let Some(runs) = mrlir
+        .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
+        .and_then(|v| v.as_array())
+    {
+        let parts: Vec<&str> = runs
+            .iter()
+            .filter_map(|r| r.get("text").and_then(|t| t.as_str()))
+            .filter(|t| *t != "Song" && *t != " • " && *t != " & " && *t != ", ")
+            .collect();
+        if !parts.is_empty() {
+            artist = parts.join(", ");
+        }
+    }
+
+    let mut album = None;
+    if let Some(runs) = mrlir
+        .pointer("/flexColumns/2/musicResponsiveListItemFlexColumnRenderer/text/runs")
+        .and_then(|v| v.as_array())
+    {
+        if let Some(al) = runs.first().and_then(|r| r.get("text")).and_then(|t| t.as_str()) {
+            album = Some(al.to_string());
+        }
+    }
+
+    let mut duration = None;
+    if let Some(dur) = mrlir
+        .pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
+        .and_then(|v| v.as_str())
+    {
+        duration = Some(dur.to_string());
+    }
+
+    let thumbnail = mrlir
+        .pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.last())
+        .and_then(|item| item.get("url"))
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string());
+
+    Some(Track {
+        id: video_id,
+        title,
+        artist,
+        album,
+        duration,
+        thumbnail,
+    })
+}
+
+pub fn collect_tracks_recursive(
+    value: &serde_json::Value,
+    tracks: &mut Vec<Track>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if let Some(obj) = value.as_object() {
+        if let Some(mrlir) = obj.get("musicResponsiveListItemRenderer") {
+            if let Some(track) = parse_mrlir_item(mrlir) {
+                if seen.insert(track.id.clone()) {
+                    tracks.push(track);
+                }
+            }
+        }
+        for (_, child) in obj {
+            collect_tracks_recursive(child, tracks, seen);
+        }
+    } else if let Some(arr) = value.as_array() {
+        for child in arr {
+            collect_tracks_recursive(child, tracks, seen);
+        }
+    }
+}
+
+pub fn collect_playlists_recursive(
+    value: &serde_json::Value,
+    playlists: &mut Vec<Playlist>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if let Some(obj) = value.as_object() {
+        if let Some(card) = obj.get("musicTwoRowItemRenderer") {
+            let browse_id = card
+                .pointer("/navigationEndpoint/browseEndpoint/browseId")
+                .and_then(|v| v.as_str());
+            let title = card
+                .pointer("/title/runs/0/text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Playlist");
+            let subtitle = card
+                .pointer("/subtitle/runs/0/text")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string());
+            let thumb = card
+                .pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails")
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.last())
+                .and_then(|t| t.get("url"))
+                .and_then(|u| u.as_str())
+                .map(|v| v.to_string());
+
+            if let Some(b_id) = browse_id {
+                if seen.insert(b_id.to_string()) {
+                    playlists.push(Playlist {
+                        id: b_id.to_string(),
+                        title: title.to_string(),
+                        description: subtitle,
+                        thumbnail: thumb,
+                        track_count: None,
+                    });
+                }
+            }
+        }
+        for (_, child) in obj {
+            collect_playlists_recursive(child, playlists, seen);
+        }
+    } else if let Some(arr) = value.as_array() {
+        for child in arr {
+            collect_playlists_recursive(child, playlists, seen);
+        }
+    }
+}
+
 pub async fn fetch_liked_songs() -> Result<Vec<Track>, String> {
     let (cookie, sapisid) = {
         let lock = SESSION.lock().unwrap();
-        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış. Lütfen Google hesabınızla giriş yapın.".to_string())?;
+        let session = lock
+            .as_ref()
+            .ok_or_else(|| "Giriş yapılmamış. Lütfen Google hesabınızla giriş yapın.".to_string())?;
         (session.cookie.clone(), session.sapisid.clone())
     };
 
@@ -266,70 +415,8 @@ pub async fn fetch_liked_songs() -> Result<Vec<Track>, String> {
         .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
 
     let mut tracks = Vec::new();
-
-    // Parse Liked Songs shelf
-    let items_opt = json
-        .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents")
-        .or_else(|| {
-            json.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
-        })
-        .and_then(|v| v.as_array());
-
-    if let Some(items) = items_opt {
-        for item in items {
-            if let Some(mrlir) = item.get("musicResponsiveListItemRenderer") {
-                let video_id = mrlir
-                    .pointer("/playlistItemData/videoId")
-                    .or_else(|| {
-                        mrlir.pointer(
-                            "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId",
-                        )
-                    })
-                    .and_then(|v| v.as_str())
-                    .map(|v| v.to_string());
-
-                let title = mrlir
-                    .pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown Title")
-                    .to_string();
-
-                let mut artist = "Unknown Artist".to_string();
-                if let Some(runs) = mrlir
-                    .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
-                    .and_then(|v| v.as_array())
-                {
-                    let parts: Vec<&str> = runs
-                        .iter()
-                        .filter_map(|r| r.get("text").and_then(|t| t.as_str()))
-                        .filter(|t| *t != "Song" && *t != " • " && *t != " & " && *t != ", ")
-                        .collect();
-                    if !parts.is_empty() {
-                        artist = parts.join(", ");
-                    }
-                }
-
-                let thumbnail = mrlir
-                    .pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails")
-                    .and_then(|v| v.as_array())
-                    .and_then(|arr| arr.last())
-                    .and_then(|item| item.get("url"))
-                    .and_then(|v| v.as_str())
-                    .map(|v| v.to_string());
-
-                if let Some(id) = video_id {
-                    tracks.push(Track {
-                        id,
-                        title,
-                        artist,
-                        album: None,
-                        duration: None,
-                        thumbnail,
-                    });
-                }
-            }
-        }
-    }
+    let mut seen = std::collections::HashSet::new();
+    collect_tracks_recursive(&json, &mut tracks, &mut seen);
 
     Ok(tracks)
 }
@@ -369,59 +456,74 @@ pub async fn fetch_user_playlists() -> Result<Vec<Playlist>, String> {
         .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
 
     let mut playlists = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
-    // Add Liked Songs virtual playlist
+    // Pinned Liked Songs playlist
     playlists.push(Playlist {
         id: "LM".to_string(),
-        title: "Beğenilen Şarkılar".to_string(),
-        description: Some("Otomatik olarak YouTube Music hesabınızdan eşitlenir".to_string()),
+        title: "Liked Songs".to_string(),
+        description: Some("YouTube Music".to_string()),
         thumbnail: None,
         track_count: None,
     });
+    seen.insert("LM".to_string());
+    seen.insert("FEmusic_liked".to_string());
 
-    if let Some(sections) = json
-        .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents")
-        .and_then(|v| v.as_array())
-    {
-        for s in sections {
-            if let Some(items) = s.pointer("/musicCarouselShelfRenderer/contents").and_then(|v| v.as_array()) {
-                for it in items {
-                    if let Some(card) = it.get("musicTwoRowItemRenderer") {
-                        let browse_id = card
-                            .pointer("/navigationEndpoint/browseEndpoint/browseId")
-                            .and_then(|v| v.as_str());
-                        let title = card
-                            .pointer("/title/runs/0/text")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Playlist");
-                        let subtitle = card
-                            .pointer("/subtitle/runs/0/text")
-                            .and_then(|v| v.as_str())
-                            .map(|v| v.to_string());
-                        let thumb = card
-                            .pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails")
-                            .and_then(|v| v.as_array())
-                            .and_then(|arr| arr.last())
-                            .and_then(|t| t.get("url"))
-                            .and_then(|u| u.as_str())
-                            .map(|v| v.to_string());
-
-                        if let Some(b_id) = browse_id {
-                            playlists.push(Playlist {
-                                id: b_id.to_string(),
-                                title: title.to_string(),
-                                description: subtitle,
-                                thumbnail: thumb,
-                                track_count: None,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
+    collect_playlists_recursive(&json, &mut playlists, &mut seen);
 
     Ok(playlists)
+}
+
+pub async fn fetch_playlist_tracks(playlist_id: &str) -> Result<Vec<Track>, String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        if let Some(s) = lock.as_ref() {
+            (s.cookie.clone(), s.sapisid.clone())
+        } else {
+            ("".to_string(), None)
+        }
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let browse_id = if playlist_id == "LM" {
+        "FEmusic_liked".to_string()
+    } else if !playlist_id.starts_with("VL") && !playlist_id.starts_with("FEmusic_") {
+        format!("VL{}", playlist_id)
+    } else {
+        playlist_id.to_string()
+    };
+
+    let url = "https://music.youtube.com/youtubei/v1/browse";
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "browseId": browse_id
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Ağ hatası: {}", e))?;
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
+
+    let mut tracks = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    collect_tracks_recursive(&json, &mut tracks, &mut seen);
+
+    Ok(tracks)
 }
 
 pub async fn toggle_like_yt(video_id: &str, like: bool) -> Result<(), String> {
