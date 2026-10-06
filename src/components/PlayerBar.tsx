@@ -85,23 +85,23 @@ export const PlayerBar: FC<PlayerBarProps> = ({
 
   return (
     <div
-      className={`h-[76px] border-t px-5 flex items-center justify-between select-none z-40 relative shrink-0 transition-colors ${
+      className={`h-[74px] px-5 flex items-center justify-between select-none z-40 relative shrink-0 border-t transition-colors ${
         isLight
-          ? "bg-[#ffffff] border-[#e5e7eb] text-[#111111] shadow-lg"
-          : "bg-[#0c0c0c] border-[#1c1c1c] text-white"
+          ? "bg-[#f0f0f0] border-[#e4e4e7] text-[#111111]"
+          : "bg-[#030303] border-[#1b1b1b] text-white"
       }`}
     >
-      {/* 0. Top Full-Width Interactive Seek Bar (Screenshot Match) */}
+      {/* 0. Top Full-Width Interactive Seek Bar */}
       <div
-        className={`absolute top-0 left-0 right-0 h-1.5 hover:h-2 transition-all group cursor-pointer ${
-          isLight ? "bg-[#e5e7eb]" : "bg-[#222222]"
+        className={`absolute top-0 left-0 right-0 h-1 hover:h-2 transition-all group cursor-pointer ${
+          isLight ? "bg-[#e4e4e7]" : "bg-[#222222]"
         }`}
       >
         <div
           className="h-full bg-[#ff0000] relative group-hover:bg-[#ff2222]"
           style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity" />
         </div>
         <input
           type="range"
@@ -119,8 +119,8 @@ export const PlayerBar: FC<PlayerBarProps> = ({
         {track ? (
           <>
             <div
-              className={`w-12 h-12 rounded-lg overflow-hidden shrink-0 border shadow-sm ${
-                isLight ? "bg-[#f3f4f6] border-[#e5e7eb]" : "bg-[#1a1a1a] border-[#252525]"
+              className={`w-11 h-11 rounded-xl overflow-hidden shrink-0 border shadow-sm ${
+                isLight ? "bg-[#ffffff] border-[#e4e4e7]" : "bg-[#161616] border-[#252525]"
               }`}
             >
               {track.thumbnail ? (
@@ -133,13 +133,13 @@ export const PlayerBar: FC<PlayerBarProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <h4
-                className={`text-xs font-bold truncate ${isLight ? "text-[#111111]" : "text-white"}`}
+                className={`text-xs font-bold truncate leading-tight ${isLight ? "text-[#18181b]" : "text-white"}`}
                 title={track.title}
               >
                 {track.title}
               </h4>
               <p
-                className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#6b7280]" : "text-[#888888]"}`}
+                className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}
                 title={track.artist}
               >
                 {track.artist}
@@ -148,9 +148,9 @@ export const PlayerBar: FC<PlayerBarProps> = ({
             {onToggleLike && (
               <button
                 onClick={onToggleLike}
-                title={isLiked ? "Beğenilenlerden Kaldır" : "Beğen"}
+                title={isLiked ? "Unlike" : "Like"}
                 className={`p-1 transition-colors cursor-pointer active:scale-125 shrink-0 ${
-                  isLight ? "text-[#9ca3af] hover:text-[#ff0000]" : "text-[#666666] hover:text-[#ff0000]"
+                  isLight ? "text-[#a1a1aa] hover:text-[#ff0000]" : "text-[#666666] hover:text-[#ff0000]"
                 }`}
               >
                 <Heart
@@ -162,23 +162,23 @@ export const PlayerBar: FC<PlayerBarProps> = ({
             )}
           </>
         ) : (
-          <div className={`text-xs italic ${isLight ? "text-[#9ca3af]" : "text-[#555555]"}`}>
-            Çalınan şarkı yok
+          <div className={`text-xs italic ${isLight ? "text-[#a1a1aa]" : "text-[#555555]"}`}>
+            No track playing
           </div>
         )}
       </div>
 
       {/* 2. Playback Controls (Center - Screenshot Match) */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3.5">
         {/* Shuffle */}
         <button
           onClick={onToggleShuffle}
-          title="Karıştır"
+          title="Shuffle"
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
             isShuffle
               ? "text-[#ff0000]"
               : isLight
-              ? "text-[#6b7280] hover:text-black"
+              ? "text-[#71717a] hover:text-black"
               : "text-[#777777] hover:text-white"
           }`}
         >
@@ -189,9 +189,9 @@ export const PlayerBar: FC<PlayerBarProps> = ({
         <button
           onClick={onPrev}
           disabled={!track}
-          title="Önceki"
+          title="Previous"
           className={`p-1.5 hover:scale-110 active:scale-95 transition-all disabled:opacity-30 cursor-pointer ${
-            isLight ? "text-[#4b5563] hover:text-black" : "text-[#aaaaaa] hover:text-white"
+            isLight ? "text-[#52525b] hover:text-black" : "text-[#aaaaaa] hover:text-white"
           }`}
         >
           <SkipBack className="w-4 h-4 fill-current" />
@@ -201,14 +201,14 @@ export const PlayerBar: FC<PlayerBarProps> = ({
         <button
           onClick={onPlayPause}
           disabled={!track && !isLoading}
-          className="w-11 h-11 rounded-full bg-[#ff0000] hover:bg-[#e60000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
+          className="w-10 h-10 rounded-full bg-[#ff0000] hover:bg-[#e60000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
         >
           {isLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : isPlaying ? (
-            <Pause className="w-5 h-5 fill-white" />
+            <Pause className="w-4 h-4 fill-white" />
           ) : (
-            <Play className="w-5 h-5 fill-white ml-0.5" />
+            <Play className="w-4 h-4 fill-white ml-0.5" />
           )}
         </button>
 
@@ -216,9 +216,9 @@ export const PlayerBar: FC<PlayerBarProps> = ({
         <button
           onClick={onNext}
           disabled={!track}
-          title="Sonraki"
+          title="Next"
           className={`p-1.5 hover:scale-110 active:scale-95 transition-all disabled:opacity-30 cursor-pointer ${
-            isLight ? "text-[#4b5563] hover:text-black" : "text-[#aaaaaa] hover:text-white"
+            isLight ? "text-[#52525b] hover:text-black" : "text-[#aaaaaa] hover:text-white"
           }`}
         >
           <SkipForward className="w-4 h-4 fill-current" />
@@ -227,12 +227,12 @@ export const PlayerBar: FC<PlayerBarProps> = ({
         {/* Repeat */}
         <button
           onClick={onToggleRepeat}
-          title="Tekrarla"
+          title="Repeat"
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
             isRepeat
               ? "text-[#ff0000]"
               : isLight
-              ? "text-[#6b7280] hover:text-black"
+              ? "text-[#71717a] hover:text-black"
               : "text-[#777777] hover:text-white"
           }`}
         >
@@ -244,22 +244,22 @@ export const PlayerBar: FC<PlayerBarProps> = ({
       <div className="flex items-center justify-end gap-3.5 w-1/4 min-w-[200px]">
         {/* Timestamp */}
         <span
-          className={`text-[11px] font-mono select-none ${
-            isLight ? "text-[#6b7280]" : "text-[#888888]"
+          className={`text-[11px] font-mono select-none font-medium ${
+            isLight ? "text-[#71717a]" : "text-[#888888]"
           }`}
         >
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
 
-        {/* HUD Mini-Player for Gaming */}
+        {/* HUD Mini-Player */}
         <button
           onClick={onToggleMiniPlayer}
-          title="Mini HUD Oyuncu Modu"
+          title="Mini HUD Player"
           className={`p-1.5 rounded-md transition-colors cursor-pointer ${
             isMiniPlayer
-              ? "text-[#ff0000] bg-[#ff0000]/10"
+              ? "text-[#ff0000] bg-rose-500/10"
               : isLight
-              ? "text-[#6b7280] hover:text-black hover:bg-[#f3f4f6]"
+              ? "text-[#71717a] hover:text-black hover:bg-[#e4e4e7]"
               : "text-[#777777] hover:text-white hover:bg-[#1a1a1a]"
           }`}
         >
@@ -271,7 +271,7 @@ export const PlayerBar: FC<PlayerBarProps> = ({
           <button
             onClick={onToggleMute}
             className={`p-1 transition-colors cursor-pointer ${
-              isLight ? "text-[#6b7280] hover:text-black" : "text-[#888888] hover:text-white"
+              isLight ? "text-[#71717a] hover:text-black" : "text-[#888888] hover:text-white"
             }`}
           >
             <VolumeIcon className="w-4 h-4" />
@@ -284,7 +284,7 @@ export const PlayerBar: FC<PlayerBarProps> = ({
             value={isMuted ? 0 : volume}
             onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
             className={`w-18 h-1 accent-[#ff0000] rounded-lg appearance-none cursor-pointer ${
-              isLight ? "bg-[#e5e7eb]" : "bg-[#282828]"
+              isLight ? "bg-[#e4e4e7]" : "bg-[#282828]"
             }`}
           />
         </div>

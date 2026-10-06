@@ -16,7 +16,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem("tubify_theme");
       if (saved === "light" || saved === "dark") return saved;
     } catch {}
-    return "dark";
+    return "light";
   });
 
   useEffect(() => {

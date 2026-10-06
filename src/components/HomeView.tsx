@@ -1,6 +1,7 @@
 import { type FC } from "react";
 import { Play, Pause, Music2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Track } from "../types/music";
 
 interface HomeViewProps {
@@ -21,34 +22,35 @@ export const HomeView: FC<HomeViewProps> = ({
   onPlayTrack,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-8 py-6 space-y-8 pb-24 transition-colors ${
-        isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-8 py-6 space-y-8 pb-28 transition-colors ${
+        isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
       }`}
     >
-      {/* 1. Recently Played (Horizontal Mini Cards from Screenshot 1) */}
+      {/* 1. Recently Played (Horizontal Mini Cards from Screenshot 4) */}
       <section className="space-y-3">
-        <h2 className={`text-xl font-bold tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
-          Recently played
+        <h2 className={`text-xl font-black tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
+          {t.recentlyPlayed}
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3">
           {recentlyPlayed.map((track, i) => {
             const isActive = activeTrack?.id === track.id;
             return (
               <div
                 key={`recent-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
-                className={`group flex items-center rounded-xl overflow-hidden border transition-all cursor-pointer relative ${
+                className={`group flex items-center rounded-2xl overflow-hidden border transition-all cursor-pointer relative shadow-sm ${
                   isLight
                     ? isActive
-                      ? "bg-[#f3f4f6] border-[#ff0000]/60 shadow-sm"
-                      : "bg-[#ffffff] hover:bg-[#f3f4f6] border-[#e5e7eb] shadow-sm"
+                      ? "bg-[#ffffff] border-[#ff0000] ring-1 ring-[#ff0000]/30"
+                      : "bg-[#ffffff] hover:bg-[#fafafa] border-[#e4e4e7]"
                     : isActive
-                    ? "bg-[#222222] border-[#ff0000]/40 shadow-sm"
-                    : "bg-[#141414] hover:bg-[#202020] border-[#222222] hover:border-[#383838]"
+                    ? "bg-[#1f1f1f] border-[#ff0000]/50"
+                    : "bg-[#121212] hover:bg-[#1a1a1a] border-[#222222]"
                 }`}
               >
                 {track.thumbnail ? (
@@ -60,7 +62,7 @@ export const HomeView: FC<HomeViewProps> = ({
                 ) : (
                   <div
                     className={`w-14 h-14 flex items-center justify-center shrink-0 ${
-                      isLight ? "bg-[#e5e7eb]" : "bg-[#1f1f1f]"
+                      isLight ? "bg-[#e4e4e7]" : "bg-[#1f1f1f]"
                     }`}
                   >
                     <Music2 className="w-6 h-6 text-[#ff0000]" />
@@ -69,24 +71,24 @@ export const HomeView: FC<HomeViewProps> = ({
 
                 <div className="px-3 min-w-0 flex-1">
                   <h4
-                    className={`text-xs font-semibold truncate ${
-                      isActive ? "text-[#ff0000]" : isLight ? "text-[#111111]" : "text-white"
+                    className={`text-xs font-bold truncate ${
+                      isActive ? "text-[#ff0000]" : isLight ? "text-[#18181b]" : "text-white"
                     }`}
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate ${isLight ? "text-[#6b7280]" : "text-[#888888]"}`}>
+                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
                     {track.artist}
                   </p>
                 </div>
 
-                {/* Hover Play Button */}
+                {/* Play Button Icon */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlayTrack(track);
                   }}
-                  className="mr-3 w-8 h-8 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 shadow-md shadow-red-500/20 shrink-0"
+                  className="mr-3 w-8 h-8 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-85 group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 shadow-md shadow-red-500/20 shrink-0"
                 >
                   {isActive && isPlaying ? (
                     <Pause className="w-4 h-4 fill-white" />
@@ -100,10 +102,10 @@ export const HomeView: FC<HomeViewProps> = ({
         </div>
       </section>
 
-      {/* 2. More Recommendations (Grid of Square Cards from Screenshot 1) */}
+      {/* 2. More Recommendations (Grid of Square Cards from Screenshot 4) */}
       <section className="space-y-3.5">
-        <h2 className={`text-xl font-bold tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
-          More recommendations
+        <h2 className={`text-xl font-black tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
+          {t.moreRecommendations}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {recommendations.map((track, i) => {
@@ -112,10 +114,10 @@ export const HomeView: FC<HomeViewProps> = ({
               <div
                 key={`rec-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
-                className={`group p-3 rounded-2xl border transition-all cursor-pointer flex flex-col space-y-2.5 relative ${
+                className={`group p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col space-y-2 relative shadow-sm ${
                   isLight
-                    ? "bg-[#ffffff] hover:bg-[#f9fafb] border-[#e5e7eb] hover:border-[#d1d5db] shadow-sm"
-                    : "bg-[#121212] hover:bg-[#1c1c1c] border-[#202020] hover:border-[#333]"
+                    ? "bg-[#ffffff] hover:bg-[#fafafa] border-[#e4e4e7]"
+                    : "bg-[#111111] hover:bg-[#181818] border-[#202020]"
                 }`}
               >
                 <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#222]">
@@ -132,24 +134,24 @@ export const HomeView: FC<HomeViewProps> = ({
                   )}
 
                   {/* Float Play Button on Card Hover */}
-                  <div className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-xl shadow-red-600/40 hover:scale-110 active:scale-95">
+                  <div className="absolute right-2 bottom-2 w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-xl shadow-red-600/40 hover:scale-110 active:scale-95">
                     {isActive && isPlaying ? (
-                      <Pause className="w-5 h-5 fill-white" />
+                      <Pause className="w-4 h-4 fill-white" />
                     ) : (
-                      <Play className="w-5 h-5 fill-white ml-0.5" />
+                      <Play className="w-4 h-4 fill-white ml-0.5" />
                     )}
                   </div>
                 </div>
 
                 <div className="min-w-0">
                   <h4
-                    className={`text-xs font-bold truncate ${
-                      isActive ? "text-[#ff0000]" : isLight ? "text-[#111111]" : "text-white"
+                    className={`text-xs font-bold truncate leading-tight ${
+                      isActive ? "text-[#ff0000]" : isLight ? "text-[#18181b]" : "text-white"
                     }`}
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#6b7280]" : "text-[#888888]"}`}>
+                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
                     {track.artist}
                   </p>
                 </div>
@@ -159,10 +161,10 @@ export const HomeView: FC<HomeViewProps> = ({
         </div>
       </section>
 
-      {/* 3. Listen Again (Row from Screenshot 1) */}
+      {/* 3. Listen Again (Row from Screenshot 4) */}
       <section className="space-y-3.5">
-        <h2 className={`text-xl font-bold tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
-          Listen again
+        <h2 className={`text-xl font-black tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
+          {t.listenAgain}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {listenAgain.map((track, i) => {
@@ -171,10 +173,10 @@ export const HomeView: FC<HomeViewProps> = ({
               <div
                 key={`listen-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
-                className={`group p-3 rounded-2xl border transition-all cursor-pointer flex flex-col space-y-2.5 relative ${
+                className={`group p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col space-y-2 relative shadow-sm ${
                   isLight
-                    ? "bg-[#ffffff] hover:bg-[#f9fafb] border-[#e5e7eb] hover:border-[#d1d5db] shadow-sm"
-                    : "bg-[#121212] hover:bg-[#1c1c1c] border-[#202020] hover:border-[#333]"
+                    ? "bg-[#ffffff] hover:bg-[#fafafa] border-[#e4e4e7]"
+                    : "bg-[#111111] hover:bg-[#181818] border-[#202020]"
                 }`}
               >
                 <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#222]">
@@ -190,24 +192,24 @@ export const HomeView: FC<HomeViewProps> = ({
                     </div>
                   )}
 
-                  <div className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-xl shadow-red-600/40 hover:scale-110 active:scale-95">
+                  <div className="absolute right-2 bottom-2 w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-xl shadow-red-600/40 hover:scale-110 active:scale-95">
                     {isActive && isPlaying ? (
-                      <Pause className="w-5 h-5 fill-white" />
+                      <Pause className="w-4 h-4 fill-white" />
                     ) : (
-                      <Play className="w-5 h-5 fill-white ml-0.5" />
+                      <Play className="w-4 h-4 fill-white ml-0.5" />
                     )}
                   </div>
                 </div>
 
                 <div className="min-w-0">
                   <h4
-                    className={`text-xs font-bold truncate ${
-                      isActive ? "text-[#ff0000]" : isLight ? "text-[#111111]" : "text-white"
+                    className={`text-xs font-bold truncate leading-tight ${
+                      isActive ? "text-[#ff0000]" : isLight ? "text-[#18181b]" : "text-white"
                     }`}
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#6b7280]" : "text-[#888888]"}`}>
+                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
                     {track.artist}
                   </p>
                 </div>

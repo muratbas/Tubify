@@ -1,7 +1,8 @@
-import { type FC, type KeyboardEvent, type MouseEvent } from "react";
-import { Search, Minus, Square, X, LogIn, Settings, Sun, Moon } from "lucide-react";
+import { useState, useRef, useEffect, type FC, type KeyboardEvent, type MouseEvent } from "react";
+import { Search, Minus, Square, X, LogIn, Settings, Bookmark, Download } from "lucide-react";
 import { minimizeWindow, toggleMaximizeWindow, closeWindow, openExternalUrl } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { UserProfile } from "../types/music";
 
 interface TitleBarProps {
@@ -9,8 +10,11 @@ interface TitleBarProps {
   onSearchChange: (query: string) => void;
   onSearchSubmit: () => void;
   userProfile: UserProfile;
+  currentView: "home" | "playlist" | "search" | "settings";
+  currentTabTitle?: string;
   onOpenLogin: () => void;
-  onOpenSettings: (tab?: "account" | "appearance" | "window") => void;
+  onOpenSettings: (tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts") => void;
+  onNavigateHome: () => void;
 }
 
 export const TitleBar: FC<TitleBarProps> = ({
@@ -18,11 +22,33 @@ export const TitleBar: FC<TitleBarProps> = ({
   onSearchChange,
   onSearchSubmit,
   userProfile,
+  currentView,
+  currentTabTitle,
   onOpenLogin,
   onOpenSettings,
+  onNavigateHome,
 }) => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
+
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const avatarMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close avatar dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: globalThis.MouseEvent) => {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
+        setIsAvatarMenuOpen(false);
+      }
+    };
+    if (isAvatarMenuOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [isAvatarMenuOpen]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -33,7 +59,7 @@ export const TitleBar: FC<TitleBarProps> = ({
   const handleMouseDown = (e: MouseEvent<HTMLElement>) => {
     if (e.button === 0) {
       const target = e.target as HTMLElement;
-      if (target.closest("button") || target.closest("input") || target.closest("a")) {
+      if (target.closest("button") || target.closest("input") || target.closest("a") || target.closest(".no-drag")) {
         return;
       }
       try {
@@ -50,25 +76,75 @@ export const TitleBar: FC<TitleBarProps> = ({
     <header
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
-      className={`h-12 w-full select-none flex items-center justify-between px-3 z-40 border-b shrink-0 transition-colors ${
+      className={`h-11 w-full select-none flex items-center justify-between px-3 z-40 shrink-0 transition-colors ${
         isLight
-          ? "bg-[#ffffff] border-[#e5e7eb] text-[#111111]"
-          : "bg-[#030303] border-[#1b1b1b] text-white"
+          ? "bg-[#f0f0f0] border-b border-[#e4e4e7] text-[#111111]"
+          : "bg-[#030303] border-b border-[#1b1b1b] text-white"
       }`}
     >
-      {/* Left: Branding */}
-      <div className="flex items-center gap-3 shrink-0" data-tauri-drag-region>
-        <div className="flex items-center gap-1.5 pl-1 cursor-default" data-tauri-drag-region>
+      {/* Left: Branding + Top Tabs (Screenshot 1 & 4 Match) */}
+      <div className="flex items-center gap-2.5 shrink-0" data-tauri-drag-region>
+        {/* Brand */}
+        <div
+          onClick={onNavigateHome}
+          className="flex items-center gap-1.5 pl-1 cursor-pointer"
+          data-tauri-drag-region
+        >
           <div className="w-5 h-5 rounded-full bg-[#ff0000] flex items-center justify-center shadow-sm shadow-red-500/30">
             <div className="w-0 h-0 border-t-[3.5px] border-t-transparent border-l-[6px] border-l-white border-b-[3.5px] border-b-transparent ml-0.5" />
           </div>
           <span
-            className={`font-extrabold text-base tracking-tight flex items-center ${
-              isLight ? "text-[#111111]" : "text-white"
+            className={`font-black text-sm tracking-tight flex items-center ${
+              isLight ? "text-[#18181b]" : "text-white"
             }`}
           >
             Tubify<span className="text-[#ff0000] font-black">_</span>
           </span>
+        </div>
+
+        {/* View Tabs matching Screenshot 1 [Bauklötze] [Settings] [+] */}
+        <div className="flex items-center gap-1 ml-1" data-tauri-drag-region>
+          {currentView === "settings" ? (
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold shadow-sm border ${
+                isLight
+                  ? "bg-[#ffffff] text-[#18181b] border-[#e4e4e7]"
+                  : "bg-[#181818] text-white border-[#2a2a2a]"
+              }`}
+            >
+              <span>{t.settings}</span>
+            </div>
+          ) : currentTabTitle ? (
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold shadow-sm border truncate max-w-[150px] ${
+                isLight
+                  ? "bg-[#ffffff] text-[#18181b] border-[#e4e4e7]"
+                  : "bg-[#181818] text-white border-[#2a2a2a]"
+              }`}
+            >
+              <span className="truncate">{currentTabTitle}</span>
+            </div>
+          ) : (
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold shadow-sm border ${
+                isLight
+                  ? "bg-[#ffffff] text-[#18181b] border-[#e4e4e7]"
+                  : "bg-[#181818] text-white border-[#2a2a2a]"
+              }`}
+            >
+              <span>Home</span>
+            </div>
+          )}
+
+          <button
+            onClick={onNavigateHome}
+            title="New Tab"
+            className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-colors cursor-pointer ${
+              isLight ? "text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#18181b]" : "text-[#888] hover:bg-[#1a1a1a] hover:text-white"
+            }`}
+          >
+            +
+          </button>
         </div>
       </div>
 
@@ -76,8 +152,8 @@ export const TitleBar: FC<TitleBarProps> = ({
       <div className="flex-1 max-w-xl mx-4 flex items-center justify-center" data-tauri-drag-region>
         <div className="relative w-full">
           <Search
-            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
-              isLight ? "text-[#9ca3af]" : "text-[#717171]"
+            className={`w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+              isLight ? "text-[#a1a1aa]" : "text-[#717171]"
             }`}
           />
           <input
@@ -85,18 +161,18 @@ export const TitleBar: FC<TitleBarProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search artists, songs, playlists, and albums"
-            className={`w-full h-8 pl-10 pr-20 rounded-full text-xs transition-all outline-none border ${
+            placeholder={t.searchPlaceholder}
+            className={`w-full h-7.5 pl-9 pr-20 rounded-full text-xs font-normal transition-all outline-none border shadow-sm ${
               isLight
-                ? "bg-[#f3f4f6] hover:bg-[#eceef2] focus:bg-[#ffffff] border-[#e5e7eb] text-[#111111] placeholder-[#6b7280] focus:border-[#d1d5db]"
-                : "bg-[#161616] hover:bg-[#1c1c1c] focus:bg-[#202020] border-[#282828] text-white placeholder-[#717171] focus:border-[#404040]"
+                ? "bg-[#ffffff] hover:bg-[#ffffff] focus:bg-[#ffffff] border-[#e4e4e7] text-[#18181b] placeholder-[#a1a1aa] focus:border-[#d4d4d8]"
+                : "bg-[#141414] hover:bg-[#1c1c1c] focus:bg-[#202020] border-[#262626] text-white placeholder-[#717171] focus:border-[#404040]"
             }`}
           />
           <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
             <kbd
               className={`px-1.5 py-0.5 text-[10px] font-mono rounded border ${
                 isLight
-                  ? "bg-[#ffffff] border-[#d1d5db] text-[#4b5563]"
+                  ? "bg-[#f4f4f5] border-[#e4e4e7] text-[#71717a]"
                   : "bg-[#0c0c0c] border-[#2b2b2b] text-[#888888]"
               }`}
             >
@@ -106,16 +182,34 @@ export const TitleBar: FC<TitleBarProps> = ({
         </div>
       </div>
 
-      {/* Right: Actions, Theme Toggle, Settings, Avatar, Window Controls */}
-      <div className="flex items-center gap-1 shrink-0" data-tauri-drag-region>
+      {/* Right: Quick Icons, Settings, Avatar (With Dropdown), Native Window Controls */}
+      <div className="flex items-center gap-0.5 shrink-0" data-tauri-drag-region>
+        {/* Bookmark Icon (Matching screenshot 1 & 4) */}
+        <button
+          title="Bookmarks"
+          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            isLight ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]" : "text-[#888888] hover:text-white hover:bg-[#181818]"
+          }`}
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Download Icon (Matching screenshot 1 & 4) */}
+        <button
+          title="Downloads"
+          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            isLight ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]" : "text-[#888888] hover:text-white hover:bg-[#181818]"
+          }`}
+        >
+          <Download className="w-3.5 h-3.5" />
+        </button>
+
         {/* Discord Link */}
         <button
           onClick={() => openExternalUrl("https://discord.com")}
           title="Discord"
           className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#4b5563] hover:text-[#111111] hover:bg-[#f3f4f6]"
-              : "text-[#888888] hover:text-white hover:bg-[#181818]"
+            isLight ? "text-[#71717a] hover:text-[#5865F2] hover:bg-[#e4e4e7]" : "text-[#888888] hover:text-white hover:bg-[#181818]"
           }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -123,14 +217,23 @@ export const TitleBar: FC<TitleBarProps> = ({
           </svg>
         </button>
 
+        {/* YouTube Music Icon */}
+        <button
+          onClick={() => openExternalUrl("https://music.youtube.com")}
+          title="YouTube Music"
+          className="p-1.5 rounded-md transition-colors cursor-pointer text-[#ff0000] hover:bg-rose-500/10"
+        >
+          <div className="w-3.5 h-3.5 rounded-full bg-[#ff0000] flex items-center justify-center">
+            <div className="w-0 h-0 border-t-[2.5px] border-t-transparent border-l-[4px] border-l-white border-b-[2.5px] border-b-transparent ml-0.5" />
+          </div>
+        </button>
+
         {/* GitHub Link */}
         <button
           onClick={() => openExternalUrl("https://github.com/muratbas/Tubify")}
           title="GitHub Repo"
           className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#4b5563] hover:text-[#111111] hover:bg-[#f3f4f6]"
-              : "text-[#888888] hover:text-white hover:bg-[#181818]"
+            isLight ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]" : "text-[#888888] hover:text-white hover:bg-[#181818]"
           }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -138,63 +241,104 @@ export const TitleBar: FC<TitleBarProps> = ({
           </svg>
         </button>
 
-        {/* Theme Toggle Button (Light / Dark) */}
-        <button
-          onClick={toggleTheme}
-          title={isLight ? "Koyu Temaya Geç" : "Açık Temaya Geç"}
-          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#f59e0b] hover:bg-[#fef3c7]"
-              : "text-[#f59e0b] hover:bg-[#181818]"
-          }`}
-        >
-          {isLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-        </button>
-
         {/* Settings Button */}
         <button
           onClick={() => onOpenSettings("account")}
-          title="Ayarlar"
+          title={t.settings}
           className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#4b5563] hover:text-[#111111] hover:bg-[#f3f4f6]"
+            currentView === "settings"
+              ? "text-[#ff0000] bg-rose-500/10"
+              : isLight
+              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]"
               : "text-[#888888] hover:text-white hover:bg-[#181818]"
           }`}
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="w-3.5 h-3.5" />
         </button>
 
-        {/* User Profile / Login Avatar */}
-        <div className="ml-1 mr-2">
+        {/* User Profile / Avatar with Dropdown (Screenshot 2 Match) */}
+        <div className="relative ml-1 mr-2" ref={avatarMenuRef}>
           {userProfile.is_authenticated ? (
-            <button
-              onClick={() => onOpenSettings("account")}
-              title={`Hesap Ayarları: ${userProfile.name || "Google Hesabım"}`}
-              className="flex items-center gap-1.5 p-0.5 rounded-full hover:ring-2 hover:ring-[#ff0000] transition-all cursor-pointer"
-            >
-              {userProfile.avatar_url ? (
-                <img
-                  src={userProfile.avatar_url}
-                  alt="Google Avatar"
-                  className="w-7 h-7 rounded-full object-cover border border-[#444] shadow-sm"
-                />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                  {userProfile.name?.[0]?.toUpperCase() || "YT"}
+            <>
+              <button
+                onClick={() => setIsAvatarMenuOpen((p) => !p)}
+                title={userProfile.name || "Murat"}
+                className="flex items-center p-0.5 rounded-full hover:ring-2 hover:ring-[#ff0000] transition-all cursor-pointer"
+              >
+                {userProfile.avatar_url ? (
+                  <img
+                    src={userProfile.avatar_url}
+                    alt="Avatar"
+                    className="w-7 h-7 rounded-full object-cover border border-[#d4d4d8] shadow-sm"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                    {userProfile.name?.[0]?.toUpperCase() || "M"}
+                  </div>
+                )}
+              </button>
+
+              {/* Dropdown Menu (Screenshot 2 Match!) */}
+              {isAvatarMenuOpen && (
+                <div
+                  className={`absolute right-0 top-9 w-52 rounded-2xl p-3 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
+                    isLight
+                      ? "bg-[#ffffff] border-[#e4e4e7] text-[#18181b]"
+                      : "bg-[#141414] border-[#2a2a2a] text-white"
+                  }`}
+                >
+                  {/* User info row */}
+                  <div className="flex items-center gap-3 p-1">
+                    {userProfile.avatar_url ? (
+                      <img
+                        src={userProfile.avatar_url}
+                        alt="Avatar"
+                        className="w-9 h-9 rounded-full object-cover border border-[#e4e4e7]"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-sm">
+                        {userProfile.name?.[0] || "M"}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate leading-tight">
+                        {userProfile.name || "Murat"}
+                      </p>
+                      <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                        {t.signedIn}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`my-2 border-t ${isLight ? "border-[#e4e4e7]" : "border-[#222222]"}`} />
+
+                  {/* Account Settings button */}
+                  <button
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      onOpenSettings("account");
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-[#f4f4f5] text-[#18181b]" : "hover:bg-[#1f1f1f] text-slate-200"
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 text-[#71717a]" />
+                    <span>{t.accountSettings}</span>
+                  </button>
                 </div>
               )}
-            </button>
+            </>
           ) : (
             <button
               onClick={onOpenLogin}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-sm ${
                 isLight
-                  ? "bg-[#ffffff] hover:bg-[#ff0000] hover:text-white text-[#374151] border-[#d1d5db]"
-                  : "bg-[#1e1e1e] hover:bg-[#ff0000] hover:text-white text-slate-300 border-[#303030]"
+                  ? "bg-[#ffffff] hover:bg-[#ff0000] hover:text-white text-[#18181b] border-[#e4e4e7]"
+                  : "bg-[#181818] hover:bg-[#ff0000] hover:text-white text-slate-300 border-[#303030]"
               }`}
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Giriş Yap</span>
+              <span>{t.signIn}</span>
             </button>
           )}
         </div>
@@ -203,29 +347,25 @@ export const TitleBar: FC<TitleBarProps> = ({
         <div className="flex items-center ml-1">
           <button
             onClick={() => minimizeWindow()}
-            title="Küçült"
+            title="Minimize"
             className={`w-9 h-8 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight
-                ? "text-[#4b5563] hover:text-black hover:bg-[#e5e7eb]"
-                : "text-[#aaaaaa] hover:text-white hover:bg-[#1a1a1a]"
+              isLight ? "text-[#71717a] hover:text-black hover:bg-[#e4e4e7]" : "text-[#aaaaaa] hover:text-white hover:bg-[#1a1a1a]"
             }`}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => toggleMaximizeWindow()}
-            title="Ekranı Kapla"
+            title="Maximize"
             className={`w-9 h-8 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight
-                ? "text-[#4b5563] hover:text-black hover:bg-[#e5e7eb]"
-                : "text-[#aaaaaa] hover:text-white hover:bg-[#1a1a1a]"
+              isLight ? "text-[#71717a] hover:text-black hover:bg-[#e4e4e7]" : "text-[#aaaaaa] hover:text-white hover:bg-[#1a1a1a]"
             }`}
           >
             <Square className="w-3 h-3" />
           </button>
           <button
             onClick={() => closeWindow()}
-            title="Kapat"
+            title="Close"
             className="w-9 h-8 flex items-center justify-center text-[#aaaaaa] hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />

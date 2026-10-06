@@ -3,11 +3,12 @@ import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
 import { PlaylistView } from "./components/PlaylistView";
+import { SettingsView } from "./components/SettingsView";
 import { PlayerBar } from "./components/PlayerBar";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
 import { LoginModal } from "./components/LoginModal";
-import { SettingsModal } from "./components/SettingsModal";
 import { useTheme } from "./context/ThemeContext";
+import { useLanguage } from "./context/LanguageContext";
 import {
   searchMusic,
   getStreamUrl,
@@ -21,7 +22,7 @@ import {
 import type { Track, PlaybackStatus, UserProfile, Playlist } from "./types/music";
 import { Loader2, Music2, Heart, Play, AlertCircle } from "lucide-react";
 
-// Curated initial recommendations matching Screenshot 1 aesthetics
+// Curated initial recommendations matching Screenshot 1 & 4 aesthetics
 const INITIAL_RECENT: Track[] = [
   {
     id: "ViwtNLUqkMY",
@@ -143,13 +144,35 @@ const INITIAL_LISTEN_AGAIN: Track[] = [
   },
 ];
 
+const EPISODES_TRACKS: Track[] = [
+  {
+    id: "ep-1",
+    title: "The Architecture of Audio Engines",
+    artist: "Tech & Soundscapes",
+    album: "Auto playlist • Episodes for Later",
+    thumbnail: "https://i.ytimg.com/vi/bU_kF9_H7g4/mqdefault.jpg",
+    duration: "48:12",
+  },
+  {
+    id: "ep-2",
+    title: "Mastering Music in Modern DAWs",
+    artist: "Tubify Sound Lab",
+    album: "Auto playlist • Episodes for Later",
+    thumbnail: "https://i.ytimg.com/vi/0Wc2J3Y9s8w/mqdefault.jpg",
+    duration: "36:45",
+  },
+];
+
 export function App() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
-  // Navigation View: "home" | "playlist" | "search"
-  const [currentView, setCurrentView] = useState<"home" | "playlist" | "search">("home");
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | { id: "liked"; title: string; description?: string } | null>(null);
+  // Navigation View: "home" | "playlist" | "search" | "settings"
+  const [currentView, setCurrentView] = useState<"home" | "playlist" | "search" | "settings">("home");
+  const [selectedPlaylist, setSelectedPlaylist] = useState<
+    Playlist | { id: "liked"; title: string; description?: string } | { id: "episodes"; title: string; description?: string } | null
+  >(null);
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -171,8 +194,9 @@ export function App() {
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<"account" | "appearance" | "window">("account");
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    "account" | "appearance" | "playback" | "library" | "window" | "shortcuts"
+  >("account");
   const [likedSongs, setLikedSongs] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
@@ -219,7 +243,7 @@ export function App() {
     };
     const handleError = () => {
       setPlaybackStatus("error");
-      setPlaybackError("Ses akışı oynatılamadı. Alternatif kanal deneniyor...");
+      setPlaybackError("Audio stream could not be loaded. Trying backup route...");
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -285,9 +309,11 @@ export function App() {
     loadUserData();
   };
 
-  const handleOpenSettings = (tab: "account" | "appearance" | "window" = "account") => {
+  const handleOpenSettings = (
+    tab: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" = "account"
+  ) => {
     setSettingsInitialTab(tab);
-    setIsSettingsModalOpen(true);
+    setCurrentView("settings");
   };
 
   const handleLogout = async () => {
@@ -334,7 +360,7 @@ export function App() {
       }
     } catch (err: unknown) {
       setPlaybackStatus("error");
-      setPlaybackError(err instanceof Error ? err.message : "Ses akışı alınamadı");
+      setPlaybackError(err instanceof Error ? err.message : "Failed to load audio stream");
     }
   };
 
@@ -375,7 +401,9 @@ export function App() {
   // Next / Prev track resolver
   const currentQueue = useMemo(() => {
     if (currentView === "playlist") {
-      return selectedPlaylist?.id === "liked" ? likedSongs : playlistTracks;
+      if (selectedPlaylist?.id === "liked") return likedSongs;
+      if (selectedPlaylist?.id === "episodes") return EPISODES_TRACKS;
+      return playlistTracks;
     }
     if (currentView === "search") {
       return searchResults;
@@ -445,14 +473,21 @@ export function App() {
       const results = await searchMusic(q);
       setSearchResults(results);
     } catch (e: unknown) {
-      setSearchError(e instanceof Error ? e.message : "Arama yapılırken bir hata oluştu");
+      setSearchError(e instanceof Error ? e.message : "Search error occurred");
     } finally {
       setIsSearching(false);
     }
   };
 
   // Select Playlist from Sidebar
-  const handleSelectPlaylist = async (pl: Playlist | "liked") => {
+  const handleSelectPlaylist = async (pl: Playlist | "liked" | "episodes") => {
+    if (pl === "episodes") {
+      setSelectedPlaylist({ id: "episodes", title: "Episodes for Later", description: "Auto playlist • 2 episodes" });
+      setPlaylistTracks(EPISODES_TRACKS);
+      setCurrentView("playlist");
+      return;
+    }
+
     if (pl === "liked" || (typeof pl !== "string" && pl.id === "LM")) {
       setSelectedPlaylist({ id: "liked", title: "Liked Songs", description: "YouTube Music" });
       setCurrentView("playlist");
@@ -482,15 +517,20 @@ export function App() {
     }
   };
 
-  const activePlaylistTracks = selectedPlaylist?.id === "liked" ? likedSongs : playlistTracks;
+  const activePlaylistTracks =
+    selectedPlaylist?.id === "liked"
+      ? likedSongs
+      : selectedPlaylist?.id === "episodes"
+      ? EPISODES_TRACKS
+      : playlistTracks;
 
   return (
     <div
       className={`flex flex-col h-screen w-screen overflow-hidden select-none font-sans transition-colors ${
-        isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+        isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
       }`}
     >
-      {/* 1. Custom Title Bar matching Screenshot 1 & 2 */}
+      {/* 1. Custom Title Bar matching Screenshot 1, 3, 4 */}
       <TitleBar
         searchQuery={searchQuery}
         onSearchChange={(q) => {
@@ -501,8 +541,14 @@ export function App() {
         }}
         onSearchSubmit={handleSearchSubmit}
         userProfile={userProfile}
+        currentView={currentView}
+        currentTabTitle={selectedPlaylist?.title || activeTrack?.title}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenSettings={handleOpenSettings}
+        onNavigateHome={() => {
+          setCurrentView("home");
+          setSelectedPlaylist(null);
+        }}
       />
 
       {/* 2. Main Middle Workspace: Sidebar + Dynamic Content View */}
@@ -517,14 +563,14 @@ export function App() {
           onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
-        {/* Right: Dynamic Views (Home, Playlist Detail, or Search) */}
+        {/* Right: Dynamic Views (Home, Playlist Detail, Search, or Full Page Settings) */}
         <main
           className={`flex-1 flex flex-col h-full overflow-hidden relative transition-colors ${
-            isLight ? "bg-[#fafbfc]" : "bg-[#030303]"
+            isLight ? "bg-[#f0f0f0]" : "bg-[#030303]"
           }`}
         >
           {playbackError && (
-            <div className="mx-6 mt-3 p-3 rounded-xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-300 text-xs flex items-center justify-between">
+            <div className="mx-6 mt-3 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-[#ff0000]" />
                 <span>{playbackError}</span>
@@ -533,12 +579,24 @@ export function App() {
                 onClick={() => setPlaybackError(null)}
                 className="text-xs text-slate-400 hover:text-white"
               >
-                Kapat
+                Close
               </button>
             </div>
           )}
 
-          {/* VIEW 1: Playlist Detail View (Screenshot 2) */}
+          {/* VIEW 1: Full-Page Settings View (Screenshot 1 Match!) */}
+          {currentView === "settings" && (
+            <SettingsView
+              initialTab={settingsInitialTab}
+              userProfile={userProfile}
+              likedSongsCount={likedSongs.length}
+              playlistsCount={playlists.length}
+              onLogout={handleLogout}
+              onOpenLogin={() => setIsLoginModalOpen(true)}
+            />
+          )}
+
+          {/* VIEW 2: Playlist Detail View (Screenshot 3 Match) */}
           {currentView === "playlist" && selectedPlaylist && (
             <PlaylistView
               playlist={selectedPlaylist}
@@ -563,55 +621,54 @@ export function App() {
             />
           )}
 
-          {/* VIEW 2: Search View */}
+          {/* VIEW 3: Search View */}
           {currentView === "search" && (
             <div
               className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-8 space-y-6 pb-24 transition-colors ${
-                isLight ? "bg-[#fafbfc] text-[#111111]" : "bg-[#030303] text-white"
+                isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
               }`}
             >
               <div className="flex items-center justify-between">
                 <h2
-                  className={`text-2xl font-bold tracking-tight ${
+                  className={`text-2xl font-extrabold tracking-tight ${
                     isLight ? "text-[#111111]" : "text-white"
                   }`}
                 >
-                  "{searchQuery}" Sonuçları
+                  {t.searchResultsFor} "{searchQuery}"
                 </h2>
                 <button
                   onClick={() => setCurrentView("home")}
-                  className={`text-xs transition-colors cursor-pointer ${
-                    isLight ? "text-[#6b7280] hover:text-[#111111]" : "text-[#888] hover:text-white"
+                  className={`text-xs font-semibold transition-colors cursor-pointer ${
+                    isLight ? "text-[#71717a] hover:text-[#111111]" : "text-[#888] hover:text-white"
                   }`}
                 >
-                  Ana Sayfaya Dön
+                  {t.backToHome}
                 </button>
               </div>
 
               {isSearching ? (
                 <div
                   className={`py-24 flex flex-col items-center justify-center gap-3 ${
-                    isLight ? "text-[#6b7280]" : "text-slate-400"
+                    isLight ? "text-[#71717a]" : "text-slate-400"
                   }`}
                 >
                   <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
-                  <p className="text-xs">YouTube Music aranıyor...</p>
+                  <p className="text-xs font-medium">Searching YouTube Music...</p>
                 </div>
               ) : searchError ? (
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
                   {searchError}
                 </div>
               ) : searchResults.length === 0 ? (
                 <div
                   className={`py-24 text-center space-y-2 ${
-                    isLight ? "text-[#6b7280]" : "text-slate-500"
+                    isLight ? "text-[#71717a]" : "text-slate-500"
                   }`}
                 >
-                  <p className="text-sm">Sonuç bulunamadı.</p>
-                  <p className="text-xs">Lütfen farklı bir şarkı veya sanatçı adı deneyin.</p>
+                  <p className="text-sm font-semibold">{t.noResultsFound}</p>
                 </div>
               ) : (
-                <div className={`divide-y ${isLight ? "divide-[#e5e7eb]" : "divide-[#181818]"}`}>
+                <div className="space-y-1">
                   {searchResults.map((track, idx) => {
                     const isActive = activeTrack?.id === track.id;
                     const isLiked = likedTrackIds.has(track.id);
@@ -620,20 +677,20 @@ export function App() {
                       <div
                         key={`search-${track.id}-${idx}`}
                         onClick={() => playTrack(track)}
-                        className={`flex items-center justify-between p-3 rounded-xl transition-all group cursor-pointer ${
+                        className={`flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer ${
                           isActive
                             ? isLight
-                              ? "bg-[#f3f4f6]"
-                              : "bg-[#202020]"
+                              ? "bg-[#ffffff] shadow-sm text-black"
+                              : "bg-[#202020] text-white"
                             : isLight
-                            ? "hover:bg-[#f3f4f6]"
-                            : "hover:bg-[#141414]"
+                            ? "hover:bg-[#ffffff]/80 text-[#18181b]"
+                            : "hover:bg-[#141414] text-slate-200"
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
                           <div
-                            className={`relative w-12 h-12 rounded-lg overflow-hidden shrink-0 ${
-                              isLight ? "bg-[#e5e7eb]" : "bg-[#222]"
+                            className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 ${
+                              isLight ? "bg-[#e4e4e7]" : "bg-[#222]"
                             }`}
                           >
                             {track.thumbnail ? (
@@ -654,11 +711,11 @@ export function App() {
 
                           <div className="min-w-0">
                             <h4
-                              className={`text-xs font-bold truncate ${
+                              className={`text-xs font-bold truncate leading-tight ${
                                 isActive
                                   ? "text-[#ff0000]"
                                   : isLight
-                                  ? "text-[#111111]"
+                                  ? "text-[#18181b]"
                                   : "text-white"
                               }`}
                             >
@@ -666,7 +723,7 @@ export function App() {
                             </h4>
                             <p
                               className={`text-[11px] truncate mt-0.5 ${
-                                isLight ? "text-[#6b7280]" : "text-[#888888]"
+                                isLight ? "text-[#71717a]" : "text-[#888888]"
                               }`}
                             >
                               {track.artist}
@@ -682,7 +739,7 @@ export function App() {
                             }}
                             className={`p-1.5 transition-colors cursor-pointer ${
                               isLight
-                                ? "text-[#9ca3af] hover:text-[#ff0000]"
+                                ? "text-[#a1a1aa] hover:text-[#ff0000]"
                                 : "text-[#666] hover:text-[#ff0000]"
                             }`}
                           >
@@ -693,8 +750,8 @@ export function App() {
                             />
                           </button>
                           <span
-                            className={`text-xs font-mono ${
-                              isLight ? "text-[#6b7280]" : "text-[#777]"
+                            className={`text-xs font-mono font-medium ${
+                              isLight ? "text-[#71717a]" : "text-[#777]"
                             }`}
                           >
                             {track.duration || "3:30"}
@@ -708,7 +765,7 @@ export function App() {
             </div>
           )}
 
-          {/* VIEW 3: Home View (Screenshot 1) */}
+          {/* VIEW 4: Home View (Screenshot 4 Match) */}
           {currentView === "home" && (
             <HomeView
               recentlyPlayed={recentTracks}
@@ -722,7 +779,7 @@ export function App() {
         </main>
       </div>
 
-      {/* 3. Bottom Player Bar matching Screenshot 1 & 2 */}
+      {/* 3. Bottom Player Bar matching Screenshot 1, 3, 4 */}
       <PlayerBar
         track={activeTrack}
         status={playbackStatus}
@@ -765,21 +822,6 @@ export function App() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
-      />
-
-      {/* 6. Settings Modal (Account, Appearance, Window) */}
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        initialTab={settingsInitialTab}
-        userProfile={userProfile}
-        likedSongsCount={likedSongs.length}
-        playlistsCount={playlists.length}
-        onLogout={handleLogout}
-        onOpenLogin={() => {
-          setIsSettingsModalOpen(false);
-          setIsLoginModalOpen(true);
-        }}
       />
     </div>
   );
