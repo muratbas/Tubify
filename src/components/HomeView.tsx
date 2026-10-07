@@ -77,9 +77,19 @@ export const HomeView: FC<HomeViewProps> = ({
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                    {track.artist}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    {track.is_explicit && (
+                      <span
+                        title="Explicit"
+                        className="w-3.5 h-3.5 rounded-[3px] bg-[#71717a] text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
+                      >
+                        E
+                      </span>
+                    )}
+                    <p className={`text-[11px] truncate ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                      {track.artist}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Play Button Icon */}
@@ -151,9 +161,19 @@ export const HomeView: FC<HomeViewProps> = ({
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                    {track.artist}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    {track.is_explicit && (
+                      <span
+                        title="Explicit"
+                        className="w-3.5 h-3.5 rounded-[3px] bg-[#71717a] text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
+                      >
+                        E
+                      </span>
+                    )}
+                    <p className={`text-[11px] truncate ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                      {track.artist}
+                    </p>
+                  </div>
                 </div>
               </div>
             );
@@ -209,9 +229,19 @@ export const HomeView: FC<HomeViewProps> = ({
                   >
                     {track.title}
                   </h4>
-                  <p className={`text-[11px] truncate mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                    {track.artist}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    {track.is_explicit && (
+                      <span
+                        title="Explicit"
+                        className="w-3.5 h-3.5 rounded-[3px] bg-[#71717a] text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
+                      >
+                        E
+                      </span>
+                    )}
+                    <p className={`text-[11px] truncate ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                      {track.artist}
+                    </p>
+                  </div>
                 </div>
               </div>
             );

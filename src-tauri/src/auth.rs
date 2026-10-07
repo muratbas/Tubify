@@ -297,6 +297,18 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         .and_then(|v| v.as_str())
         .map(|v| v.to_string());
 
+    let is_explicit = mrlir
+        .get("badges")
+        .and_then(|b| b.as_array())
+        .map(|arr| {
+            arr.iter().any(|b| {
+                b.pointer("/musicInlineBadgeRenderer/icon/iconType")
+                    .and_then(|t| t.as_str())
+                    .map(|t| t == "MUSIC_EXPLICIT_BADGE")
+                    .unwrap_or(false)
+            })
+        });
+
     Some(Track {
         id: video_id,
         title,
@@ -304,6 +316,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         album,
         duration,
         thumbnail,
+        is_explicit,
     })
 }
 
@@ -378,47 +391,36 @@ pub fn collect_playlists_recursive(
     }
 }
 
-pub async fn fetch_liked_songs() -> Result<Vec<Track>, String> {
-    let (cookie, sapisid) = {
-        let lock = SESSION.lock().unwrap();
-        let session = lock
-            .as_ref()
-            .ok_or_else(|| "Giriş yapılmamış. Lütfen Google hesabınızla giriş yapın.".to_string())?;
-        (session.cookie.clone(), session.sapisid.clone())
-    };
+pub fn extract_continuation_token(value: &serde_json::Value) -> Option<String> {
+    if let Some(token) = value.pointer("/continuationCommand/token").and_then(|v| v.as_str()) {
+        if !token.is_empty() {
+            return Some(token.to_string());
+        }
+    }
+    if let Some(token) = value.pointer("/nextContinuationData/continuation").and_then(|v| v.as_str()) {
+        if !token.is_empty() {
+            return Some(token.to_string());
+        }
+    }
 
-    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
-
-    let url = "https://music.youtube.com/youtubei/v1/browse";
-    let payload = serde_json::json!({
-        "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": "1.20240401.01.00",
-                "hl": "tr",
-                "gl": "TR"
+    if let Some(obj) = value.as_object() {
+        for (_, child) in obj {
+            if let Some(token) = extract_continuation_token(child) {
+                return Some(token);
             }
-        },
-        "browseId": "FEmusic_liked"
-    });
+        }
+    } else if let Some(arr) = value.as_array() {
+        for child in arr {
+            if let Some(token) = extract_continuation_token(child) {
+                return Some(token);
+            }
+        }
+    }
+    None
+}
 
-    let res = client
-        .post(url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Ağ hatası: {}", e))?;
-
-    let json: serde_json::Value = res
-        .json()
-        .await
-        .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
-
-    let mut tracks = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    collect_tracks_recursive(&json, &mut tracks, &mut seen);
-
-    Ok(tracks)
+pub async fn fetch_liked_songs() -> Result<Vec<Track>, String> {
+    fetch_playlist_tracks("VLLM").await
 }
 
 pub async fn fetch_user_playlists() -> Result<Vec<Playlist>, String> {
@@ -486,8 +488,8 @@ pub async fn fetch_playlist_tracks(playlist_id: &str) -> Result<Vec<Track>, Stri
 
     let (client, _) = build_client(&cookie, sapisid.as_deref())?;
 
-    let browse_id = if playlist_id == "LM" {
-        "FEmusic_liked".to_string()
+    let browse_id = if playlist_id == "LM" || playlist_id == "liked" {
+        "VLLM".to_string()
     } else if !playlist_id.starts_with("VL") && !playlist_id.starts_with("FEmusic_") {
         format!("VL{}", playlist_id)
     } else {
@@ -522,6 +524,52 @@ pub async fn fetch_playlist_tracks(playlist_id: &str) -> Result<Vec<Track>, Stri
     let mut tracks = Vec::new();
     let mut seen = std::collections::HashSet::new();
     collect_tracks_recursive(&json, &mut tracks, &mut seen);
+
+    // Fetch all subsequent batches via continuation tokens (loads 100+ songs up to completion)
+    let mut continuation_token = extract_continuation_token(&json);
+    let mut batch_count = 0;
+    while let Some(ctoken) = continuation_token {
+        batch_count += 1;
+        // Safety cap: up to 100 batches (approx. 10,000 songs)
+        if batch_count > 100 {
+            break;
+        }
+
+        let cont_url = match reqwest::Url::parse_with_params(
+            "https://music.youtube.com/youtubei/v1/browse",
+            &[("continuation", &ctoken), ("ctoken", &ctoken)],
+        ) {
+            Ok(u) => u,
+            Err(_) => break,
+        };
+
+        let cont_payload = serde_json::json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": "1.20240401.01.00",
+                    "hl": "tr",
+                    "gl": "TR"
+                }
+            }
+        });
+
+        match client.post(cont_url).json(&cont_payload).send().await {
+            Ok(resp) => {
+                if let Ok(next_json) = resp.json::<serde_json::Value>().await {
+                    let prev_len = tracks.len();
+                    collect_tracks_recursive(&next_json, &mut tracks, &mut seen);
+                    if tracks.len() == prev_len {
+                        break;
+                    }
+                    continuation_token = extract_continuation_token(&next_json);
+                } else {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
 
     Ok(tracks)
 }

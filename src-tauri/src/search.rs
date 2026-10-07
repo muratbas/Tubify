@@ -8,6 +8,8 @@ pub struct Track {
     pub album: Option<String>,
     pub duration: Option<String>,
     pub thumbnail: Option<String>,
+    #[serde(default)]
+    pub is_explicit: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,6 +94,18 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             .and_then(|v| v.as_str())
             .map(|v| v.to_string());
 
+        let is_explicit = mrlir
+            .get("badges")
+            .and_then(|b| b.as_array())
+            .map(|arr| {
+                arr.iter().any(|b| {
+                    b.pointer("/musicInlineBadgeRenderer/icon/iconType")
+                        .and_then(|t| t.as_str())
+                        .map(|t| t == "MUSIC_EXPLICIT_BADGE")
+                        .unwrap_or(false)
+                })
+            });
+
         Some(Track {
             id: video_id,
             title,
@@ -99,6 +113,7 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             album: None,
             duration: None,
             thumbnail,
+            is_explicit,
         })
     };
 

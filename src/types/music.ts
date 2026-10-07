@@ -5,6 +5,7 @@ export interface Track {
   album?: string | null;
   duration?: string | null;
   thumbnail?: string | null;
+  is_explicit?: boolean | null;
 }
 
 export interface StreamInfo {

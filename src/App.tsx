@@ -491,7 +491,7 @@ export function App() {
     if (pl === "liked" || (typeof pl !== "string" && pl.id === "LM")) {
       setSelectedPlaylist({ id: "liked", title: "Liked Songs", description: "YouTube Music" });
       setCurrentView("playlist");
-      if (likedSongs.length === 0 && userProfile.is_authenticated) {
+      if (userProfile.is_authenticated) {
         setIsLoadingTracks(true);
         try {
           const songs = await getYtLikedSongs();

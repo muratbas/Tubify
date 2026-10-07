@@ -133,6 +133,9 @@ Tubify/
 - [x] **İki Yönlü Beğeni Senkronizasyonu:** Uygulama içinde beğenilen şarkının YouTube Music üzerinde de anında beğenilmesi/kaldırılması (`toggle_yt_like`).
 - [x] **Özel Marka Logosu & Taskbar Simgesi:** Kullanıcının sağladığı `tubify.png` baz alınarak `npx tauri icon` ile tüm platform ikonları (`icon.ico`, `icon.png`, `Square...Logo` vb.) üretildi. TitleBar, LoginModal, Mini HUD ve favicon güncellendi.
 - [x] **Keskin Köşeli Playlist Kapakları (Crisp Square Covers):** PlaylistView ve Sidebar üzerinde çalma listesi kapakları Spotify tarzında net, tam oturan ve gölgeli kare (`rounded-none`) formatına getirildi.
+- [x] **Sınırsız / Tam Çalma Listesi Sayfalama (InnerTube Continuation Pagination):** 100 şarkılık sınır kaldırıldı; `continuationCommand.token` ve `nextContinuationData` döngüsü ile `VLLM` ve tüm kullanıcı çalma listelerindeki yüzlerce/binlerce şarkı eksiksiz yüklenir.
+- [x] **Explicit "E" Rozeti (Explicit Content Badge):** YouTube Music `MUSIC_EXPLICIT_BADGE` verisi ayrıştırılarak PlaylistView, PlayerBar ve HomeView kartlarında Spotify tarzı koyu gri `[E]` rozeti eklendi.
+- [x] **Temiz Albüm Gösterimi:** Albüm bilgisi bulunmayan parçalarda tire (`-`) kaldırılıp alan boş bırakıldı.
 
 ---
 
