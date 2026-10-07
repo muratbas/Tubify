@@ -131,7 +131,8 @@ Tubify/
 - [x] **Manuel Çerez Import:** Kullanıcının `copy(document.cookie)` ile tek tıkla hesabını bağlayabilmesi.
 - [x] **InnerTube Kütüphane Ayrıştırıcı:** `FEmusic_liked_videos` ve kullanıcı çalma listelerini özyinelemeli (recursive) JSON ayrıştırıcı ile eksiksiz çekme.
 - [x] **İki Yönlü Beğeni Senkronizasyonu:** Uygulama içinde beğenilen şarkının YouTube Music üzerinde de anında beğenilmesi/kaldırılması (`toggle_yt_like`).
-- [x] **Doğrudan Ses Akışı Çözücü:** Şarkı ID'sinden yüksek kaliteli ses akış URL'si üretme (`stream.rs`).
+- [x] **Özel Marka Logosu & Taskbar Simgesi:** Kullanıcının sağladığı `tubify.png` baz alınarak `npx tauri icon` ile tüm platform ikonları (`icon.ico`, `icon.png`, `Square...Logo` vb.) üretildi. TitleBar, LoginModal, Mini HUD ve favicon güncellendi.
+- [x] **Keskin Köşeli Playlist Kapakları (Crisp Square Covers):** PlaylistView ve Sidebar üzerinde çalma listesi kapakları Spotify tarzında net, tam oturan ve gölgeli kare (`rounded-none`) formatına getirildi.
 
 ---
 

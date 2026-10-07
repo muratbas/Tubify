@@ -41,7 +41,7 @@ export const MiniPlayerHUD: FC<MiniPlayerHUDProps> = ({
       {/* Top Header */}
       <div className="flex items-center justify-between mb-3 text-xs">
         <div className="flex items-center gap-1.5 text-emerald-400 font-semibold tracking-wider uppercase text-[10px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <img src="/logo.png" alt="Tubify" className="w-3.5 h-3.5 object-contain" />
           Tubify Mini HUD
         </div>
         <button

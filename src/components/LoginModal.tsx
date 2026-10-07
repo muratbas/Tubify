@@ -1,5 +1,5 @@
 import { useState, useEffect, type FC } from "react";
-import { X, Globe, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, ShieldCheck, Copy, Check } from "lucide-react";
+import { X, Globe, KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink, Copy, Check } from "lucide-react";
 import { openGoogleLogin, saveGoogleCookie, checkLoginStatus, openExternalUrl } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import type { UserProfile } from "../types/music";
@@ -127,8 +127,8 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLoginSucces
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[#ff0000]/10 text-[#ff0000] border border-[#ff0000]/20">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center p-1.5 shadow-sm">
+              <img src="/logo.png" alt="Tubify" className="w-full h-full object-contain" />
             </div>
             <div>
               <h3 className={`font-bold text-base ${isLight ? "text-[#111111]" : "text-white"}`}>

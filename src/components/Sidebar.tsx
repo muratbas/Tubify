@@ -137,7 +137,7 @@ export const Sidebar: FC<SidebarProps> = ({
               : "hover:bg-[#141414] text-[#b3b3b3] hover:text-white"
           }`}
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#800020] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
+          <div className="w-11 h-11 rounded-none bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#800020] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
             <Heart className="w-5 h-5 text-white fill-white" />
           </div>
           <div className="min-w-0 flex-1">
@@ -163,7 +163,7 @@ export const Sidebar: FC<SidebarProps> = ({
               : "hover:bg-[#141414] text-[#b3b3b3] hover:text-white"
           }`}
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#a78bfa] via-[#8b5cf6] to-[#6d28d9] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform text-white">
+          <div className="w-11 h-11 rounded-none bg-gradient-to-br from-[#a78bfa] via-[#8b5cf6] to-[#6d28d9] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform text-white">
             <Radio className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -197,13 +197,13 @@ export const Sidebar: FC<SidebarProps> = ({
                 <img
                   src={pl.thumbnail}
                   alt={pl.title}
-                  className={`w-11 h-11 rounded-xl object-cover shrink-0 border group-hover:scale-105 transition-transform ${
+                  className={`w-11 h-11 rounded-none object-cover shrink-0 border group-hover:scale-105 transition-transform ${
                     isLight ? "bg-[#e4e4e7] border-[#e4e4e7]" : "bg-[#222] border-[#2a2a2a]"
                   }`}
                 />
               ) : (
                 <div
-                  className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                  className={`w-11 h-11 rounded-none border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
                     isLight ? "bg-[#e4e4e7] border-[#e4e4e7]" : "bg-[#1c1c1c] border-[#2a2a2a]"
                   }`}
                 >

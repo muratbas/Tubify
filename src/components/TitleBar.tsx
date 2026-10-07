@@ -87,12 +87,14 @@ export const TitleBar: FC<TitleBarProps> = ({
         {/* Brand */}
         <div
           onClick={onNavigateHome}
-          className="flex items-center gap-1.5 pl-1 cursor-pointer"
+          className="flex items-center gap-2 pl-1 cursor-pointer group"
           data-tauri-drag-region
         >
-          <div className="w-5 h-5 rounded-full bg-[#ff0000] flex items-center justify-center shadow-sm shadow-red-500/30">
-            <div className="w-0 h-0 border-t-[3.5px] border-t-transparent border-l-[6px] border-l-white border-b-[3.5px] border-b-transparent ml-0.5" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Tubify"
+            className="w-5 h-5 rounded object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+          />
           <span
             className={`font-black text-sm tracking-tight flex items-center ${
               isLight ? "text-[#18181b]" : "text-white"

@@ -76,23 +76,23 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
         )}
 
         <div className="flex items-end gap-7">
-          {/* Cover Art */}
+          {/* Cover Art - Crisp square styling like Spotify */}
           <div className="shrink-0 shadow-2xl">
             {isLikedPlaylist ? (
-              <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#730018] flex items-center justify-center shadow-2xl shadow-red-950/25 border border-white/20">
+              <div className="w-48 h-48 rounded-none bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#730018] flex items-center justify-center shadow-2xl shadow-red-950/25 border border-white/20">
                 <Heart className="w-24 h-24 text-white fill-white drop-shadow-md" />
               </div>
             ) : "thumbnail" in playlist && playlist.thumbnail ? (
               <img
                 src={playlist.thumbnail}
                 alt={playlist.title}
-                className={`w-48 h-48 rounded-2xl object-cover shadow-2xl border ${
+                className={`w-48 h-48 rounded-none object-cover shadow-2xl border ${
                   isLight ? "border-[#e4e4e7] bg-[#e4e4e7]" : "border-white/10 bg-[#1a1a1a]"
                 }`}
               />
             ) : (
               <div
-                className={`w-48 h-48 rounded-2xl border flex items-center justify-center ${
+                className={`w-48 h-48 rounded-none border flex items-center justify-center shadow-2xl ${
                   isLight ? "bg-[#ffffff] border-[#e4e4e7]" : "bg-[#1c1c1c] border-white/10"
                 }`}
               >
