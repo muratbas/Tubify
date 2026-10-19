@@ -1,4 +1,4 @@
-import { useState, type FC } from "react";
+import { useState, useRef, useEffect, type FC } from "react";
 import {
   Play,
   Pause,
@@ -14,7 +14,7 @@ import { useLanguage } from "../context/LanguageContext";
 import type { Track, Playlist } from "../types/music";
 
 interface PlaylistViewProps {
-  playlist: Playlist | { id: "liked"; title: string; description?: string } | { id: "episodes"; title: string; description?: string };
+  playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null };
   tracks: Track[];
   activeTrack: Track | null;
   isPlaying: boolean;
@@ -25,6 +25,16 @@ interface PlaylistViewProps {
   onToggleLike: (track: Track) => void;
   likedTrackIds: Set<string>;
   isLoadingTracks: boolean;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
+  onNavigateArtist?: (artistId: string, artistName: string) => void;
+  onNavigateAlbum?: (
+    albumId: string,
+    albumTitle?: string,
+    artistName?: string,
+    thumbnail?: string
+  ) => void;
   onBackToHome?: () => void;
 }
 
@@ -40,13 +50,24 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   onToggleLike,
   likedTrackIds,
   isLoadingTracks,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
+  onNavigateArtist,
+  onNavigateAlbum,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const isLight = theme === "light";
 
   const [filterQuery, setFilterQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(50);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const isLikedPlaylist = playlist.id === "liked" || playlist.id === "LM";
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [playlist.id, filterQuery]);
 
   const displayTracks = tracks.filter((t) => {
     if (!filterQuery) return true;
@@ -56,6 +77,30 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
       (t.album && t.album.toLowerCase().includes(filterQuery.toLowerCase()))
     );
   });
+
+  const renderedTracks = displayTracks.slice(0, visibleCount);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          if (visibleCount < displayTracks.length) {
+            setVisibleCount((prev) => Math.min(prev + 50, displayTracks.length));
+          } else if (onLoadMore && hasMore && !isLoadingMore) {
+            onLoadMore();
+          }
+        }
+      },
+      { rootMargin: "250px" }
+    );
+
+    const el = sentinelRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [visibleCount, displayTracks.length, onLoadMore, hasMore, isLoadingMore]);
 
   return (
     <div
@@ -237,7 +282,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
             {/* Table Rows with Spotifast Hover Interaction */}
             <div className="pt-2 space-y-0.5">
-              {displayTracks.map((track, idx) => {
+              {renderedTracks.map((track, idx) => {
                 const isActive = activeTrack?.id === track.id;
                 const isLiked = likedTrackIds.has(track.id);
 
@@ -317,8 +362,14 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             </span>
                           )}
                           <p
-                            className={`text-xs truncate leading-normal py-0.5 hover:underline ${
-                              isLight ? "text-neutral-500" : "text-neutral-400"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigateArtist) {
+                                onNavigateArtist(track.artist_id || track.artist, track.artist);
+                              }
+                            }}
+                            className={`text-xs truncate leading-normal py-0.5 hover:underline cursor-pointer ${
+                              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
                             }`}
                           >
                             {track.artist}
@@ -329,7 +380,20 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
                     {/* ALBÜM */}
                     <div
-                      className={`text-xs truncate hover:underline ${
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (track.album_id && onNavigateAlbum) {
+                          onNavigateAlbum(
+                            track.album_id,
+                            track.album || undefined,
+                            track.artist,
+                            track.thumbnail || undefined
+                          );
+                        }
+                      }}
+                      className={`text-xs truncate ${
+                        track.album_id ? "hover:underline cursor-pointer" : ""
+                      } ${
                         isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
                       }`}
                     >
@@ -342,7 +406,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                         isLight ? "text-neutral-500" : "text-neutral-400"
                       }`}
                     >
-                      {idx % 3 === 0 ? "18 Eyl 2026" : idx % 2 === 0 ? "16 Eyl 2026" : "16 Ağu 2026"}
+                      {track.added_at || "—"}
                     </div>
 
                     {/* LIKE BUTTON + MORE OPTIONS on Hover */}
@@ -386,6 +450,16 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Infinite Scroll Sentinel */}
+            <div ref={sentinelRef} className="h-10 w-full flex items-center justify-center pt-2">
+              {isLoadingMore && (
+                <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
+                  <div className="w-4 h-4 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
+                  <span>Daha fazla şarkı yükleniyor...</span>
+                </div>
+              )}
             </div>
           </div>
         )}

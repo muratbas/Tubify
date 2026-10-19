@@ -141,6 +141,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const isRepeatRef = useRef(isRepeat);
   isRepeatRef.current = isRepeat;
 
+  // Preloading & Stream Caching Refs
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadedTrackRef = useRef<{ trackId: string; url: string } | null>(null);
+  const streamCacheRef = useRef<Map<string, { url: string; timestamp: number }>>(new Map());
+  const upcomingTrackRef = useRef<Track | null>(null);
+
   // Sync liked IDs to localStorage
   useEffect(() => {
     try {
@@ -150,15 +156,94 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [likedTrackIds]);
 
+  // Determine the upcoming candidate track in queue
+  const getUpcomingTrack = useCallback((): Track | null => {
+    const curQueue = queueRef.current;
+    const curTrack = currentTrackRef.current;
+    if (!curTrack || curQueue.length === 0) return null;
+
+    if (isShuffleRef.current) {
+      if (curQueue.length <= 1) return isRepeatRef.current ? curTrack : null;
+      const candidates = curQueue.filter((t) => t.id !== curTrack.id);
+      if (candidates.length === 0) return isRepeatRef.current ? curTrack : null;
+      const randIdx = Math.floor(Math.random() * candidates.length);
+      return candidates[randIdx];
+    }
+
+    const idx = curQueue.findIndex((t) => t.id === curTrack.id);
+    if (idx !== -1 && idx + 1 < curQueue.length) {
+      return curQueue[idx + 1];
+    } else if (isRepeatRef.current && curQueue.length > 0) {
+      return curQueue[0];
+    }
+    return null;
+  }, []);
+
+  // Preload upcoming track stream & audio buffer
+  const preloadUpcoming = useCallback(async () => {
+    const candidate = getUpcomingTrack();
+    if (!candidate) {
+      upcomingTrackRef.current = null;
+      return;
+    }
+
+    upcomingTrackRef.current = candidate;
+
+    // Skip if already preloaded
+    if (preloadedTrackRef.current?.trackId === candidate.id) {
+      return;
+    }
+
+    try {
+      let streamUrl = "";
+      const cached = streamCacheRef.current.get(candidate.id);
+      if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
+        streamUrl = cached.url;
+      } else {
+        const stream = await getStreamUrl(candidate.id);
+        streamUrl = stream.url;
+        streamCacheRef.current.set(candidate.id, { url: streamUrl, timestamp: Date.now() });
+      }
+
+      // Pre-buffer in secondary invisible audio element
+      if (!preloadAudioRef.current) {
+        const pAudio = new Audio();
+        pAudio.preload = "auto";
+        pAudio.volume = 0;
+        pAudio.muted = true;
+        preloadAudioRef.current = pAudio;
+      }
+
+      preloadAudioRef.current.src = streamUrl;
+      preloadAudioRef.current.load();
+      preloadedTrackRef.current = { trackId: candidate.id, url: streamUrl };
+    } catch (e) {
+      console.warn("Silent preload failed for next track:", candidate.title, e);
+    }
+  }, [getUpcomingTrack]);
+
   // Next track resolver
   const nextTrack = useCallback(() => {
     const curQueue = queueRef.current;
     const curTrack = currentTrackRef.current;
     if (!curTrack || curQueue.length === 0) return;
 
+    // 1. FAST PATH: If an upcoming preloaded track is ready, play it seamlessly!
+    const upcoming = upcomingTrackRef.current;
+    if (upcoming && curQueue.some((t) => t.id === upcoming.id)) {
+      upcomingTrackRef.current = null;
+      playTrackInternal(upcoming);
+      return;
+    }
+
+    // 2. Fallback if upcoming was not pre-determined
     if (isShuffleRef.current) {
-      const randIdx = Math.floor(Math.random() * curQueue.length);
-      playTrackInternal(curQueue[randIdx]);
+      const candidates = curQueue.filter((t) => t.id !== curTrack.id);
+      const randTrack =
+        candidates.length > 0
+          ? candidates[Math.floor(Math.random() * candidates.length)]
+          : curQueue[0];
+      playTrackInternal(randTrack);
       return;
     }
 
@@ -186,10 +271,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Initialize HTMLAudioElement
+  const nextTrackRef = useRef(nextTrack);
+  nextTrackRef.current = nextTrack;
+
+  // Initialize HTMLAudioElement ONCE on mount
   useEffect(() => {
     const audio = new Audio();
-    audio.volume = volume;
+    const initVol = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+    audio.volume = !isNaN(initVol) ? initVol : 0.85;
     audioRef.current = audio;
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
@@ -198,7 +287,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onPause = () => setPlaybackStatus("paused");
     const onEnded = () => {
       setPlaybackStatus("paused");
-      nextTrack();
+      nextTrackRef.current();
     };
     const onError = () => {
       setPlaybackStatus("error");
@@ -220,13 +309,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
+      if (preloadAudioRef.current) {
+        preloadAudioRef.current.src = "";
+        preloadAudioRef.current = null;
+      }
     };
-  }, [nextTrack, volume]);
+  }, []);
+
+  // Separate effect to handle volume & mute changes without resetting audio element
+  useEffect(() => {
+    if (audioRef.current) {
+      const targetVol = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+      if (!isNaN(targetVol) && isFinite(targetVol)) {
+        audioRef.current.volume = targetVol;
+      }
+    }
+  }, [volume, isMuted]);
+
+  // Preload upcoming track 3 seconds after current track enters playing state
+  useEffect(() => {
+    if (!activeTrack || playbackStatus !== "playing") return;
+
+    const timer = window.setTimeout(() => {
+      preloadUpcoming();
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [activeTrack?.id, playbackStatus, queue, isShuffle, isRepeat, preloadUpcoming]);
 
   const playTrackInternal = async (track: Track) => {
     if (!audioRef.current) return;
     setActiveTrack(track);
-    setPlaybackStatus("loading");
     setPlaybackError(null);
 
     // Save to recents
@@ -241,8 +356,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
+    // 1. INSTANT SWAP: If track is already preloaded and buffered, play immediately!
+    if (preloadedTrackRef.current && preloadedTrackRef.current.trackId === track.id) {
+      const preloadedUrl = preloadedTrackRef.current.url;
+      preloadedTrackRef.current = null; // Consumed
+
+      try {
+        audioRef.current.src = preloadedUrl;
+        audioRef.current.currentTime = 0;
+        await audioRef.current.play();
+        setPlaybackStatus("playing");
+        return;
+      } catch (e) {
+        console.warn("Instant playback from preloaded buffer failed, falling back to fresh fetch:", e);
+      }
+    }
+
+    // 2. MEMORY CACHE PATH: Check if stream URL is in memory cache
+    const cached = streamCacheRef.current.get(track.id);
+    if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
+      try {
+        audioRef.current.src = cached.url;
+        audioRef.current.currentTime = 0;
+        await audioRef.current.play();
+        setPlaybackStatus("playing");
+        return;
+      } catch {
+        // Fallback to fresh network fetch
+      }
+    }
+
+    // 3. NORMAL PATH: Fresh network fetch
+    setPlaybackStatus("loading");
     try {
       const stream = await getStreamUrl(track.id);
+      streamCacheRef.current.set(track.id, { url: stream.url, timestamp: Date.now() });
       if (audioRef.current) {
         audioRef.current.src = stream.url;
         await audioRef.current.play();
@@ -277,7 +425,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   const setVolume = (vol: number) => {
-    const clamped = Math.max(0, Math.min(1, vol));
+    const num = isNaN(vol) ? 0.85 : vol;
+    const clamped = Math.max(0, Math.min(1, num));
     setVolumeState(clamped);
     setIsMuted(clamped === 0);
     if (audioRef.current) {
@@ -288,7 +437,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const toggleMute = () => {
     if (!audioRef.current) return;
     if (isMuted) {
-      audioRef.current.volume = volume || 0.85;
+      const vol = volume > 0 ? Math.min(1, volume) : 0.85;
+      audioRef.current.volume = vol;
       setIsMuted(false);
     } else {
       audioRef.current.volume = 0;

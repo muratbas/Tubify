@@ -1,4 +1,12 @@
-import type { Track, StreamInfo, UserProfile, Playlist } from "../types/music";
+import type {
+  Track,
+  StreamInfo,
+  UserProfile,
+  Playlist,
+  PlaylistTracksResult,
+  ArtistDetails,
+  AlbumDetails,
+} from "../types/music";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -176,6 +184,44 @@ export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<Track[]>("get_playlist_tracks", { playlistId });
+  }
+  return [];
+}
+
+export async function getPlaylistTracksPage(
+  playlistId: string,
+  continuation?: string | null
+): Promise<PlaylistTracksResult> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<PlaylistTracksResult>("get_playlist_tracks_page", {
+      playlistId,
+      continuation: continuation || null,
+    });
+  }
+  return { tracks: [], continuation: null };
+}
+
+export async function getArtistDetails(browseId: string): Promise<ArtistDetails> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<ArtistDetails>("get_artist_details", { browseId });
+  }
+  throw new Error("Tauri ortamı gereklidir.");
+}
+
+export async function getAlbumDetails(browseId: string): Promise<AlbumDetails> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<AlbumDetails>("get_album_details", { browseId });
+  }
+  throw new Error("Tauri ortamı gereklidir.");
+}
+
+export async function getRadioTracks(videoId: string): Promise<Track[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<Track[]>("get_radio_tracks", { videoId });
   }
   return [];
 }

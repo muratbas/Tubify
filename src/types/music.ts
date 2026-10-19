@@ -2,10 +2,49 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
+  artist_id?: string | null;
   album?: string | null;
+  album_id?: string | null;
   duration?: string | null;
   thumbnail?: string | null;
   is_explicit?: boolean | null;
+  added_at?: string | null;
+}
+
+export interface PlaylistTracksResult {
+  tracks: Track[];
+  continuation?: string | null;
+}
+
+export interface ArtistItem {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  thumbnail?: string | null;
+  item_type: "album" | "single" | string;
+}
+
+export interface ArtistDetails {
+  id: string;
+  name: string;
+  description?: string | null;
+  subscribers?: string | null;
+  thumbnail?: string | null;
+  top_tracks: Track[];
+  albums: ArtistItem[];
+  singles: ArtistItem[];
+}
+
+export interface AlbumDetails {
+  id: string;
+  title: string;
+  artist: string;
+  artist_id?: string | null;
+  year?: string | null;
+  thumbnail?: string | null;
+  description?: string | null;
+  track_count?: string | null;
+  tracks: Track[];
 }
 
 export interface StreamInfo {

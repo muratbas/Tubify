@@ -2,7 +2,7 @@ pub mod auth;
 pub mod search;
 pub mod stream;
 
-use auth::{Playlist, UserProfile};
+use auth::{AlbumDetails, ArtistDetails, Playlist, PlaylistTracksResult, UserProfile};
 use search::Track;
 use stream::StreamInfo;
 use tauri::{AppHandle, Manager};
@@ -86,6 +86,29 @@ async fn get_playlist_tracks(playlist_id: String) -> Result<Vec<Track>, String> 
 }
 
 #[tauri::command]
+async fn get_playlist_tracks_page(
+    playlist_id: String,
+    continuation: Option<String>,
+) -> Result<PlaylistTracksResult, String> {
+    auth::fetch_playlist_tracks_page(&playlist_id, continuation.as_deref()).await
+}
+
+#[tauri::command]
+async fn get_artist_details(browse_id: String) -> Result<ArtistDetails, String> {
+    auth::fetch_artist_details(&browse_id).await
+}
+
+#[tauri::command]
+async fn get_album_details(browse_id: String) -> Result<AlbumDetails, String> {
+    auth::fetch_album_details(&browse_id).await
+}
+
+#[tauri::command]
+async fn get_radio_tracks(video_id: String) -> Result<Vec<Track>, String> {
+    auth::fetch_radio_tracks(&video_id).await
+}
+
+#[tauri::command]
 fn minimize_window(window: tauri::Window) {
     let _ = window.minimize();
 }
@@ -123,6 +146,10 @@ pub fn run() {
             get_yt_liked_songs,
             get_yt_playlists,
             get_playlist_tracks,
+            get_playlist_tracks_page,
+            get_artist_details,
+            get_album_details,
+            get_radio_tracks,
             toggle_yt_like,
             open_google_login,
             check_login_status,

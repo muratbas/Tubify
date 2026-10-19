@@ -13,6 +13,7 @@ interface HomeViewProps {
   activeTrack?: Track | null;
   isPlaying?: boolean;
   onPlayTrack?: (track: Track) => void;
+  onNavigateArtist?: (artistId: string, artistName: string) => void;
 }
 
 export const HomeView: FC<HomeViewProps> = ({
@@ -22,6 +23,7 @@ export const HomeView: FC<HomeViewProps> = ({
   activeTrack: propActiveTrack,
   isPlaying: propIsPlaying,
   onPlayTrack: propOnPlayTrack,
+  onNavigateArtist,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -117,8 +119,14 @@ export const HomeView: FC<HomeViewProps> = ({
                       </span>
                     )}
                     <p
-                      className={`text-[11px] truncate ${
-                        isLight ? "text-[#71717a]" : "text-white/60"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigateArtist) {
+                          onNavigateArtist(track.artist_id || track.artist, track.artist);
+                        }
+                      }}
+                      className={`text-[11px] truncate hover:underline cursor-pointer ${
+                        isLight ? "text-[#71717a] hover:text-black" : "text-white/60 hover:text-white"
                       }`}
                     >
                       {track.artist}
@@ -223,8 +231,14 @@ export const HomeView: FC<HomeViewProps> = ({
                       </span>
                     )}
                     <p
-                      className={`text-[11px] truncate ${
-                        isLight ? "text-[#71717a]" : "text-white/60"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigateArtist) {
+                          onNavigateArtist(track.artist_id || track.artist, track.artist);
+                        }
+                      }}
+                      className={`text-[11px] truncate hover:underline cursor-pointer ${
+                        isLight ? "text-[#71717a] hover:text-black" : "text-white/60 hover:text-white"
                       }`}
                     >
                       {track.artist}
@@ -303,8 +317,14 @@ export const HomeView: FC<HomeViewProps> = ({
                       </span>
                     )}
                     <p
-                      className={`text-[11px] truncate ${
-                        isLight ? "text-[#71717a]" : "text-white/60"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigateArtist) {
+                          onNavigateArtist(track.artist_id || track.artist, track.artist);
+                        }
+                      }}
+                      className={`text-[11px] truncate hover:underline cursor-pointer ${
+                        isLight ? "text-[#71717a] hover:text-black" : "text-white/60 hover:text-white"
                       }`}
                     >
                       {track.artist}

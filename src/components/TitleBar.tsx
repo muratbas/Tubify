@@ -20,13 +20,15 @@ interface TitleBarProps {
   onSearchChange: (query: string) => void;
   onSearchSubmit: () => void;
   userProfile: UserProfile;
-  currentView: "home" | "playlist" | "search" | "settings";
+  currentView: "home" | "playlist" | "search" | "settings" | "artist" | "album";
   currentTabTitle?: string;
   onOpenLogin: () => void;
   onOpenSettings: (tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts") => void;
   onNavigateHome: () => void;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 }
 
 export const TitleBar: FC<TitleBarProps> = ({
@@ -39,6 +41,8 @@ export const TitleBar: FC<TitleBarProps> = ({
   onNavigateHome,
   onNavigateBack,
   onNavigateForward,
+  canGoBack = false,
+  canGoForward = false,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -111,11 +115,16 @@ export const TitleBar: FC<TitleBarProps> = ({
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={onNavigateBack || onNavigateHome}
+          disabled={!canGoBack}
           title="Geri"
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-            isLight
-              ? "bg-black/10 hover:bg-black/20 text-neutral-800"
-              : "bg-black/40 hover:bg-black/70 text-white"
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            canGoBack
+              ? isLight
+                ? "bg-black/10 hover:bg-black/20 text-neutral-800 cursor-pointer active:scale-95"
+                : "bg-black/40 hover:bg-black/70 text-white cursor-pointer active:scale-95"
+              : isLight
+              ? "bg-black/5 text-neutral-300 cursor-not-allowed opacity-40"
+              : "bg-white/5 text-white/20 cursor-not-allowed opacity-30"
           }`}
         >
           <ChevronLeft className="w-5 h-5" />
@@ -123,11 +132,16 @@ export const TitleBar: FC<TitleBarProps> = ({
 
         <button
           onClick={onNavigateForward}
+          disabled={!canGoForward}
           title="İleri"
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-            isLight
-              ? "bg-black/5 hover:bg-black/15 text-neutral-500"
-              : "bg-black/20 hover:bg-black/50 text-white/50"
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            canGoForward
+              ? isLight
+                ? "bg-black/10 hover:bg-black/20 text-neutral-800 cursor-pointer active:scale-95"
+                : "bg-black/40 hover:bg-black/70 text-white cursor-pointer active:scale-95"
+              : isLight
+              ? "bg-black/5 text-neutral-300 cursor-not-allowed opacity-40"
+              : "bg-white/5 text-white/20 cursor-not-allowed opacity-30"
           }`}
         >
           <ChevronRight className="w-5 h-5" />

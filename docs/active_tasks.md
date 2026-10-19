@@ -40,14 +40,30 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
   - Hero ve Tracklist: `192x192px` kapak, `text-6xl font-extrabold` başlık, aksiyon barında `w-14 h-14` kırmızı Play butonu, `# ▲` kırmızı sıralama oku, satır hover'ında yumuşak gri zemin (`hover:bg-neutral-200/60 rounded-lg`), sıra numarası yerine siyah `▶` play ikonu, kırmızı kalp ve üç nokta (`...`).
   - Alt Oynatıcı: `h-[84px]`, `56x56px` kapak, ortada `w-9 h-9` siyah daire içinde beyaz Play butonu, ince ve zarif progress bar (`h-1 bg-neutral-200`).
   - `npm run build` ile sıfır hata doğrulandı.
-- [x] **Aşama 10:** Tipografi, İkon Kalınlığı ve İnce Detay Düzeltmeleri:
-  - Sol üstteki `h-12` gereksiz boşluk kaldırıldı; "Ana Sayfa" ve "Ara" doğrudan üstten (`pt-3.5`) başlatıldı.
-  - Arama çubuğu genişliği görsel doğrultusunda uzatıldı (`w-80 md:w-96 lg:w-[440px]`).
-  - Sol bardaki filtre hapları yatay kaydırma çubuğu yerine görseldeki gibi 2 satır halinde aşağı kaydırıldı (Satır 1: Çalma Listeleri + Albümler, Satır 2: Sanatçılar + Podcast'ler, Satır 3: `v Son çalınanlar` butonu).
-  - Tipografi / Font: `index.html` içerisindeki harici Google Fonts (Inter) bağlantıları tamamen temizlendi; `index.css` üzerinde `@theme` ve evrensel `*` seçici ile tüm arayüz strictly `SpotifyMix` fontuna bağlandı.
-  - Metin Kesilme (Clipping) Hataları: "Beğenilenler" başlığındaki `ğ` harfinin ve satırlardaki Türkçe karakterlerin alttan kesilmesi, `leading-snug pb-2 pt-1` ve `leading-normal py-0.5` verilerek tamamen giderildi.
-  - İkon Kalınlığı: Tüm Lucide ikonları global olarak `stroke-width: 2.25px !important` kuralıyla tok, dolgun ve premium desktop hissi verecek şekilde kalınlaştırıldı.
-  - `npm run build` ile sıfır hata doğrulandı.
+- [x] **Aşama 11:** Faz 1 & Faz 2 — Gerçek Navigasyon, Sayfalama & Performans Optimizasyonu:
+  - **InnerTube Fonksiyon Durum Analizi:**
+    - `like`: Kısmen mevcuttu (`toggle_yt_like` ve `get_yt_liked_songs`). Faz 3 için yerel timestamp ve optimistic UI hazırlığı yapıldı.
+    - `album`: Eksikti (önceki kod tüm ID'lere `VL` ekleyerek `MPREb_` albüm ID'lerini bozuyordu). Rust tarafında `get_album_details` yazılarak sanatçı, kapak, çıkış yılı ve parça listesi parsingi eklendi.
+    - `artist`: Tamamen eksikti. Rust tarafında `get_artist_details` yazılarak sanatçı avatarı, abone sayısı, bio, popüler şarkılar (Top Tracks) ve albüm/single diskografisi parsingi eklendi.
+    - `radio`: Tamamen eksikti. Rust tarafında `get_radio_tracks` (`RDAMVM<videoId>` watch playlist) endpoint'i tanımlandı.
+  - **Faz 1 (Performans & Infinite Scroll):**
+    - Rust tarafındaki 100 continuation token'lık senkron bloklayan döngü durduruldu. `get_playlist_tracks_page` ile ilk ~100 parça anında (~200ms) frontend'e döndürülüyor ve continuation token saklanıyor.
+    - Frontend DOM şişmesini önlemek için `PlaylistView` içine 50'şer parçalık `IntersectionObserver` sentinel eklendi. Kullanıcı aşağı kaydırdıkça DOM'a 50'şer şarkı ekleniyor; listenin sonuna gelindiğinde backend'den bir sonraki batch otomatik çekiliyor.
+  - **Faz 2 (Gerçek Navigasyon & History Stack):**
+    - Tarayıcı tarzı sayfa geçmişi (`NavigationEntry[]` ve `historyIndex`) `App.tsx` içine kuruldu.
+    - TitleBar'daki `<` (Geri) ve `>` (İleri) butonları gerçek geçmişe bağlandı; gidilecek sayfa olmadığında soluk/inaktif oluyor.
+    - `ArtistView.tsx` ve `AlbumView.tsx` bileşenleri Spotify/Spotifast estetiğinde oluşturuldu.
+    - Parça satırlarında, alt player bar'da ve ana sayfada sanatçı ve albüm isimleri tıklanabilir hale getirildi ve doğrudan ilgili sayfayı açıyor.
+    - Sahte eklenme tarihleri (`18 Eyl 2026` vb.) temizlendi, `track.added_at || "—"` formatına geçirildi.
+  - **Hata Düzeltmeleri (Volume Slider & Albüm Metadata):**
+    - `PlayerContext.tsx` içindeki HTMLAudioElement yaşam döngüsü `useEffect`'inden `volume` ve `nextTrack` bağımlılıkları tamamen ayrıştırıldı (`nextTrackRef` ve bağımsız `useEffect([volume, isMuted])` kuruldu). Ses slider'ı kaydırıldığında çalan şarkının kesilmesi/sıfırlanması sorunu kesin olarak çözüldü; `setVolume` ve `PlayerBar`'a NaN/Infinity korumaları eklendi.
+    - `auth.rs` `fetch_album_details` fonksiyonuna `musicResponsiveHeaderRenderer`, `musicDetailHeaderRenderer` ve `microformat` çoklu çözümleyici eklendi. `straplineTextOne`, `subtitle.runs` ve `pageOwnerDetails` üzerinden sanatçı adı, sanatçı ID'si, albüm adı, kapak görseli ve çıkış yılı eksiksiz ayrıştırıldı.
+    - Şarkı satırlarına miras (inheritance) eklendi: Albüm şarkılarında boş gelen sanatçı adı, albüm adı ve kapak resmi otomatik olarak albümün ana verilerinden miras alınıyor.
+    - `AlbumView.tsx` içerisine başlangıç verisi (optimistic metadata: `initialArtistName`, `initialThumbnail`, `albumTitle`) bağlandı; şarkı satırlarına 40x40 küçük kapak görselleri (`Music2` fallback'li) eklendi.
+  - **UX Geliştirmeleri (Mouse 4/5 & Next Track Preloading):**
+    - `App.tsx` içerisine global `window` MouseEvent dinleyicileri eklendi. `button === 3` (Mouse 4 / Back) ve `button === 4` (Mouse 5 / Forward) butonları uygulamanın kendi `historyIndex` stack navigasyonuna bağlandı; WebView2 varsayılan tarayıcı geçmişi `preventDefault` ile engellendi.
+    - `PlayerContext.tsx` içerisine Dual-Buffer Preloader ve Stream URL Önbelleği (`streamCacheRef`) eklendi. Şarkı çalmaya başladıktan 3 saniye sonra sıradaki şarkı (Shuffle/Repeat kurallarına göre) arka planda çözülüp sessiz ikinci bir `HTMLAudioElement` (`preload="auto"`, `muted`) ile tamponlanıyor. Şarkı bittiğinde veya Sonraki Şarkı'ya basıldığında tekrar ağ isteği beklemeden milisaniyeler içinde anında çalmaya başlıyor.
+  - `cargo check` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
-- Kullanıcı deneyimini izlemek ve talep edilen ince ayarları uygulamak.
+- **Faz 4:** Sağ Tık / Üç Nokta (`...`) Context Menüsü (Sıraya Ekle, Sonra Çal, Listeye Ekle, Radyoyu Başlat, Sanatçıya/Albüme Git).

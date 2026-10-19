@@ -5,7 +5,11 @@ pub struct Track {
     pub id: String,
     pub title: String,
     pub artist: String,
+    #[serde(default)]
+    pub artist_id: Option<String>,
     pub album: Option<String>,
+    #[serde(default)]
+    pub album_id: Option<String>,
     pub duration: Option<String>,
     pub thumbnail: Option<String>,
     #[serde(default)]
@@ -62,6 +66,9 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
                     "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId",
                 )
             })
+            .or_else(|| {
+                mrlir.pointer("/doubleTapEndpoint/watchEndpoint/videoId")
+            })
             .and_then(|v| v.as_str())
             .map(|v| v.to_string())?;
 
@@ -72,17 +79,76 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             .to_string();
 
         let mut artist = "Unknown Artist".to_string();
+        let mut artist_id: Option<String> = None;
+        let mut album: Option<String> = None;
+        let mut album_id: Option<String> = None;
+        let mut duration: Option<String> = None;
+
         if let Some(runs) = mrlir
             .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
             .and_then(|v| v.as_array())
         {
-            let artist_parts: Vec<&str> = runs
-                .iter()
-                .filter_map(|r| r.get("text").and_then(|t| t.as_str()))
-                .filter(|t| *t != "Song" && *t != " • " && *t != " & " && *t != ", ")
-                .collect();
+            let mut artist_parts: Vec<&str> = Vec::new();
+            for r in runs {
+                let text = r.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                let b_id = r
+                    .pointer("/navigationEndpoint/browseEndpoint/browseId")
+                    .and_then(|v| v.as_str());
+
+                if let Some(bid) = b_id {
+                    if bid.starts_with("UC") || bid.starts_with("FEmusic_artist") {
+                        if artist_id.is_none() {
+                            artist_id = Some(bid.to_string());
+                        }
+                    } else if bid.starts_with("MPREb_") || bid.starts_with("FEmusic_library_privately_owned_release") || bid.starts_with("OLAK5uy_") {
+                        if album_id.is_none() {
+                            album_id = Some(bid.to_string());
+                            if album.is_none() && !text.is_empty() {
+                                album = Some(text.to_string());
+                            }
+                        }
+                    }
+                }
+
+                if text != "Song" && text != " • " && text != " & " && text != ", " && !text.is_empty() {
+                    if text.chars().all(|c| c.is_ascii_digit() || c == ':') && text.contains(':') {
+                        duration = Some(text.to_string());
+                    } else if b_id.is_some() && !b_id.unwrap().starts_with("UC") && album.is_none() {
+                        album = Some(text.to_string());
+                    } else if artist_parts.is_empty() || (b_id.is_some() && b_id.unwrap().starts_with("UC")) {
+                        artist_parts.push(text);
+                    }
+                }
+            }
             if !artist_parts.is_empty() {
                 artist = artist_parts.join(", ");
+            }
+        }
+
+        // Check flexColumns 2 if present (often Album)
+        if let Some(runs) = mrlir
+            .pointer("/flexColumns/2/musicResponsiveListItemFlexColumnRenderer/text/runs")
+            .and_then(|v| v.as_array())
+        {
+            if let Some(first) = runs.first() {
+                if let Some(al) = first.get("text").and_then(|t| t.as_str()) {
+                    if !al.is_empty() {
+                        album = Some(al.to_string());
+                    }
+                }
+                if let Some(bid) = first.pointer("/navigationEndpoint/browseEndpoint/browseId").and_then(|v| v.as_str()) {
+                    album_id = Some(bid.to_string());
+                }
+            }
+        }
+
+        // Fixed column duration fallback
+        if duration.is_none() {
+            if let Some(dur) = mrlir
+                .pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
+                .and_then(|v| v.as_str())
+            {
+                duration = Some(dur.to_string());
             }
         }
 
@@ -110,8 +176,10 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             id: video_id,
             title,
             artist,
-            album: None,
-            duration: None,
+            artist_id,
+            album,
+            album_id,
+            duration,
             thumbnail,
             is_explicit,
         })

@@ -40,6 +40,13 @@ interface PlayerBarProps {
   onToggleLike?: () => void;
   onToggleShuffle?: () => void;
   onToggleRepeat?: () => void;
+  onNavigateArtist?: (artistId: string, artistName: string) => void;
+  onNavigateAlbum?: (
+    albumId: string,
+    albumTitle?: string,
+    artistName?: string,
+    thumbnail?: string
+  ) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -122,6 +129,16 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
 
         <div className="min-w-0 max-w-[200px]">
           <h4
+            onClick={() => {
+              if (track?.album_id && props.onNavigateAlbum) {
+                props.onNavigateAlbum(
+                  track.album_id,
+                  track.album || undefined,
+                  track.artist,
+                  track.thumbnail || undefined
+                );
+              }
+            }}
             title={track?.title}
             className={`text-sm font-semibold truncate leading-normal py-0.5 hover:underline cursor-pointer ${
               isLight ? "text-neutral-900" : "text-white"
@@ -130,9 +147,14 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
             {track ? track.title : "Tubify"}
           </h4>
           <p
+            onClick={() => {
+              if (track && props.onNavigateArtist) {
+                props.onNavigateArtist(track.artist_id || track.artist, track.artist);
+              }
+            }}
             title={track?.artist}
             className={`text-xs truncate leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
-              isLight ? "text-neutral-500" : "text-neutral-400"
+              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
           >
             {track ? track.artist : "Çalmaya başlamak için bir parça seçin"}
@@ -342,7 +364,10 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               max={1}
               step={0.01}
               value={isMuted ? 0 : volume}
-              onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) onVolumeChange(val);
+              }}
               aria-label="Ses seviyesi"
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
