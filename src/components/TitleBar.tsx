@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect, type FC, type KeyboardEvent, type MouseEvent } from "react";
-import { Search, Minus, Square, X, LogIn, Settings, Bookmark, Download } from "lucide-react";
+import {
+  Search,
+  Minus,
+  Square,
+  X,
+  LogIn,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { minimizeWindow, toggleMaximizeWindow, closeWindow } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -15,6 +25,8 @@ interface TitleBarProps {
   onOpenLogin: () => void;
   onOpenSettings: (tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts") => void;
   onNavigateHome: () => void;
+  onNavigateBack?: () => void;
+  onNavigateForward?: () => void;
 }
 
 export const TitleBar: FC<TitleBarProps> = ({
@@ -22,11 +34,11 @@ export const TitleBar: FC<TitleBarProps> = ({
   onSearchChange,
   onSearchSubmit,
   userProfile,
-  currentView,
-  currentTabTitle,
   onOpenLogin,
   onOpenSettings,
   onNavigateHome,
+  onNavigateBack,
+  onNavigateForward,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -82,11 +94,9 @@ export const TitleBar: FC<TitleBarProps> = ({
         return;
       }
       try {
-        import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-          getCurrentWindow().startDragging();
-        });
-      } catch {
-        // Fallback
+        getCurrentWindow().startDragging();
+      } catch (err) {
+        console.debug("Drag error:", err);
       }
     }
   };
@@ -95,71 +105,41 @@ export const TitleBar: FC<TitleBarProps> = ({
     <header
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
-      className={`h-12 w-full select-none flex items-center justify-between px-3.5 z-40 shrink-0 transition-colors ${
-        isLight
-          ? "bg-[#f0f0f0] border-b border-[#e4e4e7] text-[#111111]"
-          : "bg-[#030303] border-b border-white/[0.06] text-white"
-      }`}
+      className="h-14 w-full select-none flex items-center justify-between px-5 z-30 shrink-0 bg-transparent transition-colors absolute top-0 left-0 right-0"
     >
-      {/* Left: Branding + Nav Tab */}
-      <div className="flex items-center gap-3 shrink-0" data-tauri-drag-region>
-        <div
-          onClick={onNavigateHome}
-          className="flex items-center gap-2 pl-1 cursor-pointer group active:scale-98 transition-all"
-          data-tauri-drag-region
+      {/* Left: Navigation Buttons (< and >) and Search Bar */}
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onNavigateBack || onNavigateHome}
+          title="Geri"
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+            isLight
+              ? "bg-black/10 hover:bg-black/20 text-neutral-800"
+              : "bg-black/40 hover:bg-black/70 text-white"
+          }`}
         >
-          <img
-            src="/logo.png"
-            alt="Tubify"
-            className="w-5 h-5 rounded object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
-          />
-          <span
-            className={`font-black text-sm tracking-tight flex items-center ${
-              isLight ? "text-[#18181b]" : "text-white"
-            }`}
-          >
-            Tubify<span className="text-[#ff0000] font-black">_</span>
-          </span>
-        </div>
+          <ChevronLeft className="w-5 h-5" />
+        </button>
 
-        {/* View Tab */}
-        <div className="flex items-center gap-1.5 ml-1" data-tauri-drag-region>
-          <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold shadow-sm border transition-all ${
-              isLight
-                ? "bg-[#ffffff] text-[#18181b] border-[#e4e4e7]"
-                : "bg-white/[0.06] text-white border-white/[0.08]"
-            }`}
-          >
-            <span className="truncate max-w-[140px]">
-              {currentView === "settings"
-                ? t.settings
-                : currentTabTitle || "Home"}
-            </span>
-          </div>
+        <button
+          onClick={onNavigateForward}
+          title="İleri"
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+            isLight
+              ? "bg-black/5 hover:bg-black/15 text-neutral-500"
+              : "bg-black/20 hover:bg-black/50 text-white/50"
+          }`}
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
 
-          <button
-            onClick={onNavigateHome}
-            title="Home Tab"
-            className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs transition-colors cursor-pointer ${
-              isLight
-                ? "text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#18181b]"
-                : "text-white/60 hover:bg-white/[0.08] hover:text-white"
-            }`}
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      {/* Center: Command / Search Bar with Ctrl+K */}
-      <div className="flex-1 max-w-xl mx-4 flex items-center justify-center" data-tauri-drag-region>
-        <div className="relative w-full max-w-md group">
+        {/* Round Spotifast Search Bar (w-[280px]) */}
+        <div className="relative w-[280px] ml-1 group">
           <Search
-            className={`w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
+            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
               isLight
-                ? "text-[#a1a1aa] group-focus-within:text-[#18181b]"
-                : "text-white/40 group-focus-within:text-white"
+                ? "text-neutral-500 group-focus-within:text-neutral-900"
+                : "text-neutral-400 group-focus-within:text-white"
             }`}
           />
           <input
@@ -168,19 +148,17 @@ export const TitleBar: FC<TitleBarProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t.searchPlaceholder}
-            className={`w-full h-8 pl-9 pr-16 rounded-xl text-xs font-normal transition-all outline-none border shadow-sm ${
+            placeholder="Ne çalmak istersiniz?"
+            className={`w-full h-8 pl-9 pr-12 rounded-full text-sm font-medium transition-all outline-none border shadow-sm ${
               isLight
-                ? "bg-[#ffffff] border-[#e4e4e7] text-[#18181b] placeholder-[#a1a1aa] focus:ring-1 focus:ring-[#18181b]/30"
-                : "bg-white/[0.04] hover:bg-white/[0.06] focus:bg-white/[0.08] border-white/[0.08] text-white placeholder-white/40 focus:ring-1 focus:ring-white/20"
+                ? "bg-white text-neutral-900 placeholder-neutral-500 border-neutral-200/80 focus:border-neutral-400"
+                : "bg-[#242424] text-white placeholder-neutral-400 border-transparent focus:border-white/20"
             }`}
           />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
             <kbd
-              className={`px-1.5 py-0.5 text-[9px] font-mono font-medium rounded-md border ${
-                isLight
-                  ? "bg-[#f4f4f5] border-[#e4e4e7] text-[#71717a]"
-                  : "bg-white/[0.06] border-white/[0.1] text-white/50"
+              className={`px-1.5 py-0.2 text-[10px] font-mono font-medium rounded ${
+                isLight ? "bg-neutral-100 text-neutral-500" : "bg-white/10 text-white/40"
               }`}
             >
               Ctrl K
@@ -189,61 +167,45 @@ export const TitleBar: FC<TitleBarProps> = ({
         </div>
       </div>
 
-      {/* Right: Quick Links, Settings, Avatar, Window Controls */}
-      <div className="flex items-center gap-1 shrink-0" data-tauri-drag-region>
-        <button
-          title="Bookmarks"
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]"
-              : "text-white/50 hover:text-white hover:bg-white/[0.08]"
-          }`}
-        >
-          <Bookmark className="w-3.5 h-3.5" />
-        </button>
+      {/* Broad Middle Draggable Region - Allows instant dragging anywhere between search and right buttons */}
+      <div
+        data-tauri-drag-region
+        onMouseDown={handleMouseDown}
+        className="flex-1 h-full min-w-8 cursor-default"
+      />
 
-        <button
-          title="Downloads"
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]"
-              : "text-white/50 hover:text-white hover:bg-white/[0.08]"
-          }`}
-        >
-          <Download className="w-3.5 h-3.5" />
-        </button>
-
+      {/* Right: Settings, User Avatar, and Window Controls (- □ ×) */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Settings Button */}
         <button
           onClick={() => onOpenSettings("account")}
           title={t.settings}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            currentView === "settings"
-              ? "text-[#ff0000] bg-rose-500/10"
-              : isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]"
-              : "text-white/50 hover:text-white hover:bg-white/[0.08]"
+          className={`p-2 rounded-full transition-colors cursor-pointer ${
+            isLight
+              ? "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
+              : "text-neutral-300 hover:text-white hover:bg-white/10"
           }`}
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings className="w-4 h-4" />
         </button>
 
         {/* User Profile / Avatar with Dropdown */}
-        <div className="relative ml-1 mr-2" ref={avatarMenuRef}>
+        <div className="relative mr-2" ref={avatarMenuRef}>
           {userProfile.is_authenticated ? (
             <>
               <button
                 onClick={() => setIsAvatarMenuOpen((p) => !p)}
-                title={userProfile.name || "Murat"}
-                className="flex items-center p-0.5 rounded-full hover:ring-2 hover:ring-[#ff0000] transition-all cursor-pointer"
+                title={userProfile.name || "Kullanıcı"}
+                className="flex items-center p-0.5 rounded-full hover:scale-105 transition-all cursor-pointer ring-2 ring-transparent hover:ring-[#ff0000]"
               >
                 {userProfile.avatar_url ? (
                   <img
                     src={userProfile.avatar_url}
                     alt="Avatar"
-                    className="w-7 h-7 rounded-full object-cover border border-[#d4d4d8] shadow-sm"
+                    className="w-8 h-8 rounded-full object-cover shadow-sm"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-xs shadow-sm">
                     {userProfile.name?.[0]?.toUpperCase() || "M"}
                   </div>
                 )}
@@ -251,18 +213,18 @@ export const TitleBar: FC<TitleBarProps> = ({
 
               {isAvatarMenuOpen && (
                 <div
-                  className={`absolute right-0 top-9 w-52 rounded-2xl p-3 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
+                  className={`absolute right-0 top-11 w-52 rounded-xl p-2 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
                     isLight
-                      ? "bg-[#ffffff] border-[#e4e4e7] text-[#18181b]"
-                      : "bg-[#141416] border-white/[0.1] text-white backdrop-blur-xl"
+                      ? "bg-white border-neutral-200 text-neutral-900"
+                      : "bg-[#282828] border-white/10 text-white"
                   }`}
                 >
-                  <div className="flex items-center gap-3 p-1">
+                  <div className="flex items-center gap-3 p-2">
                     {userProfile.avatar_url ? (
                       <img
                         src={userProfile.avatar_url}
                         alt="Avatar"
-                        className="w-9 h-9 rounded-full object-cover border border-[#e4e4e7]"
+                        className="w-9 h-9 rounded-full object-cover"
                       />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-sm">
@@ -273,24 +235,24 @@ export const TitleBar: FC<TitleBarProps> = ({
                       <p className="text-xs font-bold truncate leading-tight">
                         {userProfile.name || "Murat"}
                       </p>
-                      <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-white/50"}`}>
+                      <p className={`text-[11px] ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
                         {t.signedIn}
                       </p>
                     </div>
                   </div>
 
-                  <div className={`my-2 border-t ${isLight ? "border-[#e4e4e7]" : "border-white/[0.08]"}`} />
+                  <div className={`my-1 border-t ${isLight ? "border-neutral-200" : "border-white/10"}`} />
 
                   <button
                     onClick={() => {
                       setIsAvatarMenuOpen(false);
                       onOpenSettings("account");
                     }}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                      isLight ? "hover:bg-[#f4f4f5] text-[#18181b]" : "hover:bg-white/[0.08] text-white/90"
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
                     }`}
                   >
-                    <Settings className="w-4 h-4 text-white/50" />
+                    <Settings className="w-4 h-4 text-neutral-500" />
                     <span>{t.accountSettings}</span>
                   </button>
                 </div>
@@ -299,11 +261,7 @@ export const TitleBar: FC<TitleBarProps> = ({
           ) : (
             <button
               onClick={onOpenLogin}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-sm active:scale-95 ${
-                isLight
-                  ? "bg-[#ffffff] hover:bg-[#ff0000] hover:text-white text-[#18181b] border-[#e4e4e7]"
-                  : "bg-white/[0.06] hover:bg-[#ff0000] hover:text-white text-white/90 border-white/[0.1]"
-              }`}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-[#ff0000] text-white hover:bg-[#e60000] hover:scale-105 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>{t.signIn}</span>
@@ -311,35 +269,36 @@ export const TitleBar: FC<TitleBarProps> = ({
           )}
         </div>
 
-        {/* Windows Native Controls */}
-        <div className="flex items-center">
+        {/* Windows Native Controls (- □ ×) */}
+        <div className="flex items-center -mr-2">
           <button
             onClick={() => minimizeWindow()}
-            title="Minimize"
-            className={`w-8 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? "text-[#71717a] hover:bg-[#e4e4e7]" : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+            title="Simge Durumuna Küçült"
+            className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
+              isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            <Minus className="w-3.5 h-3.5" />
+            <Minus className="w-4 h-4" />
           </button>
           <button
             onClick={() => toggleMaximizeWindow()}
-            title="Maximize"
-            className={`w-8 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? "text-[#71717a] hover:bg-[#e4e4e7]" : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+            title="Büyüt / Geri Yükle"
+            className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
+              isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            <Square className="w-3 h-3" />
+            <Square className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => closeWindow()}
-            title="Close"
-            className="w-8 h-7 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-[#ff0000] transition-colors cursor-pointer"
+            title="Kapat"
+            className="w-10 h-9 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
     </header>
   );
 };
+export default TitleBar;

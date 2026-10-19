@@ -297,34 +297,13 @@ export const App: FC = () => {
 
   return (
     <div
-      className={`h-screen w-screen overflow-hidden select-none flex flex-col p-2 md:p-2.5 gap-2 md:gap-2.5 transition-colors font-sans ${
-        isLight ? "bg-[#eaeaea] text-[#111111]" : "bg-[#030303] text-white"
-      }`}
+      className={`h-screen w-screen overflow-hidden select-none flex flex-col ${
+        isLight ? "bg-[#ffffff] text-[#18181b]" : "bg-[#0a0a0a] text-white"
+      } font-sans`}
     >
-      {/* 1. Custom Title Bar */}
-      <TitleBar
-        searchQuery={searchQuery}
-        onSearchChange={(q) => {
-          setSearchQuery(q);
-          if (!q && currentView === "search") {
-            setCurrentView("home");
-          }
-        }}
-        onSearchSubmit={handleSearchSubmit}
-        userProfile={userProfile}
-        currentView={currentView}
-        currentTabTitle={selectedPlaylist?.title || player.activeTrack?.title}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
-        onOpenSettings={handleOpenSettings}
-        onNavigateHome={() => {
-          setCurrentView("home");
-          setSelectedPlaylist(null);
-        }}
-      />
-
-      {/* 2. Bento Middle Workspace: Sol Sidebar + Orta Ana Panel + Sağ Drawer */}
-      <div className="flex-1 flex gap-2 md:gap-2.5 overflow-hidden min-h-0 relative">
-        {/* Module 1: Sol Panel (Daraltılabilir Sidebar) */}
+      {/* Middle Workspace: Sol Panel (Sidebar) + Sağ Alan (Header + Main Content) */}
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        {/* Module 1: Sol Panel (Sidebar) - Ekranın en sol üstünden (top-0 left-0) oynatıcıya kadar kesintisiz tek parça */}
         <Sidebar
           selectedPlaylistId={selectedPlaylist ? selectedPlaylist.id : null}
           onSelectPlaylist={handleSelectPlaylist}
@@ -332,34 +311,70 @@ export const App: FC = () => {
           playlists={playlists}
           userProfile={userProfile}
           onOpenLogin={() => setIsLoginModalOpen(true)}
+          currentView={currentView}
+          onNavigateHome={() => {
+            setCurrentView("home");
+            setSelectedPlaylist(null);
+          }}
+          onNavigateSearch={() => {
+            setCurrentView("search");
+            setSelectedPlaylist(null);
+          }}
         />
 
-        {/* Module 2: Orta Ana Panel (Kendi İçinde Bağımsız Scrollable Bento Card) */}
-        <main
-          className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden border relative transition-all duration-300 shadow-xl ${
-            isLight
-              ? "bg-[#ffffff]/85 border-[#e4e4e7]"
-              : "bg-[#09090c]/85 border-white/[0.08] backdrop-blur-xl"
-          }`}
-        >
-          {/* Apple Music Style Ambient Blur Background */}
-          <AmbientBackground thumbnail={player.activeTrack?.thumbnail} />
+        {/* Module 2: Sağ Alan (Üstte Header + Altta Ana İçerik) */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative">
+          {/* Header SADECE sağdaki Ana İçerik panelinin en üstünde */}
+          <TitleBar
+            searchQuery={searchQuery}
+            onSearchChange={(q) => {
+              setSearchQuery(q);
+              if (!q && currentView === "search") {
+                setCurrentView("home");
+              }
+            }}
+            onSearchSubmit={handleSearchSubmit}
+            userProfile={userProfile}
+            currentView={currentView}
+            currentTabTitle={selectedPlaylist?.title || player.activeTrack?.title}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
+            onOpenSettings={handleOpenSettings}
+            onNavigateHome={() => {
+              setCurrentView("home");
+              setSelectedPlaylist(null);
+            }}
+            onNavigateBack={() => {
+              if (currentView !== "home" || selectedPlaylist) {
+                setCurrentView("home");
+                setSelectedPlaylist(null);
+              }
+            }}
+          />
 
-          {/* Audio error banner */}
-          {player.playbackError && (
-            <div className="mx-6 mt-3 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between z-20">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-[#ff0000]" />
-                <span>{player.playbackError}</span>
+          {/* Module 2 İçerik: Ana İçerik Paneli (Bitişik, rounded-none, shadow-none) */}
+          <main
+            className={`flex-1 flex flex-col h-full overflow-hidden relative ${
+              isLight ? "bg-[#ffffff]" : "bg-[#121212]"
+            }`}
+          >
+            {/* Apple Music Style Ambient Blur Background */}
+            <AmbientBackground thumbnail={player.activeTrack?.thumbnail} />
+
+            {/* Audio error banner */}
+            {player.playbackError && (
+              <div className="mx-6 mt-16 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between z-20">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-[#ff0000]" />
+                  <span>{player.playbackError}</span>
+                </div>
+                <button
+                  onClick={player.clearPlaybackError}
+                  className="text-xs text-white/50 hover:text-white cursor-pointer"
+                >
+                  Close
+                </button>
               </div>
-              <button
-                onClick={player.clearPlaybackError}
-                className="text-xs text-white/50 hover:text-white cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          )}
+            )}
 
           {/* VIEW 1: Settings View */}
           {currentView === "settings" && (
@@ -401,7 +416,7 @@ export const App: FC = () => {
           {/* VIEW 3: Search View */}
           {currentView === "search" && (
             <div
-              className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-6 pb-28 relative ${
+              className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-20 space-y-6 pb-28 relative ${
                 isLight ? "text-[#111111]" : "text-white"
               }`}
             >
@@ -561,6 +576,7 @@ export const App: FC = () => {
             />
           )}
         </main>
+        </div>
 
         {/* Module 3: Sağ Panel (Açılıp Kapanabilir Drawer: Now Playing 1:1/16:9, Queue, Lyrics) */}
         <RightDrawer />

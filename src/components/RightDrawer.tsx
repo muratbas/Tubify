@@ -54,10 +54,10 @@ export const RightDrawer: FC = () => {
 
   return (
     <aside
-      className={`w-[340px] xl:w-[380px] h-full flex flex-col rounded-2xl overflow-hidden shrink-0 border transition-all duration-300 relative select-none ${
+      className={`w-[340px] xl:w-[380px] h-full flex flex-col rounded-none overflow-hidden shrink-0 border-l transition-all duration-300 relative select-none ${
         isLight
-          ? "bg-[#ffffff]/90 border-[#e4e4e7] text-[#111111] shadow-xl"
-          : "bg-[#09090c]/85 border-white/[0.08] text-white shadow-2xl backdrop-blur-xl"
+          ? "bg-[#ffffff] border-[#e4e4e7] text-[#111111]"
+          : "bg-[#0a0a0a] border-white/10 text-white"
       }`}
     >
       {/* Drawer Header with Tabs */}

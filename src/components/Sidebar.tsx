@@ -1,19 +1,17 @@
-import { useState, type FC } from "react";
+import { useState, type FC, type MouseEvent } from "react";
 import {
-  Heart,
+  Home,
   Search,
-  ListFilter,
+  Library,
   Plus,
+  ArrowUpDown,
+  Pin,
   Music2,
   FolderPlus,
-  Radio,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Library,
+  LayoutGrid,
 } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTheme } from "../context/ThemeContext";
-import { useLanguage } from "../context/LanguageContext";
-import { usePlayer } from "../context/PlayerContext";
 import type { Playlist, UserProfile } from "../types/music";
 
 interface SidebarProps {
@@ -23,6 +21,9 @@ interface SidebarProps {
   playlists: Playlist[];
   userProfile: UserProfile;
   onOpenLogin: () => void;
+  currentView?: "home" | "playlist" | "search" | "settings";
+  onNavigateHome?: () => void;
+  onNavigateSearch?: () => void;
 }
 
 export const Sidebar: FC<SidebarProps> = ({
@@ -32,307 +33,368 @@ export const Sidebar: FC<SidebarProps> = ({
   playlists,
   userProfile,
   onOpenLogin,
+  currentView = "home",
+  onNavigateHome,
+  onNavigateSearch,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const { isSidebarCollapsed, toggleSidebarCollapsed } = usePlayer();
   const isLight = theme === "light";
 
-  const [activeTab, setActiveTab] = useState<"playlists" | "albums">("playlists");
+  const [activeFilter, setActiveFilter] = useState<"all" | "playlists" | "albums" | "artists">("all");
   const [filterText, setFilterText] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const filteredPlaylists = playlists.filter((pl) => {
     if (pl.id === "LM") return false;
+    if (!filterText) return true;
     return pl.title.toLowerCase().includes(filterText.toLowerCase());
   });
 
+  const isHomeActive = currentView === "home" && !selectedPlaylistId;
+  const isSearchActive = currentView === "search";
+
+  const handleMouseDown = (e: MouseEvent<HTMLElement>) => {
+    if (e.button === 0) {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest("button") ||
+        target.closest("input") ||
+        target.closest("a") ||
+        target.closest(".no-drag")
+      ) {
+        return;
+      }
+      try {
+        getCurrentWindow().startDragging();
+      } catch (err) {
+        console.debug("Drag error:", err);
+      }
+    }
+  };
+
   return (
     <aside
-      className={`h-full flex flex-col rounded-2xl overflow-hidden shrink-0 border transition-all duration-300 relative select-none ${
-        isSidebarCollapsed ? "w-[72px]" : "w-[260px] xl:w-[280px]"
-      } ${
+      className={`w-[260px] flex flex-col select-none shrink-0 h-full border-r transition-colors ${
         isLight
-          ? "bg-[#ffffff]/90 border-[#e4e4e7] text-[#111111] shadow-sm"
-          : "bg-[#09090c]/85 border-white/[0.08] text-white shadow-2xl backdrop-blur-xl"
+          ? "bg-white border-[#f0f0f0] text-neutral-800"
+          : "bg-[#121212] border-white/10 text-white"
       }`}
     >
-      {/* Top Header / Library Bar */}
+      {/* 0. Top Window Drag Header (Logo removed as requested, smooth window drag) */}
       <div
-        className={`p-3 flex items-center justify-between border-b shrink-0 ${
-          isLight ? "border-[#e4e4e7]" : "border-white/[0.08]"
-        }`}
-      >
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="w-8 h-8 rounded-xl bg-white/[0.05] flex items-center justify-center shrink-0 text-[#ff0000]">
-            <Library className="w-4 h-4" />
-          </div>
-          {!isSidebarCollapsed && (
-            <span
-              className={`font-extrabold text-xs tracking-tight uppercase ${
-                isLight ? "text-[#18181b]" : "text-white/90"
-              }`}
-            >
-              {t.library}
-            </span>
-          )}
-        </div>
+        data-tauri-drag-region
+        onMouseDown={handleMouseDown}
+        className="h-12 w-full shrink-0 cursor-default"
+      />
 
+      {/* 1. Top Section: Ana Sayfa & Ara */}
+      <div className="px-5 space-y-3.5 shrink-0">
         <button
-          onClick={toggleSidebarCollapsed}
-          title={isSidebarCollapsed ? t.expandSidebar : t.collapseSidebar}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-              : "text-white/60 hover:text-white hover:bg-white/[0.08]"
+          onClick={onNavigateHome}
+          className={`w-full flex items-center gap-4 text-sm font-medium transition-colors cursor-pointer text-left ${
+            isHomeActive
+              ? "text-[#ff0000]"
+              : isLight
+              ? "text-neutral-600 hover:text-neutral-900"
+              : "text-neutral-400 hover:text-white"
           }`}
         >
-          {isSidebarCollapsed ? (
-            <PanelLeftOpen className="w-4 h-4" />
-          ) : (
-            <PanelLeftClose className="w-4 h-4" />
-          )}
+          <Home className={`w-5 h-5 ${isHomeActive ? "text-[#ff0000]" : ""}`} />
+          <span>Ana Sayfa</span>
+        </button>
+
+        <button
+          onClick={onNavigateSearch}
+          className={`w-full flex items-center gap-4 text-sm font-medium transition-colors cursor-pointer text-left ${
+            isSearchActive
+              ? "text-[#ff0000]"
+              : isLight
+              ? "text-neutral-600 hover:text-neutral-900"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <Search className={`w-5 h-5 ${isSearchActive ? "text-[#ff0000]" : ""}`} />
+          <span>Ara</span>
         </button>
       </div>
 
-      {/* Expanded Controls */}
-      {!isSidebarCollapsed && (
+      {/* Thin Horizontal Divider */}
+      <div
+        className={`my-3 mx-4 border-b ${
+          isLight ? "border-neutral-200" : "border-white/10"
+        }`}
+      />
+
+      {/* 2. Library Section: Kitaplık, Filtreler, Çalma Listeleri */}
+      <div className="flex-1 flex flex-col px-3 overflow-hidden min-h-0">
+        {/* Kitaplık Header */}
         <div
-          className={`p-3 space-y-2.5 border-b shrink-0 ${
-            isLight ? "border-[#e4e4e7]" : "border-white/[0.06]"
+          className={`flex items-center justify-between px-2 py-1.5 ${
+            isLight ? "text-neutral-600" : "text-neutral-400"
           }`}
         >
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("playlists")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "playlists"
-                  ? isLight
-                    ? "bg-[#18181b] text-white shadow-sm"
-                    : "bg-white text-black shadow-sm"
-                  : isLight
-                  ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                  : "text-white/60 hover:text-white hover:bg-white/[0.06]"
-              }`}
-            >
-              {t.playlists}
-            </button>
-            <button
-              onClick={() => setActiveTab("albums")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "albums"
-                  ? isLight
-                    ? "bg-[#18181b] text-white shadow-sm"
-                    : "bg-white text-black shadow-sm"
-                  : isLight
-                  ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                  : "text-white/60 hover:text-white hover:bg-white/[0.06]"
-              }`}
-            >
-              {t.albums}
-            </button>
-          </div>
-
-          {/* New Playlist Action Button */}
           <button
-            onClick={() => {
-              if (!userProfile.is_authenticated) {
-                onOpenLogin();
-              }
-            }}
-            className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer shadow-sm active:scale-98 ${
-              isLight
-                ? "bg-[#ffffff] hover:bg-[#f4f4f5] text-[#18181b] border-[#e4e4e7]"
-                : "bg-white/[0.04] hover:bg-white/[0.08] text-white/90 border-white/[0.08]"
+            onClick={onNavigateHome}
+            className={`flex items-center gap-2.5 font-bold text-sm transition-colors cursor-pointer ${
+              isLight ? "hover:text-neutral-900" : "hover:text-white"
             }`}
           >
-            <Plus className="w-3.5 h-3.5 text-[#ff0000]" />
-            <span>{t.newPlaylist}</span>
+            <Library className="w-5 h-5" />
+            <span>Kitaplık</span>
           </button>
 
-          {/* Filter Playlists Search Input */}
-          <div className="flex items-center justify-between gap-2 pt-0.5">
-            <div className="relative flex-1">
-              <Search
-                className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${
-                  isLight ? "text-[#a1a1aa]" : "text-white/40"
-                }`}
-              />
-              <input
-                type="text"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                placeholder={t.filterPlaylists}
-                className={`w-full h-7 pl-8 pr-2 rounded-lg bg-white/[0.04] text-xs focus:outline-none focus:ring-1 focus:ring-[#ff0000]/50 transition-all ${
-                  isLight
-                    ? "text-[#18181b] placeholder-[#a1a1aa] border border-[#e4e4e7]"
-                    : "text-white placeholder-white/30 border border-white/[0.06]"
-                }`}
-              />
-            </div>
+          <div className="flex items-center gap-0.5">
             <button
-              title="Sort"
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isLight ? "text-[#71717a] hover:text-[#18181b]" : "text-white/40 hover:text-white"
+              onClick={() => setIsSearchOpen((prev) => !prev)}
+              title="Kitaplıkta ara"
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5" />
+              <Search className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (!userProfile.is_authenticated) {
+                  onOpenLogin();
+                }
+              }}
+              title="Çalma listesi oluştur"
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              title="Görünüm"
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
         </div>
-      )}
 
-      {/* Playlist List Scrollable Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1.5 custom-scrollbar">
-        {/* Pinned 1: Liked Songs */}
-        <div
-          onClick={() => onSelectPlaylist("liked")}
-          title={isSidebarCollapsed ? `${t.likedSongs} (${likedSongsCount})` : undefined}
-          className={`flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer group active:scale-98 ${
-            selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
-              ? isLight
-                ? "bg-[#18181b] text-white shadow-sm"
-                : "bg-white/[0.12] text-white border border-white/[0.1]"
-              : isLight
-              ? "hover:bg-[#f4f4f5] text-[#27272a]"
-              : "hover:bg-white/[0.04] text-white/70 hover:text-white"
-          } ${isSidebarCollapsed ? "justify-center px-0" : ""}`}
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff334b] via-[#e60023] to-[#800020] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
-            <Heart className="w-4 h-4 text-white fill-white" />
-          </div>
-          {!isSidebarCollapsed && (
-            <div className="min-w-0 flex-1">
-              <h4 className="text-xs font-bold truncate leading-tight">{t.likedSongs}</h4>
-              <p
-                className={`text-[11px] truncate mt-0.5 ${
-                  selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
-                    ? isLight
-                      ? "text-white/70"
-                      : "text-white/60"
-                    : isLight
-                    ? "text-[#71717a]"
-                    : "text-white/40"
-                }`}
-              >
-                YouTube Music • {likedSongsCount} songs
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Pinned 2: Episodes for Later */}
-        <div
-          onClick={() => onSelectPlaylist("episodes")}
-          title={isSidebarCollapsed ? t.episodesForLater : undefined}
-          className={`flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer group active:scale-98 ${
-            selectedPlaylistId === "episodes"
-              ? isLight
-                ? "bg-[#18181b] text-white shadow-sm"
-                : "bg-white/[0.12] text-white border border-white/[0.1]"
-              : isLight
-              ? "hover:bg-[#f4f4f5] text-[#27272a]"
-              : "hover:bg-white/[0.04] text-white/70 hover:text-white"
-          } ${isSidebarCollapsed ? "justify-center px-0" : ""}`}
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#a78bfa] via-[#8b5cf6] to-[#6d28d9] flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform text-white">
-            <Radio className="w-4 h-4" />
-          </div>
-          {!isSidebarCollapsed && (
-            <div className="min-w-0 flex-1">
-              <h4 className="text-xs font-bold truncate leading-tight">{t.episodesForLater}</h4>
-              <p
-                className={`text-[11px] truncate mt-0.5 ${
-                  selectedPlaylistId === "episodes"
-                    ? isLight
-                      ? "text-white/70"
-                      : "text-white/60"
-                    : isLight
-                    ? "text-[#71717a]"
-                    : "text-white/40"
-                }`}
-              >
-                Auto playlist • 2 episodes
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* User Playlists */}
-        {filteredPlaylists.map((pl) => {
-          const isSelected = selectedPlaylistId === pl.id;
-          return (
-            <div
-              key={pl.id}
-              onClick={() => onSelectPlaylist(pl)}
-              title={isSidebarCollapsed ? pl.title : undefined}
-              className={`flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer group active:scale-98 ${
-                isSelected
-                  ? isLight
-                    ? "bg-[#18181b] text-white shadow-sm"
-                    : "bg-white/[0.12] text-white border border-white/[0.1]"
-                  : isLight
-                  ? "hover:bg-[#f4f4f5] text-[#27272a]"
-                  : "hover:bg-white/[0.04] text-white/70 hover:text-white"
-              } ${isSidebarCollapsed ? "justify-center px-0" : ""}`}
-            >
-              {pl.thumbnail ? (
-                <img
-                  src={pl.thumbnail}
-                  alt={pl.title}
-                  className="w-10 h-10 rounded-xl object-cover shrink-0 bg-zinc-800 shadow-sm group-hover:scale-105 transition-transform"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Music2 className="w-4 h-4 text-[#ff0000]" />
-                </div>
-              )}
-              {!isSidebarCollapsed && (
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-xs font-bold truncate leading-tight">{pl.title}</h4>
-                  <p
-                    className={`text-[11px] truncate mt-0.5 ${
-                      isSelected
-                        ? isLight
-                          ? "text-white/70"
-                          : "text-white/60"
-                        : isLight
-                        ? "text-[#71717a]"
-                        : "text-white/40"
-                    }`}
-                  >
-                    {pl.description || userProfile.name || "YouTube Music"}
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Empty state / Connect Google button */}
-        {!isSidebarCollapsed && filteredPlaylists.length === 0 && !userProfile.is_authenticated && (
-          <div
-            className={`p-4 mt-2 text-center rounded-2xl border space-y-2.5 ${
-              isLight ? "bg-[#f4f4f5]/60 border-[#e4e4e7]" : "bg-white/[0.02] border-white/[0.06]"
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1.5 px-2 py-2 overflow-x-auto no-scrollbar shrink-0">
+          <button
+            onClick={() => setActiveFilter((prev) => (prev === "playlists" ? "all" : "playlists"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+              activeFilter === "playlists"
+                ? "bg-black text-white"
+                : isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/15 text-white/80"
             }`}
           >
-            <div className="w-8 h-8 mx-auto rounded-full bg-[#ff0000]/10 flex items-center justify-center">
-              <FolderPlus className="w-4 h-4 text-[#ff0000]" />
+            Çalma Listeleri
+          </button>
+          <button
+            onClick={() => setActiveFilter((prev) => (prev === "albums" ? "all" : "albums"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+              activeFilter === "albums"
+                ? "bg-black text-white"
+                : isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/15 text-white/80"
+            }`}
+          >
+            Albümler
+          </button>
+          <button
+            onClick={() => setActiveFilter((prev) => (prev === "artists" ? "all" : "artists"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+              activeFilter === "artists"
+                ? "bg-black text-white"
+                : isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/15 text-white/80"
+            }`}
+          >
+            Sanatçılar
+          </button>
+        </div>
+
+        {/* Sort Row */}
+        <div
+          className={`flex items-center justify-between px-2 py-1.5 text-xs ${
+            isLight ? "text-neutral-500" : "text-neutral-400"
+          }`}
+        >
+          {isSearchOpen ? (
+            <div className="w-full relative">
+              <input
+                type="text"
+                autoFocus
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                placeholder="Kitaplıkta ara..."
+                className={`w-full h-7 pl-2 pr-6 rounded text-xs outline-none ${
+                  isLight
+                    ? "bg-white border border-neutral-200 text-neutral-900"
+                    : "bg-[#242424] text-white"
+                }`}
+              />
+              {filterText && (
+                <button
+                  onClick={() => setFilterText("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
+                >
+                  ✕
+                </button>
+              )}
             </div>
-            <p className={`text-xs font-bold ${isLight ? "text-[#18181b]" : "text-white/90"}`}>
-              {t.playlists}
-            </p>
-            <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-white/50"}`}>
-              {t.notConnectedDesc}
-            </p>
+          ) : (
             <button
-              onClick={onOpenLogin}
-              className="w-full py-1.5 px-3 bg-[#ff0000] hover:bg-[#e60000] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
+                isLight ? "hover:text-neutral-900" : "hover:text-white"
+              }`}
+              title="Sıralama ölçütü"
             >
-              {t.connectGoogle}
+              <span>Son çalınanlar</span>
+              <ArrowUpDown className="w-3.5 h-3.5" />
             </button>
+          )}
+        </div>
+
+        {/* Playlist List (Scrollable, 44x44 thumbnails) */}
+        <div className="flex-1 overflow-y-auto px-1 py-1 space-y-0.5 custom-scrollbar">
+          {/* Pinned: Beğenilenler */}
+          <div
+            onClick={() => onSelectPlaylist("liked")}
+            className={`flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group ${
+              selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
+                ? isLight
+                  ? "bg-neutral-100/90 text-neutral-900"
+                  : "bg-white/15 text-white"
+                : isLight
+                ? "hover:bg-neutral-100/60 text-neutral-600"
+                : "hover:bg-white/5 text-neutral-400"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-md bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center shrink-0 shadow-sm">
+                <svg
+                  className="w-5 h-5 text-white fill-white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              </div>
+
+              <div className="min-w-0">
+                <h4
+                  className={`text-sm font-semibold truncate leading-tight ${
+                    selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
+                      ? "text-[#ff0000]"
+                      : isLight
+                      ? "text-neutral-900"
+                      : "text-white"
+                  }`}
+                >
+                  Beğenilenler
+                </h4>
+                <p
+                  className={`text-xs truncate mt-0.5 ${
+                    isLight ? "text-neutral-500" : "text-neutral-400"
+                  }`}
+                >
+                  Çalma listesi • {likedSongsCount} şarkı
+                </p>
+              </div>
+            </div>
+
+            {/* YouTube Red Pin */}
+            <Pin className="w-3.5 h-3.5 text-[#ff0000] fill-[#ff0000] rotate-45 shrink-0" />
           </div>
-        )}
+
+          {/* User Playlists */}
+          {filteredPlaylists.map((pl) => {
+            const isSelected = selectedPlaylistId === pl.id;
+
+            return (
+              <div
+                key={pl.id}
+                onClick={() => onSelectPlaylist(pl)}
+                className={`flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group ${
+                  isSelected
+                    ? isLight
+                      ? "bg-neutral-100/90 text-neutral-900"
+                      : "bg-white/15 text-white"
+                    : isLight
+                    ? "hover:bg-neutral-100/60 text-neutral-600"
+                    : "hover:bg-white/5 text-neutral-400"
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {pl.thumbnail ? (
+                    <img
+                      src={pl.thumbnail}
+                      alt={pl.title}
+                      className="w-11 h-11 rounded-md object-cover shrink-0 bg-neutral-200"
+                    />
+                  ) : (
+                    <div
+                      className={`w-11 h-11 rounded-md flex items-center justify-center shrink-0 ${
+                        isLight ? "bg-neutral-100" : "bg-[#282828]"
+                      }`}
+                    >
+                      <Music2 className="w-5 h-5 text-neutral-400" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <h4
+                      className={`text-sm font-semibold truncate leading-tight ${
+                        isSelected
+                          ? "text-[#ff0000]"
+                          : isLight
+                          ? "text-neutral-900"
+                          : "text-white"
+                      }`}
+                    >
+                      {pl.title}
+                    </h4>
+                    <p
+                      className={`text-xs truncate mt-0.5 ${
+                        isLight ? "text-neutral-500" : "text-neutral-400"
+                      }`}
+                    >
+                      Çalma Listesi • {userProfile.name || "murat"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Connect Google CTA if not signed in */}
+          {filteredPlaylists.length === 0 && !userProfile.is_authenticated && (
+            <div
+              className={`p-4 mt-2 text-center rounded-lg space-y-2 ${
+                isLight ? "bg-neutral-50 border border-neutral-200" : "bg-[#181818]"
+              }`}
+            >
+              <FolderPlus className="w-6 h-6 mx-auto text-neutral-400" />
+              <p className={`text-xs font-bold ${isLight ? "text-neutral-900" : "text-white"}`}>
+                İlk çalma listeni oluştur
+              </p>
+              <p className={`text-[11px] ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
+                Çalma listelerine ve beğenilen şarkılarına erişmek için Google hesabına bağlan.
+              </p>
+              <button
+                onClick={onOpenLogin}
+                className="w-full py-1.5 px-3 bg-[#ff0000] text-white text-xs font-bold rounded-full hover:bg-[#e60000] transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                Giriş Yap
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
 };
+export default Sidebar;

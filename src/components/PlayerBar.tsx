@@ -7,19 +7,17 @@ import {
   Volume2,
   VolumeX,
   Volume1,
-  Maximize2,
   Shuffle,
   Repeat,
   Loader2,
   Music2,
   Heart,
-  PanelRight,
+  Mic2,
+  ListMusic,
   Tv,
-  Disc3,
 } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
 import { usePlayer } from "../context/PlayerContext";
-import { MicroVisualizer } from "./MicroVisualizer";
+import { useTheme } from "../context/ThemeContext";
 import type { Track, PlaybackStatus } from "../types/music";
 
 interface PlayerBarProps {
@@ -29,7 +27,6 @@ interface PlayerBarProps {
   duration?: number;
   volume?: number;
   isMuted?: boolean;
-  isMiniPlayer?: boolean;
   isLiked?: boolean;
   isShuffle?: boolean;
   isRepeat?: boolean;
@@ -53,18 +50,16 @@ function formatTime(seconds: number): string {
 }
 
 export const PlayerBar: FC<PlayerBarProps> = (props) => {
-  const { theme } = useTheme();
   const player = usePlayer();
+  const { theme } = useTheme();
   const isLight = theme === "light";
 
-  // Use props if passed, otherwise fall back to PlayerContext
   const track = props.track !== undefined ? props.track : player.activeTrack;
   const status = props.status !== undefined ? props.status : player.playbackStatus;
   const currentTime = props.currentTime !== undefined ? props.currentTime : player.currentTime;
   const duration = props.duration !== undefined ? props.duration : player.duration;
   const volume = props.volume !== undefined ? props.volume : player.volume;
   const isMuted = props.isMuted !== undefined ? props.isMuted : player.isMuted;
-  const isMiniPlayer = props.isMiniPlayer !== undefined ? props.isMiniPlayer : player.isMiniPlayer;
   const isShuffle = props.isShuffle !== undefined ? props.isShuffle : player.isShuffle;
   const isRepeat = props.isRepeat !== undefined ? props.isRepeat : player.isRepeat;
 
@@ -81,7 +76,6 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
   const onSeek = props.onSeek || player.seek;
   const onVolumeChange = props.onVolumeChange || player.setVolume;
   const onToggleMute = props.onToggleMute || player.toggleMute;
-  const onToggleMiniPlayer = props.onToggleMiniPlayer || player.toggleMiniPlayer;
   const onToggleLike =
     props.onToggleLike || (() => track && player.toggleLike(track));
   const onToggleShuffle = props.onToggleShuffle || player.toggleShuffle;
@@ -99,42 +93,18 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
   };
 
   return (
-    <div
-      className={`h-[82px] px-4 md:px-6 rounded-2xl flex items-center justify-between select-none z-40 relative shrink-0 border transition-all duration-300 ${
+    <footer
+      className={`h-[84px] px-4 border-t flex items-center justify-between select-none z-40 relative shrink-0 transition-colors ${
         isLight
-          ? "bg-[#ffffff]/90 border-[#e4e4e7] text-[#111111] shadow-xl"
-          : "bg-[#09090c]/85 border-white/[0.08] text-white shadow-2xl backdrop-blur-2xl"
+          ? "bg-white border-[#f0f0f0] text-neutral-900"
+          : "bg-[#000000] border-[#282828] text-white"
       }`}
     >
-      {/* 0. Top Interactive Seek Bar overlay with hover expansion */}
-      <div className="absolute top-0 left-4 right-4 h-1.5 hover:h-2.5 transition-all group cursor-pointer -translate-y-1/2">
+      {/* 1. Left Side: 56x56 Artwork + Title + Artist + Heart */}
+      <div className="flex items-center gap-3.5 w-[30%] min-w-[180px]">
         <div
-          className={`w-full h-full rounded-full overflow-hidden relative ${
-            isLight ? "bg-[#e4e4e7]" : "bg-white/[0.08]"
-          }`}
-        >
-          <div
-            className="h-full bg-gradient-to-r from-[#ff0000] to-[#e60023] rounded-full transition-all"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={duration || 100}
-          step={0.1}
-          value={currentTime}
-          onChange={handleSeekChange}
-          aria-label="Seek progress"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-      </div>
-
-      {/* 1. Left Side: Track Info + MicroVisualizer + Like */}
-      <div className="flex items-center gap-3.5 min-w-[200px] max-w-[30%]">
-        <div
-          className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-md ${
-            isLight ? "bg-[#e4e4e7] ring-1 ring-black/5" : "bg-zinc-800 ring-1 ring-white/10"
+          className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 shadow-sm ${
+            isLight ? "bg-neutral-100" : "bg-[#282828]"
           }`}
         >
           {track?.thumbnail ? (
@@ -145,73 +115,60 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Music2 className="w-5 h-5 text-[#ff0000]" />
+              <Music2 className={`w-6 h-6 ${isLight ? "text-neutral-400" : "text-neutral-500"}`} />
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4
-              title={track?.title}
-              className={`text-xs font-bold truncate leading-tight tracking-tight ${
-                isLight ? "text-[#18181b]" : "text-white"
-              }`}
-            >
-              {track ? track.title : "Tubify Desktop"}
-            </h4>
-            {track && isPlaying && <MicroVisualizer isPlaying={isPlaying} />}
-          </div>
-
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {track?.is_explicit && (
-              <span
-                title="Explicit"
-                className="w-3.5 h-3.5 rounded-[3px] bg-[#71717a] text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none"
-              >
-                E
-              </span>
-            )}
-            <p
-              title={track?.artist}
-              className={`text-[11px] font-medium truncate ${
-                isLight ? "text-[#71717a]" : "text-white/60"
-              }`}
-            >
-              {track ? track.artist : "Choose a track to start"}
-            </p>
-          </div>
+        <div className="min-w-0 max-w-[200px]">
+          <h4
+            title={track?.title}
+            className={`text-sm font-semibold truncate leading-tight hover:underline cursor-pointer ${
+              isLight ? "text-neutral-900" : "text-white"
+            }`}
+          >
+            {track ? track.title : "Tubify"}
+          </h4>
+          <p
+            title={track?.artist}
+            className={`text-xs truncate mt-0.5 hover:underline cursor-pointer ${
+              isLight ? "text-neutral-500" : "text-neutral-400"
+            }`}
+          >
+            {track ? track.artist : "Çalmaya başlamak için bir parça seçin"}
+          </p>
         </div>
 
         {track && (
           <button
             onClick={onToggleLike}
-            className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 active:scale-90 ${
-              isLiked
-                ? "text-[#ff0000] bg-rose-500/10"
-                : isLight
-                ? "text-[#a1a1aa] hover:text-[#ff0000] hover:bg-[#f4f4f5]"
-                : "text-white/40 hover:text-[#ff0000] hover:bg-white/[0.06]"
+            className={`p-1.5 transition-transform active:scale-125 cursor-pointer ml-1 shrink-0 ${
+              isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
-            title={isLiked ? "Unlike" : "Like"}
+            title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
           >
-            <Heart className={`w-4 h-4 ${isLiked ? "fill-[#ff0000]" : ""}`} />
+            <Heart
+              className={`w-4 h-4 ${
+                isLiked ? "text-[#ff0000] fill-[#ff0000]" : ""
+              }`}
+            />
           </button>
         )}
       </div>
 
-      {/* 2. Center: Controls + Time indicators */}
-      <div className="flex flex-col items-center gap-1 flex-1 max-w-[480px]">
-        <div className="flex items-center gap-4">
+      {/* 2. Center: Playback Controls & Timeline Progress Bar */}
+      <div className="flex flex-col items-center gap-1.5 w-[40%] max-w-[720px]">
+        {/* Buttons */}
+        <div className="flex items-center gap-5">
           <button
             onClick={onToggleShuffle}
-            title={isShuffle ? "Shuffle On" : "Shuffle Off"}
-            className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            title={isShuffle ? "Karışık Açık" : "Karışık Kapalı"}
+            className={`transition-colors cursor-pointer ${
               isShuffle
-                ? "text-[#ff0000] bg-rose-500/10"
+                ? "text-[#ff0000]"
                 : isLight
-                ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                : "text-white/50 hover:text-white hover:bg-white/[0.06]"
+                ? "text-neutral-500 hover:text-neutral-900"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
             <Shuffle className="w-4 h-4" />
@@ -220,104 +177,163 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <button
             onClick={onPrev}
             disabled={!track}
-            title="Previous track"
-            className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
-              isLight
-                ? "text-[#18181b] hover:bg-[#f4f4f5]"
-                : "text-white/80 hover:text-white hover:bg-white/[0.06]"
+            title="Önceki"
+            className={`transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+              isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
           >
-            <SkipBack className="w-4 h-4 fill-current" />
+            <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
+          {/* Center Play Button: 36x36 (w-9 h-9) black circle with white icon in light mode */}
           <button
             onClick={onPlayPause}
             disabled={!track && !isLoading}
-            title={isPlaying ? "Pause" : "Play"}
-            className="w-10 h-10 rounded-full bg-[#ff0000] hover:bg-[#e60000] text-white flex items-center justify-center shadow-lg hover:shadow-red-500/25 transition-all cursor-pointer active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={isPlaying ? "Duraklat" : "Oynat"}
+            className={`w-9 h-9 rounded-full hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer shadow-md disabled:opacity-40 ${
+              isLight ? "bg-black text-white" : "bg-white text-black"
+            }`}
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className={`w-4 h-4 animate-spin ${isLight ? "text-white" : "text-black"}`} />
             ) : isPlaying ? (
-              <Pause className="w-5 h-5 fill-white" />
+              <Pause className={`w-4 h-4 ${isLight ? "fill-white stroke-white" : "fill-black stroke-black"}`} />
             ) : (
-              <Play className="w-5 h-5 fill-white ml-0.5" />
+              <Play className={`w-4 h-4 ml-0.5 ${isLight ? "fill-white stroke-white" : "fill-black stroke-black"}`} />
             )}
           </button>
 
           <button
             onClick={onNext}
             disabled={!track}
-            title="Next track"
-            className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
-              isLight
-                ? "text-[#18181b] hover:bg-[#f4f4f5]"
-                : "text-white/80 hover:text-white hover:bg-white/[0.06]"
+            title="Sonraki"
+            className={`transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+              isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
           >
-            <SkipForward className="w-4 h-4 fill-current" />
+            <SkipForward className="w-5 h-5 fill-current" />
           </button>
 
           <button
             onClick={onToggleRepeat}
-            title={isRepeat ? "Repeat On" : "Repeat Off"}
-            className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            title={isRepeat ? "Tekrar Açık" : "Tekrar Kapalı"}
+            className={`transition-colors cursor-pointer ${
               isRepeat
-                ? "text-[#ff0000] bg-rose-500/10"
+                ? "text-[#ff0000]"
                 : isLight
-                ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                : "text-white/50 hover:text-white hover:bg-white/[0.06]"
+                ? "text-neutral-500 hover:text-neutral-900"
+                : "text-neutral-400 hover:text-white"
             }`}
           >
             <Repeat className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Small time readout */}
-        <div className="flex items-center gap-2 text-[10px] font-mono tracking-tight font-medium text-white/50">
-          <span className={isLight ? "text-[#52525b]" : "text-white/70"}>
+        {/* Timeline Slider with Times */}
+        <div className="w-full flex items-center gap-2">
+          <span
+            className={`text-[11px] font-mono w-10 text-right ${
+              isLight ? "text-neutral-500" : "text-neutral-400"
+            }`}
+          >
             {formatTime(currentTime)}
           </span>
-          <span>/</span>
-          <span>{formatTime(duration)}</span>
+
+          <div
+            className={`flex-1 h-1 hover:h-1.5 rounded-full overflow-hidden relative group cursor-pointer transition-all ${
+              isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
+            }`}
+          >
+            <div
+              className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
+                isLight ? "bg-neutral-800" : "bg-white"
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeekChange}
+              aria-label="Şarkı ilerleme çubuğu"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </div>
+
+          <span
+            className={`text-[11px] font-mono w-10 ${
+              isLight ? "text-neutral-500" : "text-neutral-400"
+            }`}
+          >
+            {formatTime(duration)}
+          </span>
         </div>
       </div>
 
-      {/* 3. Right: Volume + 1:1/16:9 Toggle + Drawer toggle + MiniPlayer */}
-      <div className="flex items-center gap-3 min-w-[200px] justify-end">
-        {/* Aspect Ratio Button */}
+      {/* 3. Right: Lyrics, Queue, Device, Volume */}
+      <div className="flex items-center gap-3 w-[30%] justify-end">
+        {/* Lyrics */}
         <button
-          onClick={player.toggle16x9Aspect}
-          title={player.is16x9Aspect ? "16:9 Video Mode" : "1:1 Album Mode"}
-          className={`p-2 rounded-xl transition-all cursor-pointer hidden md:flex items-center gap-1.5 text-xs font-semibold ${
-            player.is16x9Aspect
-              ? "bg-[#ff0000]/15 text-[#ff0000]"
+          onClick={() => player.setRightDrawerTab("lyrics")}
+          title="Şarkı Sözleri"
+          className={`p-1.5 transition-colors cursor-pointer ${
+            player.isRightDrawerOpen && player.rightDrawerTab === "lyrics"
+              ? "text-[#ff0000]"
               : isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-              : "text-white/50 hover:text-white hover:bg-white/[0.06]"
+              ? "text-neutral-500 hover:text-neutral-900"
+              : "text-neutral-400 hover:text-white"
           }`}
         >
-          {player.is16x9Aspect ? (
-            <Tv className="w-4 h-4 text-[#ff0000]" />
-          ) : (
-            <Disc3 className="w-4 h-4" />
-          )}
+          <Mic2 className="w-4 h-4" />
+        </button>
+
+        {/* Queue */}
+        <button
+          onClick={() => player.setRightDrawerTab("queue")}
+          title="Sıradaki Şarkılar"
+          className={`p-1.5 transition-colors cursor-pointer ${
+            player.isRightDrawerOpen && player.rightDrawerTab === "queue"
+              ? "text-[#ff0000]"
+              : isLight
+              ? "text-neutral-500 hover:text-neutral-900"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <ListMusic className="w-4 h-4" />
+        </button>
+
+        {/* Devices */}
+        <button
+          title="Bir cihaza bağlan"
+          className={`p-1.5 transition-colors cursor-pointer ${
+            isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <Tv className="w-4 h-4" />
         </button>
 
         {/* Volume */}
         <div className="flex items-center gap-2 group">
           <button
             onClick={onToggleMute}
-            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-              isLight ? "text-[#71717a] hover:text-[#18181b]" : "text-white/60 hover:text-white"
+            className={`p-1 transition-colors cursor-pointer ${
+              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
-            title={isMuted ? "Unmute" : "Mute"}
+            title={isMuted ? "Sesi Aç" : "Sesi Kapat"}
           >
             <VolumeIcon className="w-4 h-4" />
           </button>
-          <div className="w-20 h-1 bg-white/[0.1] rounded-full overflow-hidden relative cursor-pointer group-hover:h-1.5 transition-all">
+          <div
+            className={`w-24 h-1 group-hover:h-1.5 rounded-full overflow-hidden relative cursor-pointer transition-all ${
+              isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
+            }`}
+          >
             <div
-              className="h-full bg-white/80 group-hover:bg-[#ff0000] rounded-full transition-all"
+              className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
+                isLight ? "bg-neutral-800" : "bg-white"
+              }`}
               style={{ width: `${isMuted ? 0 : volume * 100}%` }}
             />
             <input
@@ -327,42 +343,13 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               step={0.01}
               value={isMuted ? 0 : volume}
               onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-              aria-label="Volume slider"
+              aria-label="Ses seviyesi"
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
           </div>
         </div>
-
-        {/* Right Drawer Toggle (Now Playing / Queue) */}
-        <button
-          onClick={() => player.toggleRightDrawer()}
-          title="Toggle Now Playing & Queue Drawer"
-          className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            player.isRightDrawerOpen
-              ? "bg-[#ff0000] text-white shadow-md shadow-red-500/20"
-              : isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-              : "text-white/60 hover:text-white hover:bg-white/[0.06]"
-          }`}
-        >
-          <PanelRight className="w-4 h-4" />
-        </button>
-
-        {/* Mini Player HUD */}
-        <button
-          onClick={onToggleMiniPlayer}
-          title={isMiniPlayer ? "Close Mini Player" : "Open Mini Player HUD"}
-          className={`p-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            isMiniPlayer
-              ? "text-[#ff0000] bg-rose-500/10"
-              : isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-              : "text-white/50 hover:text-white hover:bg-white/[0.06]"
-          }`}
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
       </div>
-    </div>
+    </footer>
   );
 };
+export default PlayerBar;

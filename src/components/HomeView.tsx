@@ -38,7 +38,7 @@ export const HomeView: FC<HomeViewProps> = ({
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 py-5 space-y-7 pb-28 transition-colors relative ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 pt-16 space-y-7 pb-28 transition-colors relative ${
         isLight ? "text-[#111111]" : "text-white"
       }`}
     >
