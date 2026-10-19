@@ -82,6 +82,14 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - **Bağlantıyı Kopyala:** YouTube Music şarkı URL'sini (`navigator.clipboard`) kopyalar.
     - **Dokunsal Toast Bildirimi (Pill Notification):**
       - Sıraya ekleme, sonra çalma, çalma listesine ekleme, beğeni ve kopyalama işlemlerinde ekranın alt-orta kısmında şık, yüzen bir onay balonu (`player.toastMessage`) gösterilir.
+  - [x] **Aşama 13:** Şarkı Radyosu (`playlistPanelVideoRenderer` & Anında Çalma):
+    - **Backend Parser Desteği (`auth.rs`):**
+      - YouTube Music `/youtubei/v1/next` endpoint'inin döndürdüğü `playlistPanelVideoRenderer` şeması için `parse_playlist_panel_video_renderer` fonksiyonu yazıldı.
+      - `longBylineText.runs` dizisindeki Sanatçı (`UC...`) ve Albüm (`MPREb...` / `OLAK5uy_` / `MP...`) `browseId`'leri ayrıştırılarak şarkıların sanatçı ve albüm bağlantıları eksiksiz çekildi.
+      - `collect_tracks_recursive` içine entegre edilerek `get_radio_tracks`'in 50 şarkılık radyo kuyruğunu başarıyla döndürmesi sağlandı.
+    - **Anında Çalma ve Paralel Yükleme (`PlayerContext.tsx`):**
+      - Tıklanan şarkı çalmıyorsa ağ yanıtı beklenmeden anında `playTrackInternal(track)` ile başlatılıyor.
+      - 50 şarkılık radyo listesi arka planda paralel çekilip geldiğinde mevcut şarkı başa alınarak `queueRef` ve `queueState` içine yükleniyor; `preloadUpcoming()` tetiklenerek 2. şarkı arabelleğe önceden alınıyor.
   - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar

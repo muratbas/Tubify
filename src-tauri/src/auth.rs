@@ -401,6 +401,123 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
     })
 }
 
+pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<Track> {
+    let video_id = ppvr.get("videoId").and_then(|v| v.as_str())?.to_string();
+    let title = ppvr
+        .pointer("/title/runs/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown Title")
+        .to_string();
+
+    let duration = ppvr
+        .pointer("/lengthText/runs/0/text")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let thumbnail = ppvr
+        .pointer("/thumbnail/thumbnails")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.last())
+        .and_then(|item| item.get("url"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| Some(format!("https://i.ytimg.com/vi/{}/mqdefault.jpg", video_id)));
+
+    let is_explicit = ppvr
+        .get("badges")
+        .and_then(|b| b.as_array())
+        .map(|arr| {
+            arr.iter().any(|b| {
+                b.pointer("/musicInlineBadgeRenderer/icon/iconType")
+                    .and_then(|t| t.as_str())
+                    .map(|t| t == "MUSIC_EXPLICIT_BADGE")
+                    .unwrap_or(false)
+            })
+        });
+
+    let mut artist_id: Option<String> = None;
+    let mut album: Option<String> = None;
+    let mut album_id: Option<String> = None;
+    let mut artist_parts: Vec<&str> = Vec::new();
+
+    let runs_opt = ppvr
+        .pointer("/longBylineText/runs")
+        .or_else(|| ppvr.pointer("/shortBylineText/runs"))
+        .and_then(|v| v.as_array());
+
+    if let Some(runs) = runs_opt {
+        for r in runs {
+            let text = r.get("text").and_then(|t| t.as_str()).unwrap_or("").trim();
+            if text.is_empty() || text == "•" || text == "&" || text == "," {
+                continue;
+            }
+
+            let b_id = r
+                .pointer("/navigationEndpoint/browseEndpoint/browseId")
+                .and_then(|v| v.as_str());
+
+            if let Some(bid) = b_id {
+                if bid.starts_with("UC") || bid.starts_with("FEmusic_artist") {
+                    if artist_id.is_none() {
+                        artist_id = Some(bid.to_string());
+                    }
+                    if !artist_parts.contains(&text) {
+                        artist_parts.push(text);
+                    }
+                } else if bid.starts_with("MPREb_")
+                    || bid.starts_with("FEmusic_library_privately_owned_release")
+                    || bid.starts_with("OLAK5uy_")
+                    || bid.starts_with("MP")
+                {
+                    if album_id.is_none() {
+                        album_id = Some(bid.to_string());
+                    }
+                    if album.is_none() {
+                        album = Some(text.to_string());
+                    }
+                } else {
+                    if artist_parts.is_empty() {
+                        artist_parts.push(text);
+                    }
+                }
+            } else {
+                let is_metric = text.contains("görüntüleme")
+                    || text.contains("views")
+                    || text.contains("view")
+                    || text.contains("beğeni")
+                    || text.contains("likes")
+                    || text.contains("like");
+
+                if !is_metric {
+                    if artist_parts.is_empty() {
+                        artist_parts.push(text);
+                    } else if album.is_none() && !artist_parts.contains(&text) {
+                        album = Some(text.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let artist = if !artist_parts.is_empty() {
+        artist_parts.join(", ")
+    } else {
+        "Unknown Artist".to_string()
+    };
+
+    Some(Track {
+        id: video_id,
+        title,
+        artist,
+        artist_id,
+        album,
+        album_id,
+        duration,
+        thumbnail,
+        is_explicit,
+    })
+}
+
 pub fn collect_tracks_recursive(
     value: &serde_json::Value,
     tracks: &mut Vec<Track>,
@@ -409,6 +526,12 @@ pub fn collect_tracks_recursive(
     if let Some(obj) = value.as_object() {
         if let Some(mrlir) = obj.get("musicResponsiveListItemRenderer") {
             if let Some(track) = parse_mrlir_item(mrlir) {
+                if seen.insert(track.id.clone()) {
+                    tracks.push(track);
+                }
+            }
+        } else if let Some(ppvr) = obj.get("playlistPanelVideoRenderer") {
+            if let Some(track) = parse_playlist_panel_video_renderer(ppvr) {
                 if seen.insert(track.id.clone()) {
                     tracks.push(track);
                 }

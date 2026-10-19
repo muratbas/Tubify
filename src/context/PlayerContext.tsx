@@ -410,6 +410,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     if (newQueue && newQueue.length > 0) {
+      queueRef.current = newQueue;
       setQueueState(newQueue);
     }
     await playTrackInternal(track);
@@ -558,23 +559,44 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [playTrack, preloadUpcoming, showToast]);
 
   const startRadio = useCallback(async (track: Track) => {
-    showToast(`"${track.title}" için radyo başlatılıyor...`);
+    showToast(`"${track.title}" radyosu başlatılıyor...`);
+
+    // 1. Instant Playback: If this track isn't already playing, start playing it immediately!
+    if (currentTrackRef.current?.id !== track.id) {
+      queueRef.current = [track];
+      setQueueState([track]);
+      playTrackInternal(track);
+    }
+
+    // 2. Fetch ~50 radio tracks from YouTube Music Watch Playlist endpoint in parallel
     try {
       const radioTracks = await getRadioTracks(track.id);
-      const fullList = radioTracks.length > 0 ? radioTracks : [track];
-      const finalQueue = fullList.some((t) => t.id === track.id)
-        ? fullList
-        : [track, ...fullList];
+      if (radioTracks && radioTracks.length > 0) {
+        // Place the currently selected track at the head of the radio queue (avoiding duplicates)
+        const filtered = radioTracks.filter((t) => t.id !== track.id);
+        const finalQueue = [track, ...filtered];
 
-      setQueueState(finalQueue);
-      await playTrackInternal(track);
-      showToast(`Radyo başladı: "${track.title}"`);
+        queueRef.current = finalQueue;
+        setQueueState(finalQueue);
+
+        // Invalidate preloader and immediately trigger preload for track #2
+        preloadedTrackRef.current = null;
+        upcomingTrackRef.current = null;
+        preloadUpcoming();
+
+        showToast(`Radyo hazır: "${track.title}" (${finalQueue.length} şarkı)`);
+      } else {
+        queueRef.current = [track];
+        setQueueState([track]);
+        showToast(`Radyo listesi bulunamadı, "${track.title}" çalınıyor`);
+      }
     } catch (e) {
       console.error("Radio start error:", e);
+      queueRef.current = [track];
+      setQueueState([track]);
       showToast("Radyo başlatılamadı, tek şarkı oynatılıyor");
-      playTrack(track, [track]);
     }
-  }, [playTrack, showToast]);
+  }, [preloadUpcoming, showToast]);
 
   const removeFromQueue = useCallback((trackId: string) => {
     setQueueState((prev) => prev.filter((t) => t.id !== trackId));
