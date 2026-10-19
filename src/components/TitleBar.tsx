@@ -29,6 +29,7 @@ interface TitleBarProps {
   onNavigateForward?: () => void;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  isScrolled?: boolean;
 }
 
 export const TitleBar: FC<TitleBarProps> = ({
@@ -43,6 +44,7 @@ export const TitleBar: FC<TitleBarProps> = ({
   onNavigateForward,
   canGoBack = false,
   canGoForward = false,
+  isScrolled = false,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -109,11 +111,24 @@ export const TitleBar: FC<TitleBarProps> = ({
     <header
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
-      className={`h-14 w-full select-none flex items-center justify-between px-5 z-40 shrink-0 transition-colors relative border-b ${
-        isLight
-          ? "bg-white/80 border-neutral-200/80 text-[#111111]"
-          : "bg-[#0a0a0a]/80 border-white/10 text-white"
-      } backdrop-blur-md`}
+      style={
+        isScrolled
+          ? {
+              backgroundColor: isLight
+                ? "rgba(var(--ambient-rgb, 210, 205, 245), 0.92)"
+                : "rgba(18, 18, 18, 0.88)",
+              boxShadow:
+                "0 6px 16px -2px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.06)",
+            }
+          : undefined
+      }
+      className={`h-14 w-full select-none flex items-center justify-between px-5 z-20 shrink-0 transition-all duration-300 ease-out relative ${
+        isScrolled
+          ? isLight
+            ? "backdrop-blur-md border-b border-transparent text-[#111111]"
+            : "backdrop-blur-md border-b border-transparent text-white"
+          : "bg-transparent border-b border-transparent shadow-none text-current"
+      }`}
     >
       {/* Left: Navigation Buttons (< and >) and Search Bar */}
       <div className="flex items-center gap-2 shrink-0">

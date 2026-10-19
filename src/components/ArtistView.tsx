@@ -35,6 +35,8 @@ interface ArtistViewProps {
   ) => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
+  onScroll?: (e: React.UIEvent<HTMLElement>) => void;
+  onCoverResolved?: (url: string) => void;
 }
 
 export const ArtistView: FC<ArtistViewProps> = ({
@@ -50,6 +52,8 @@ export const ArtistView: FC<ArtistViewProps> = ({
   likedTrackIds,
   onNavigateAlbum,
   onContextMenuTrack,
+  onScroll,
+  onCoverResolved,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -92,6 +96,9 @@ export const ArtistView: FC<ArtistViewProps> = ({
 
         if (!isCancelled) {
           setArtistData(details);
+          if (details.thumbnail && onCoverResolved) {
+            onCoverResolved(details.thumbnail);
+          }
         }
       } catch (e: unknown) {
         if (!isCancelled) {
@@ -110,7 +117,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [artistId, artistName]);
+  }, [artistId, artistName, onCoverResolved]);
 
   if (isLoading) {
     return (
@@ -138,18 +145,13 @@ export const ArtistView: FC<ArtistViewProps> = ({
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pb-28 transition-colors ${
-        isLight ? "bg-white text-neutral-900" : "bg-[#121212] text-white"
+      onScroll={onScroll}
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 scroll-smooth ${
+        isLight ? "text-neutral-900" : "text-white"
       }`}
     >
-      {/* Hero Header with ambient backdrop */}
-      <div
-        className={`relative px-8 pb-6 pt-6 flex flex-col gap-6 ${
-          isLight
-            ? "bg-gradient-to-b from-[#fecaca]/40 via-[#fee2e2]/20 to-white"
-            : "bg-gradient-to-b from-[#450a0a] via-[#1c0606] to-[#121212]"
-        }`}
-      >
+      {/* Hero Header with transparent ambient backdrop */}
+      <div className="relative px-8 pb-6 pt-6 flex flex-col gap-6 bg-transparent">
         <div className="flex items-end gap-6 pt-2">
           {/* Circular Artist Avatar (192x192px) */}
           <div className="shrink-0 shadow-2xl rounded-full overflow-hidden w-48 h-48 border-2 border-white/20">
@@ -157,6 +159,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
               <img
                 src={artistData.thumbnail}
                 alt={artistData.name}
+                crossOrigin="anonymous"
                 className="w-full h-full object-cover bg-neutral-200"
               />
             ) : (
@@ -249,8 +252,8 @@ export const ArtistView: FC<ArtistViewProps> = ({
             <h2 className="text-xl font-bold tracking-tight mb-4">Popüler</h2>
 
             <div
-              className={`grid grid-cols-[40px_1fr_1fr_70px_60px] gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-b ${
-                isLight ? "text-neutral-500 border-neutral-200/60" : "text-neutral-400 border-white/10"
+              className={`grid grid-cols-[40px_1fr_1fr_70px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
+                isLight ? "text-neutral-700 border-black/10" : "text-neutral-300 border-white/10"
               }`}
             >
               <span>#</span>
@@ -279,11 +282,11 @@ export const ArtistView: FC<ArtistViewProps> = ({
                     className={`grid grid-cols-[40px_1fr_1fr_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
-                          ? "bg-neutral-100/90 text-neutral-900"
-                          : "bg-white/15 text-white"
+                          ? "bg-black/[0.07] text-neutral-950 font-medium"
+                          : "bg-white/[0.12] text-white font-medium"
                         : isLight
-                        ? "hover:bg-neutral-200/60 text-neutral-600"
-                        : "hover:bg-white/10 text-neutral-400"
+                        ? "hover:bg-black/[0.05] text-neutral-700"
+                        : "hover:bg-white/[0.08] text-neutral-300"
                     }`}
                   >
                     {/* Index or Animated 3 Dots */}
@@ -323,6 +326,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         <img
                           src={track.thumbnail}
                           alt={track.title}
+                          crossOrigin="anonymous"
                           className="w-10 h-10 rounded object-cover shrink-0 bg-neutral-200"
                         />
                       ) : (

@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, type FC } from "react";
+import { useState, useEffect, useMemo, useCallback, type FC } from "react";
+import { extractDominantColor, setAmbientColor } from "./utils/colorExtractor";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
@@ -146,7 +147,7 @@ export const App: FC = () => {
       | { type: "home" }
       | { type: "search"; query: string }
       | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null } }
-      | { type: "artist"; artistId: string; artistName?: string }
+      | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
       | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
       | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
     )[]
@@ -157,12 +158,15 @@ export const App: FC = () => {
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
 
+  const [ambientRgb, setAmbientRgb] = useState<string>("210, 205, 245");
+  const [resolvedCover, setResolvedCover] = useState<string | null>(null);
+
   const navigateTo = (
     entry:
       | { type: "home" }
       | { type: "search"; query: string }
       | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null } }
-      | { type: "artist"; artistId: string; artistName?: string }
+      | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
       | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
       | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
   ) => {
@@ -181,15 +185,32 @@ export const App: FC = () => {
     const newHistory = history.slice(0, historyIndex + 1).concat(entry);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
+    setResolvedCover(null);
+    setIsScrolled(false);
   };
 
   const handleGoBack = () => {
-    if (canGoBack) setHistoryIndex((prev) => prev - 1);
+    if (canGoBack) {
+      setHistoryIndex((prev) => prev - 1);
+      setResolvedCover(null);
+      setIsScrolled(false);
+    }
   };
 
   const handleGoForward = () => {
-    if (canGoForward) setHistoryIndex((prev) => prev + 1);
+    if (canGoForward) {
+      setHistoryIndex((prev) => prev + 1);
+      setResolvedCover(null);
+      setIsScrolled(false);
+    }
   };
+
+  // Dynamic Sticky TitleBar scroll state (Durum B: scrollTop > 10)
+  const [isScrolled, setIsScrolled] = useState(false);
+  const handleViewScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
+    setIsScrolled(e.currentTarget.scrollTop > 10);
+  }, []);
+
 
   // Buttery Smooth Momentum Wheel Scrolling across all views
   useEffect(() => {
@@ -242,8 +263,8 @@ export const App: FC = () => {
     };
   }, [canGoBack, canGoForward, history.length]);
 
-  const handleNavigateArtist = (artistId: string, artistName: string) => {
-    navigateTo({ type: "artist", artistId, artistName });
+  const handleNavigateArtist = (artistId: string, artistName: string, thumbnail?: string) => {
+    navigateTo({ type: "artist", artistId, artistName, thumbnail });
   };
 
   const handleNavigateAlbum = (
@@ -452,6 +473,50 @@ export const App: FC = () => {
       ? EPISODES_TRACKS
       : playlistTracks;
 
+  // Dynamic Spotifast Soft Pastel Color Extraction
+  useEffect(() => {
+    let coverUrl: string | null | undefined = resolvedCover;
+
+    if (!coverUrl) {
+      if (currentNav.type === "playlist") {
+        if (currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM") {
+          coverUrl = activePlaylistTracks[0]?.thumbnail || player.activeTrack?.thumbnail;
+        } else {
+          coverUrl =
+            currentNav.playlist.thumbnail ||
+            activePlaylistTracks[0]?.thumbnail ||
+            player.activeTrack?.thumbnail;
+        }
+      } else if (currentNav.type === "album") {
+        coverUrl = currentNav.thumbnail || player.activeTrack?.thumbnail;
+      } else if (currentNav.type === "artist") {
+        coverUrl = currentNav.thumbnail || player.activeTrack?.thumbnail;
+      } else {
+        coverUrl = player.activeTrack?.thumbnail;
+      }
+    }
+
+    if (coverUrl) {
+      extractDominantColor(coverUrl).then((rgb) => {
+        const rgbStr = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+        setAmbientRgb(rgbStr);
+        setAmbientColor(rgb);
+      });
+    } else {
+      setAmbientRgb("210, 205, 245");
+      setAmbientColor([210, 205, 245]);
+    }
+  }, [
+    currentNav,
+    currentNav.type === "playlist" ? currentNav.playlist.thumbnail : null,
+    currentNav.type === "playlist" ? currentNav.playlist.id : null,
+    currentNav.type === "album" ? currentNav.thumbnail : null,
+    currentNav.type === "artist" ? currentNav.thumbnail : null,
+    resolvedCover,
+    activePlaylistTracks[0]?.thumbnail,
+    player.activeTrack?.thumbnail,
+  ]);
+
   return (
     <div
       className={`h-screen w-screen overflow-hidden select-none flex flex-col ${
@@ -478,47 +543,52 @@ export const App: FC = () => {
           onNavigateSearch={() => navigateTo({ type: "search", query: searchQuery })}
         />
 
-        {/* Module 2: Sağ Alan (Üstte Header + Altta Ana İçerik) */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative">
-          {/* Header SADECE sağdaki Ana İçerik panelinin en üstünde */}
-          <TitleBar
-            searchQuery={searchQuery}
-            onSearchChange={(q) => {
-              setSearchQuery(q);
-              if (!q && currentNav.type === "search") {
-                navigateTo({ type: "home" });
+        {/* Module 2: Sağ Alan (Ana Kapsayıcı: style={{ '--ambient-rgb': ambientRgb }}) */}
+        <div
+          className={`relative flex-1 flex flex-col h-full overflow-hidden min-w-0 ${
+            isLight ? "bg-white" : "bg-[#0c0c0c]"
+          }`}
+          style={{ "--ambient-rgb": ambientRgb } as React.CSSProperties}
+        >
+          {/* KATMAN 1 — Sabit Ambient Arka Plan (Asla Scroll Olmaz!) */}
+          <AmbientBackground />
+
+          {/* KATMAN 2 — Sabit Üst Titlebar / Header (z-20) */}
+          <div className="absolute top-0 left-0 right-0 z-20 pointer-events-auto">
+            <TitleBar
+              searchQuery={searchQuery}
+              onSearchChange={(q) => {
+                setSearchQuery(q);
+                if (!q && currentNav.type === "search") {
+                  navigateTo({ type: "home" });
+                }
+              }}
+              onSearchSubmit={handleSearchSubmit}
+              userProfile={userProfile}
+              currentView={currentNav.type}
+              currentTabTitle={
+                currentNav.type === "playlist"
+                  ? currentNav.playlist.title
+                  : currentNav.type === "artist"
+                  ? currentNav.artistName
+                  : currentNav.type === "album"
+                  ? currentNav.albumTitle
+                  : player.activeTrack?.title
               }
-            }}
-            onSearchSubmit={handleSearchSubmit}
-            userProfile={userProfile}
-            currentView={currentNav.type}
-            currentTabTitle={
-              currentNav.type === "playlist"
-                ? currentNav.playlist.title
-                : currentNav.type === "artist"
-                ? currentNav.artistName
-                : currentNav.type === "album"
-                ? currentNav.albumTitle
-                : player.activeTrack?.title
-            }
-            onOpenLogin={() => setIsLoginModalOpen(true)}
-            onOpenSettings={handleOpenSettings}
-            onNavigateHome={() => navigateTo({ type: "home" })}
-            onNavigateBack={handleGoBack}
-            onNavigateForward={handleGoForward}
-            canGoBack={canGoBack}
-            canGoForward={canGoForward}
-          />
+              onOpenLogin={() => setIsLoginModalOpen(true)}
+              onOpenSettings={handleOpenSettings}
+              onNavigateHome={() => navigateTo({ type: "home" })}
+              onNavigateBack={handleGoBack}
+              onNavigateForward={handleGoForward}
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              isScrolled={isScrolled}
+            />
+          </div>
 
           {/* Module 2 İçerik: Ana İçerik Paneli ve Sağ Panel */}
-          <div className="flex-1 flex overflow-hidden min-h-0 relative">
-            <main
-              className={`flex-1 flex flex-col h-full overflow-hidden relative ${
-                isLight ? "bg-[#ffffff]" : "bg-[#121212]"
-              }`}
-            >
-            {/* Apple Music Style Ambient Blur Background */}
-            <AmbientBackground thumbnail={player.activeTrack?.thumbnail} />
+          <div className="flex-1 flex overflow-hidden min-h-0 relative z-10 bg-transparent">
+            <main className="relative z-10 flex-1 flex flex-col h-full overflow-hidden bg-transparent">
 
             {/* Audio error banner */}
             {player.playbackError && (
@@ -545,6 +615,7 @@ export const App: FC = () => {
                 playlistsCount={playlists.length}
                 onLogout={handleLogout}
                 onOpenLogin={() => setIsLoginModalOpen(true)}
+                onScroll={handleViewScroll}
               />
             )}
 
@@ -573,6 +644,7 @@ export const App: FC = () => {
                 onNavigateAlbum={handleNavigateAlbum}
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
+                onScroll={handleViewScroll}
               />
             )}
 
@@ -594,6 +666,8 @@ export const App: FC = () => {
                 onNavigateAlbum={handleNavigateAlbum}
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
+                onScroll={handleViewScroll}
+                onCoverResolved={(url) => setResolvedCover(url)}
               />
             )}
 
@@ -617,13 +691,16 @@ export const App: FC = () => {
                 onNavigateArtist={handleNavigateArtist}
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
+                onScroll={handleViewScroll}
+                onCoverResolved={(url) => setResolvedCover(url)}
               />
             )}
 
             {/* VIEW 5: Search View */}
             {currentNav.type === "search" && (
               <div
-                className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-6 space-y-6 pb-28 relative ${
+                onScroll={handleViewScroll}
+                className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-16 space-y-6 pb-28 relative z-10 bg-transparent ${
                   isLight ? "text-[#111111]" : "text-white"
                 }`}
               >
@@ -797,12 +874,17 @@ export const App: FC = () => {
                 onPlayTrack={(t) => player.playTrack(t, [...player.recentTracks, ...INITIAL_RECOMMENDED])}
                 onNavigateArtist={handleNavigateArtist}
                 onContextMenuTrack={handleOpenContextMenu}
+                onScroll={handleViewScroll}
               />
             )}
             </main>
 
             {/* Module 3: Sağ Panel (Queue / Lyrics / NowPlaying) */}
-            <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
+            {player.queueViewMode !== "closed" && (
+              <div className="pt-14 flex h-full shrink-0">
+                <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -5,51 +5,20 @@ interface AmbientBackgroundProps {
   thumbnail?: string | null;
 }
 
-export const AmbientBackground: FC<AmbientBackgroundProps> = ({ thumbnail }) => {
+export const AmbientBackground: FC<AmbientBackgroundProps> = () => {
   const { theme } = useTheme();
   const isLight = theme === "light";
 
-  if (!thumbnail) {
-    return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none -z-10">
-        <div
-          className={`absolute -top-32 left-1/4 w-[500px] h-[500px] rounded-full blur-[140px] transition-opacity duration-1000 ${
-            isLight ? "bg-rose-200/20" : "bg-red-950/20"
-          }`}
-        />
-        <div
-          className={`absolute top-1/3 -right-24 w-[400px] h-[400px] rounded-full blur-[120px] transition-opacity duration-1000 ${
-            isLight ? "bg-amber-100/15" : "bg-rose-900/15"
-          }`}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none -z-10">
-      {/* Blurred artwork reflection for authentic album ambient matching */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-          isLight ? "opacity-15" : "opacity-25"
-        }`}
-      >
-        <img
-          src={thumbnail}
-          alt=""
-          aria-hidden="true"
-          className="w-full h-full object-cover filter blur-[100px] scale-125 transform-gpu saturate-150"
-        />
-      </div>
-
-      {/* Subtle radial shading overlay to ensure text contrast */}
-      <div
-        className={`absolute inset-0 ${
-          isLight
-            ? "bg-gradient-to-b from-[#f0f0f0]/70 via-[#f0f0f0]/90 to-[#f0f0f0]"
-            : "bg-gradient-to-b from-[#030303]/60 via-[#030303]/85 to-[#030303]"
-        }`}
-      />
-    </div>
+    <div
+      className="absolute inset-0 pointer-events-none z-0 transition-colors duration-700 ease-out overflow-hidden"
+      style={{
+        background: isLight
+          ? "linear-gradient(180deg, rgba(var(--ambient-rgb), 0.90) 0%, rgba(var(--ambient-rgb), 0.55) 30%, rgba(var(--ambient-rgb), 0.18) 62%, rgba(255, 255, 255, 1) 95%)"
+          : "linear-gradient(180deg, rgba(var(--ambient-rgb), 0.45) 0%, rgba(var(--ambient-rgb), 0.25) 30%, rgba(var(--ambient-rgb), 0.08) 62%, rgba(12, 12, 12, 1) 95%)",
+      }}
+    />
   );
 };
+
+export default AmbientBackground;

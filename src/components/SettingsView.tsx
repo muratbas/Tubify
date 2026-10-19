@@ -29,6 +29,7 @@ interface SettingsViewProps {
   playlistsCount: number;
   onLogout: () => Promise<void>;
   onOpenLogin: () => void;
+  onScroll?: (e: React.UIEvent<HTMLElement>) => void;
 }
 
 export const SettingsView: FC<SettingsViewProps> = ({
@@ -36,6 +37,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
   userProfile,
   onLogout,
   onOpenLogin,
+  onScroll,
 }) => {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -96,7 +98,8 @@ export const SettingsView: FC<SettingsViewProps> = ({
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-10 pt-6 pb-12 space-y-7 transition-colors ${
+      onScroll={onScroll}
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-10 pt-16 pb-12 space-y-7 transition-colors ${
         isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
       }`}
     >

@@ -15,6 +15,7 @@ interface HomeViewProps {
   onPlayTrack?: (track: Track) => void;
   onNavigateArtist?: (artistId: string, artistName: string) => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
+  onScroll?: (e: React.UIEvent<HTMLElement>) => void;
 }
 
 export const HomeView: FC<HomeViewProps> = ({
@@ -26,6 +27,7 @@ export const HomeView: FC<HomeViewProps> = ({
   onPlayTrack: propOnPlayTrack,
   onNavigateArtist,
   onContextMenuTrack,
+  onScroll,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -42,7 +44,8 @@ export const HomeView: FC<HomeViewProps> = ({
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 pt-4 space-y-7 pb-28 transition-colors relative ${
+      onScroll={onScroll}
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 pt-16 space-y-7 pb-28 transition-colors relative z-10 bg-transparent ${
         isLight ? "text-[#111111]" : "text-white"
       }`}
     >

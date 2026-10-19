@@ -172,6 +172,37 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **Global ve Hafif Dinleyici (`data-tooltip`):** DOM şişmesini ve gereksiz wrapper div karmaşasını önlemek için dinamik `data-tooltip` ve `data-tooltip-side` öznitelikleri dinlendi. Fare üzerine geldiğinde ~160ms içinde anında ve pürüzsüzce belirir, tıklandığında anında kapanır.
     - **Tüm Üst ve Alt Kontrollere Uygulandı:** `TitleBar.tsx` (Simge Durumuna Küçült, Büyüt/Geri Yükle, Kapat, Ayarlar, Geri/İleri) ve `PlayerBar.tsx` (Oynat/Duraklat, Sıradaki, Karışık, Tekrar, Ses, vb.) üzerindeki tüm yerel `title` öznitelikleri yeni özel tooltip yapısına taşındı.
   - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 25:** Dinamik Renk Çıkarımı (Color Extraction), Sabit Ambient Zemin ve Scroll-Duyarlı Sticky Titlebar Mimarisi:
+    - **1. Kapaktan Dinamik Dominant Renk Çıkarımı (`src/utils/colorExtractor.ts`):** Harici kütüphane bağımlılığı olmadan saf HTML5 Offscreen Canvas API kullanılarak çalan şarkının veya aktif çalma listesi/albümün kapak görselinden dominant ve canlı (vibrant) renk anında ayıklandı; aşırı siyah/beyaz/soluk renkler filtrelendi. Çıkarılan renk `:root` üzerinde `--ambient-color-raw: r, g, b` CSS değişkeni olarak atanarak dinamik hale getirildi. Kapak değiştikçe tüm sayfa atmosferi 700ms yumuşak CSS geçişiyle (`transition-all duration-700 ease-out`) yeni renge bürünüyor.
+    - **2. Ekrana Sabitlenen Solmayan Ambient Zemin (`AmbientBackground.tsx`):** Ambient degrade katmanı scroll container'ların içinden tamamen çıkarıldı ve ana görünümün arkasında ekrana sabit (`absolute inset-0 pointer-events-none -z-10`) olarak konumlandırıldı. `PlaylistView`, `AlbumView`, `ArtistView`, `HomeView` ve arama görünümlerindeki opak zeminler ve yukarı kayıp kaybolan sert yerel gradyanlar kaldırılıp `bg-transparent` yapıldı. Böylece kullanıcı listenin en altındaki 70-80. şarkıya inse bile arkadaki atmosferik degrade ilk şarkıdakiyle birebir aynı yoğunlukta sabit kalıyor, şarkılar bu katmanın önünden şeffafça akıyor.
+    - **3. Scroll-Duyarlı Dinamik Sticky Titlebar (`TitleBar.tsx`):** Arama çubuğu, profil ve pencere kontrollerini barındıran Titlebar, `absolute top-0 left-0 right-0 z-30` olarak en üstte sabitlendi.
+      - **En Tepedeyken (`scrollTop === 0`):** Titlebar tamamen şeffaf (`bg-transparent border-transparent shadow-none`), arkadaki ambiyans zemin ve playlist başlığıyla tek parça cam bütünlüğü oluşturuyor.
+      - **Aşağı Kaydırıldığında (`scrollTop > 0`):** Şarkı satırları Titlebar'ın altından geçerken metinlerin birbirine girmemesi için Titlebar anında buzlu cam efektine (`backdrop-blur-md bg-white/80` veya `bg-[#121212]/80`), zarif bir alt sınır çizgisine (`border-b border-black/[0.04]` / `border-white/[0.06]`) ve `shadow-sm` gölgeye geçiyor.
+    - **Z-Index Stacking Context & Görünürlük Onarımı:** `AmbientBackground.tsx` bileşenindeki `-z-10` değeri, ana container `<main>`'in beyaz arka planı tarafından örtülüyordu. Bu durum `z-0`'a çekildi; görünümler (`PlaylistView`, `AlbumView`, `ArtistView`, `HomeView`, `Search`) `relative z-10` olarak öne alındı.
+    - **Solmayan Canlı Atmosfer:** Lineer ve radyal gradyanların opaklıkları artırılarak (`0.48 - 0.58` tepe, `0.10 - 0.14` taban) sayfanın 80. şarkısında dahi ambiyansın beyaza doğru kaybolması engellendi.
+    - **CORS Cache-Busting & Monokrom Fallback:** Canvas renk çıkarıcısına Chromium non-CORS disk cache çakışmalarını önleyen `safeUrl` ve monokrom kapaklar için genel piksel ortalama fallback'i eklendi. Liked Songs gibi kapaksız çalma listelerinde ikonik mor renk ataması sağlandı.
+  - [x] **Aşama 26:** Spotifast Tarzı Dinamik Pastel Renk Çıkarımı (`fast-average-color`), Sabit (Fixed-Viewport) Pastel Ambient Katman ve Gölgeli Sticky Titlebar:
+    - **1. `fast-average-color` & Soft Pastel Clamping Algoritması (`src/utils/colorExtractor.ts`):**
+      - `fast-average-color` paketi kuruldu ve `fac.getColorAsync(img, { algorithm: 'dominant' })` ile dominant renk çıkarımı bağlandı.
+      - CORS engeline karşı `crossOrigin = "anonymous"` tanımlandı; Chromium disk-cache çakışmasını önleyen `cors=1` query param eklendi.
+      - Ham RGB $\to$ HSL $\to$ Soft Pastel RGB dönüştürücü algoritma uygulandı:
+        - Hue: Orijinal renk özü korundu (`0-360`).
+        - Saturation: `%60` ile `%80` arasına sabitlendi (`Math.min(80, Math.max(60, s))`).
+        - Lightness: `%78` ile `%85` arasına sabitlendi (`Math.min(85, Math.max(78, l))`).
+      - Hata veya CORS durumunda varsayılan tatlı lavanta/gri tonu (`210, 205, 245`) fallback sağlandı. Liked Songs listesinde de ikonik Spotifast pastel lavanta tonu (`205, 195, 245`) anında devrede.
+      - CSS değişkeni `--ambient-rgb: r, g, b` hem `:root` hem de sağ ana kapsayıcıya aktarıldı.
+    - **2. Kaydırmayla Asla Azalmayan 3-Katmanlı Sabit Viewport Mimarisi (`App.tsx`, `AmbientBackground.tsx`):**
+      - **Katman 1 (Sabit Ambient Arka Plan - `z-0`):** `absolute inset-0 pointer-events-none z-0 transition-colors duration-700 ease-out`. Linear gradient: `linear-gradient(180deg, rgba(var(--ambient-rgb), 0.90) 0%, rgba(var(--ambient-rgb), 0.55) 30%, rgba(var(--ambient-rgb), 0.18) 62%, rgba(255, 255, 255, 1) 95%)`. Scroll container'ların tamamen dışına sabitlendi; kullanıcı 72. şarkıya inse bile ekranın üstündeki renk yoğunluğu milim oynamadan sabit kalır.
+      - **Katman 2 (Sabit Üst Titlebar - `z-20`):** `absolute top-0 left-0 right-0 z-20 pointer-events-auto`.
+      - **Katman 3 (Şeffaf Kaydırılabilir İçerik - `z-10`):** `relative z-10 flex-1 overflow-y-auto bg-transparent scroll-smooth`. Hero banner (kapak + başlık) ve şarkı tablosu tamamen `bg-transparent`.
+    - **3. Dinamik Sticky Titlebar ve "Scroll Shadow" (`TitleBar.tsx`):**
+      - **Durum A (`scrollTop <= 10`):** Titlebar tamamen şeffaf (`bg-transparent border-transparent shadow-none`), arkadaki pastel ambiyans ile tek parça bütünlük.
+      - **Durum B (`scrollTop > 10`):** Şarkılar yukarı kaydığında Titlebar zeminine `backgroundColor: rgba(var(--ambient-rgb), 0.92)` ve `backdrop-blur-md` atanır; alt sınırına `box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.06)` derinlik gölgesi eklenerek şarkıların gölgenin altından akıp girmesi sağlandı.
+    - **4. Tablo ve Satır Kontrast Uyumu (`PlaylistView.tsx`, `AlbumView.tsx`, `ArtistView.tsx`):**
+      - Tablo başlık satırı (`# ▲`, `BAŞLIK`, `ALBÜM`, vb.) `text-neutral-700 font-bold border-b border-black/10` ile şeffaf zemin üzerinde net okunur kılındı.
+      - Şarkı satırlarında katı renk yerine ambiyansla uyumlu yarı saydam vurgu (`hover:bg-black/[0.05]`, aktif şarkıda `bg-black/[0.07]`) uygulandı; arkadaki pastel zemin satırların içinden zarifçe hissedilmeye devam ediyor.
+      - Tüm kapak ve parça `<img>` etiketlerine `crossOrigin="anonymous"` eklendi.
+  - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
