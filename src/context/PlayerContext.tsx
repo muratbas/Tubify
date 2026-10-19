@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Track, PlaybackStatus, RightDrawerTab, MoodCategory } from "../types/music";
-import { getStreamUrl, toggleYtLike } from "../services/api";
+import { getStreamUrl, toggleYtLike, getRadioTracks } from "../services/api";
 
 const INITIAL_RECENT: Track[] = [
   {
@@ -84,6 +84,12 @@ interface PlayerContextType {
   setQueue: (tracks: Track[]) => void;
   clearPlaybackError: () => void;
   syncLikedIds: (ids: string[]) => void;
+  toastMessage: string | null;
+  showToast: (msg: string) => void;
+  addToQueue: (track: Track) => void;
+  playNext: (track: Track) => void;
+  startRadio: (track: Track) => Promise<void>;
+  removeFromQueue: (trackId: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -500,6 +506,81 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setQueueState(tracks);
   };
 
+  // Toast notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    setToastMessage(msg);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+  }, []);
+
+  const addToQueue = useCallback((track: Track) => {
+    setQueueState((prev) => {
+      if (prev.length === 0 && !currentTrackRef.current) {
+        playTrackInternal(track);
+        return [track];
+      }
+      return [...prev, track];
+    });
+    showToast(`"${track.title}" sıraya eklendi`);
+  }, [showToast]);
+
+  const playNext = useCallback((track: Track) => {
+    const curTrack = currentTrackRef.current;
+    if (!curTrack) {
+      playTrack(track, [track]);
+      showToast(`"${track.title}" oynatılıyor`);
+      return;
+    }
+
+    setQueueState((prev) => {
+      const idx = prev.findIndex((t) => t.id === curTrack.id);
+      if (idx === -1) {
+        return [curTrack, track, ...prev.filter((t) => t.id !== curTrack.id)];
+      }
+      const updated = [...prev];
+      updated.splice(idx + 1, 0, track);
+      return updated;
+    });
+
+    // Invalidate preloader so it immediately preloads this play-next track!
+    preloadedTrackRef.current = null;
+    upcomingTrackRef.current = track;
+    preloadUpcoming();
+
+    showToast(`"${track.title}" bundan sonra çalınacak`);
+  }, [playTrack, preloadUpcoming, showToast]);
+
+  const startRadio = useCallback(async (track: Track) => {
+    showToast(`"${track.title}" için radyo başlatılıyor...`);
+    try {
+      const radioTracks = await getRadioTracks(track.id);
+      const fullList = radioTracks.length > 0 ? radioTracks : [track];
+      const finalQueue = fullList.some((t) => t.id === track.id)
+        ? fullList
+        : [track, ...fullList];
+
+      setQueueState(finalQueue);
+      await playTrackInternal(track);
+      showToast(`Radyo başladı: "${track.title}"`);
+    } catch (e) {
+      console.error("Radio start error:", e);
+      showToast("Radyo başlatılamadı, tek şarkı oynatılıyor");
+      playTrack(track, [track]);
+    }
+  }, [playTrack, showToast]);
+
+  const removeFromQueue = useCallback((trackId: string) => {
+    setQueueState((prev) => prev.filter((t) => t.id !== trackId));
+    showToast("Şarkı kuyruktan kaldırıldı");
+  }, [showToast]);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -521,6 +602,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isMiniPlayer,
         likedTrackIds,
         recentTracks,
+        toastMessage,
         playTrack,
         togglePlayPause,
         seek,
@@ -540,6 +622,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setQueue,
         clearPlaybackError,
         syncLikedIds,
+        showToast,
+        addToQueue,
+        playNext,
+        startRadio,
+        removeFromQueue,
       }}
     >
       {children}

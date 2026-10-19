@@ -10,6 +10,7 @@ import {
   Disc3,
   Loader2,
   AlertCircle,
+  MoreHorizontal,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { getArtistDetails, searchMusic } from "../services/api";
@@ -32,6 +33,7 @@ interface ArtistViewProps {
     artistName?: string,
     thumbnail?: string
   ) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
 }
 
@@ -47,6 +49,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
   onToggleLike,
   likedTrackIds,
   onNavigateAlbum,
+  onContextMenuTrack,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -269,6 +272,11 @@ export const ArtistView: FC<ArtistViewProps> = ({
                   <div
                     key={`${track.id}-${idx}`}
                     onDoubleClick={() => onPlayTrack(track, topSongs)}
+                    onContextMenu={(e) => {
+                      if (onContextMenuTrack) {
+                        onContextMenuTrack(track, e);
+                      }
+                    }}
                     className={`grid grid-cols-[40px_1fr_1fr_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
@@ -342,29 +350,34 @@ export const ArtistView: FC<ArtistViewProps> = ({
                     </div>
 
                     {/* Album Link */}
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (track.album_id) {
-                          onNavigateAlbum(
-                            track.album_id,
-                            track.album || undefined,
-                            track.artist,
-                            track.thumbnail || undefined
-                          );
-                        }
-                      }}
-                      className={`text-xs truncate ${
-                        track.album_id ? "hover:underline cursor-pointer" : ""
-                      } ${
-                        isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-                      }`}
-                    >
-                      {track.album || "Single"}
-                    </div>
+                    {(() => {
+                      const isSingle = !track.album || track.album.toLowerCase() === "single";
+                      return (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isSingle && track.album_id) {
+                              onNavigateAlbum(
+                                track.album_id,
+                                track.album || undefined,
+                                track.artist,
+                                track.thumbnail || undefined
+                              );
+                            }
+                          }}
+                          className={`text-xs truncate ${
+                            !isSingle && track.album_id ? "hover:underline cursor-pointer" : ""
+                          } ${
+                            isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                          }`}
+                        >
+                          {!isSingle ? track.album : ""}
+                        </div>
+                      );
+                    })()}
 
-                    {/* Heart Like */}
-                    <div className="flex items-center justify-center">
+                    {/* Heart Like & More */}
+                    <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -382,6 +395,19 @@ export const ArtistView: FC<ArtistViewProps> = ({
                               : "text-neutral-400 opacity-0 group-hover:opacity-100 hover:text-white"
                           }`}
                         />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onContextMenuTrack) {
+                            onContextMenuTrack(track, e);
+                          }
+                        }}
+                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 transition-opacity cursor-pointer"
+                        title="Diğer seçenekler"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
                       </button>
                     </div>
 

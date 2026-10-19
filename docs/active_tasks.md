@@ -65,5 +65,24 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - `PlayerContext.tsx` içerisine Dual-Buffer Preloader ve Stream URL Önbelleği (`streamCacheRef`) eklendi. Şarkı çalmaya başladıktan 3 saniye sonra sıradaki şarkı (Shuffle/Repeat kurallarına göre) arka planda çözülüp sessiz ikinci bir `HTMLAudioElement` (`preload="auto"`, `muted`) ile tamponlanıyor. Şarkı bittiğinde veya Sonraki Şarkı'ya basıldığında tekrar ağ isteği beklemeden milisaniyeler içinde anında çalmaya başlıyor.
   - `cargo check` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 12:** Faz 4 — Sağ Tık / Üç Nokta (`...`) Context Menüsü ve Global Aksiyonlar:
+    - **Global Context Menu Bileşeni (`TrackContextMenu.tsx`):**
+      - Spotify / Spotifast masaüstü tasarım standartlarına uygun, tema destekli (açık/koyu mod), fare koordinatlarına göre açılan ve ekran sınırlarını taşmayan (viewport bounds detection) akıllı menü oluşturuldu.
+      - Menü dışına tıklama (click outside) ve `Escape` tuşu ile anında kapanma sağlandı.
+    - **Çift Tetikleme Mekanizması (Dual-Trigger):**
+      - Tüm parça satırlarında sağ tık (`onContextMenu`) ve satır sonlarındaki üç nokta (`...` / `MoreHorizontal`) butonuna sol tık ile menünün açılması sağlandı.
+      - `PlaylistView`, `ArtistView`, `AlbumView`, `HomeView` (En Son Çalınanlar, Öneriler, Yeniden Dinle), `SearchView`, `RightDrawer` (Sıradaki Şarkılar) ve `PlayerBar` (sol parça alanı) bileşenlerine entegre edildi.
+    - **Eksiksiz Aksiyon Seti:**
+      - **Sıraya Ekle (`addToQueue`):** Parçayı aktif kuyruğun en sonuna ekler.
+      - **Bundan Sonra Çal (`playNext`):** Parçayı mevcut çalan şarkının hemen ardına ekler ve kesintisiz geçiş için Dual-Buffer preloader'ı anında tetikler.
+      - **Şarkı Radyosunu Başlat (`startRadio`):** Rust InnerTube `get_radio_tracks` (`RDAMVM<videoId>`) API'sini çağırarak şarkıya özel dinamik radyo listesini kuyruğa yükler ve oynatır.
+      - **Çalma Listesine Ekle (Submenu):** Fare ile üzerine gelindiğinde sağa (veya ekran kenarında sola) açılan dinamik alt menü ile kullanıcının çalma listeleri ve Beğenilenler listelenir; parçayı listeye kaydeder.
+      - **Sanatçıya Git / Albüme Git:** Faz 2'de hazırlanan `ArtistView` ve `AlbumView` navigasyonunu tetikleyerek ilgili detay sayfasına yönlendirir.
+      - **Beğen / Beğenilenler'den Kaldır:** Global `likedTrackIds` state'ini ve YouTube Music senkronizasyonunu yönetir.
+      - **Bağlantıyı Kopyala:** YouTube Music şarkı URL'sini (`navigator.clipboard`) kopyalar.
+    - **Dokunsal Toast Bildirimi (Pill Notification):**
+      - Sıraya ekleme, sonra çalma, çalma listesine ekleme, beğeni ve kopyalama işlemlerinde ekranın alt-orta kısmında şık, yüzen bir onay balonu (`player.toastMessage`) gösterilir.
+  - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
-- **Faz 4:** Sağ Tık / Üç Nokta (`...`) Context Menüsü (Sıraya Ekle, Sonra Çal, Listeye Ekle, Radyoyu Başlat, Sanatçıya/Albüme Git).
+- Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.

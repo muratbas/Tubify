@@ -10,14 +10,20 @@ import {
   FileText,
   Play,
   Share2,
+  MoreHorizontal,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import { MicroVisualizer } from "./MicroVisualizer";
 import { openExternalUrl } from "../services/api";
+import type { Track } from "../types/music";
 
-export const RightDrawer: FC = () => {
+interface RightDrawerProps {
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
+}
+
+export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
   const {
     activeTrack,
     playbackStatus,
@@ -263,7 +269,7 @@ export const RightDrawer: FC = () => {
                     {activeTrack.artist}
                   </p>
 
-                  {activeTrack.album && (
+                  {activeTrack.album && activeTrack.album.toLowerCase() !== "single" && (
                     <p
                       className={`text-xs truncate ${
                         isLight ? "text-[#71717a]" : "text-white/50"
@@ -364,6 +370,11 @@ export const RightDrawer: FC = () => {
                     <div
                       key={`queue-${track.id}-${idx}`}
                       onClick={() => playTrack(track)}
+                      onContextMenu={(e) => {
+                        if (onContextMenuTrack) {
+                          onContextMenuTrack(track, e);
+                        }
+                      }}
                       className={`flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer group ${
                         isActive
                           ? isLight
@@ -434,6 +445,18 @@ export const RightDrawer: FC = () => {
                             }`}
                           />
                         </button>
+                        {onContextMenuTrack && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onContextMenuTrack(track, e);
+                            }}
+                            className="p-1 transition-colors cursor-pointer text-white/30 group-hover:text-white/70 hover:text-white"
+                            title="Daha fazla seçenek"
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <span className="text-[11px] font-mono text-white/40">
                           {track.duration || "3:30"}
                         </span>
@@ -464,7 +487,9 @@ export const RightDrawer: FC = () => {
                 <p className="text-sm text-white font-bold tracking-tight">
                   {activeTrack.title}
                 </p>
-                <p className="opacity-70 text-[11px]">{activeTrack.album || "Single"}</p>
+                {activeTrack.album && activeTrack.album.toLowerCase() !== "single" && (
+                  <p className="opacity-70 text-[11px]">{activeTrack.album}</p>
+                )}
               </div>
             )}
           </div>

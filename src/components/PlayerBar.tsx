@@ -15,6 +15,7 @@ import {
   Mic2,
   ListMusic,
   Tv,
+  MoreHorizontal,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
@@ -47,6 +48,7 @@ interface PlayerBarProps {
     artistName?: string,
     thumbnail?: string
   ) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -107,8 +109,14 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           : "bg-[#000000] border-[#282828] text-white"
       }`}
     >
-      {/* 1. Left Side: 56x56 Artwork + Title + Artist + Heart */}
-      <div className="flex items-center gap-3.5 w-[30%] min-w-[180px]">
+      <div
+        className="flex items-center gap-3.5 w-[30%] min-w-[180px]"
+        onContextMenu={(e) => {
+          if (track && props.onContextMenuTrack) {
+            props.onContextMenuTrack(track, e);
+          }
+        }}
+      >
         <div
           className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 shadow-sm ${
             isLight ? "bg-neutral-100" : "bg-[#282828]"
@@ -128,24 +136,33 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         </div>
 
         <div className="min-w-0 max-w-[200px]">
-          <h4
-            onClick={() => {
-              if (track?.album_id && props.onNavigateAlbum) {
-                props.onNavigateAlbum(
-                  track.album_id,
-                  track.album || undefined,
-                  track.artist,
-                  track.thumbnail || undefined
-                );
-              }
-            }}
-            title={track?.title}
-            className={`text-sm font-semibold truncate leading-normal py-0.5 hover:underline cursor-pointer ${
-              isLight ? "text-neutral-900" : "text-white"
-            }`}
-          >
-            {track ? track.title : "Tubify"}
-          </h4>
+          {(() => {
+            const hasAlbum = !!(
+              track?.album_id &&
+              track.album &&
+              track.album.toLowerCase() !== "single"
+            );
+            return (
+              <h4
+                onClick={() => {
+                  if (hasAlbum && props.onNavigateAlbum) {
+                    props.onNavigateAlbum(
+                      track!.album_id!,
+                      track!.album || undefined,
+                      track!.artist,
+                      track!.thumbnail || undefined
+                    );
+                  }
+                }}
+                title={track?.title}
+                className={`text-sm font-semibold truncate leading-normal py-0.5 ${
+                  hasAlbum ? "hover:underline cursor-pointer" : ""
+                } ${isLight ? "text-neutral-900" : "text-white"}`}
+              >
+                {track ? track.title : "Tubify"}
+              </h4>
+            );
+          })()}
           <p
             onClick={() => {
               if (track && props.onNavigateArtist) {
@@ -162,19 +179,34 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         </div>
 
         {track && (
-          <button
-            onClick={onToggleLike}
-            className={`p-1.5 transition-transform active:scale-125 cursor-pointer ml-1 shrink-0 ${
-              isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-            }`}
-            title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
-          >
-            <Heart
-              className={`w-4 h-4 ${
-                isLiked ? "text-[#ff0000] fill-[#ff0000]" : ""
+          <>
+            <button
+              onClick={onToggleLike}
+              className={`p-1.5 transition-transform active:scale-125 cursor-pointer ml-1 shrink-0 ${
+                isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
               }`}
-            />
-          </button>
+              title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
+            >
+              <Heart
+                className={`w-4 h-4 ${
+                  isLiked ? "text-[#ff0000] fill-[#ff0000]" : ""
+                }`}
+              />
+            </button>
+            <button
+              onClick={(e) => {
+                if (props.onContextMenuTrack) {
+                  props.onContextMenuTrack(track, e);
+                }
+              }}
+              className={`p-1.5 transition-transform active:scale-125 cursor-pointer shrink-0 ${
+                isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+              }`}
+              title="Daha fazla seçenek"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </>
         )}
       </div>
 

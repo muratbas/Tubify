@@ -14,6 +14,7 @@ interface HomeViewProps {
   isPlaying?: boolean;
   onPlayTrack?: (track: Track) => void;
   onNavigateArtist?: (artistId: string, artistName: string) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
 }
 
 export const HomeView: FC<HomeViewProps> = ({
@@ -24,6 +25,7 @@ export const HomeView: FC<HomeViewProps> = ({
   isPlaying: propIsPlaying,
   onPlayTrack: propOnPlayTrack,
   onNavigateArtist,
+  onContextMenuTrack,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -71,6 +73,11 @@ export const HomeView: FC<HomeViewProps> = ({
               <div
                 key={`recent-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
+                onContextMenu={(e) => {
+                  if (onContextMenuTrack) {
+                    onContextMenuTrack(track, e);
+                  }
+                }}
                 className={`group flex items-center rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer relative shadow-sm active:scale-[0.98] ${
                   isLight
                     ? isActive
@@ -179,6 +186,11 @@ export const HomeView: FC<HomeViewProps> = ({
               <div
                 key={`rec-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
+                onContextMenu={(e) => {
+                  if (onContextMenuTrack) {
+                    onContextMenuTrack(track, e);
+                  }
+                }}
                 className={`group p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col space-y-2 relative shadow-sm active:scale-[0.98] ${
                   isLight
                     ? "bg-[#ffffff] hover:bg-[#f4f4f5] border-[#e4e4e7]"
@@ -267,6 +279,11 @@ export const HomeView: FC<HomeViewProps> = ({
               <div
                 key={`listen-${track.id}-${i}`}
                 onClick={() => onPlayTrack(track)}
+                onContextMenu={(e) => {
+                  if (onContextMenuTrack) {
+                    onContextMenuTrack(track, e);
+                  }
+                }}
                 className={`group p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col space-y-2 relative shadow-sm active:scale-[0.98] ${
                   isLight
                     ? "bg-[#ffffff] hover:bg-[#f4f4f5] border-[#e4e4e7]"

@@ -10,6 +10,7 @@ import {
   Disc,
   Loader2,
   AlertCircle,
+  MoreHorizontal,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { getAlbumDetails } from "../services/api";
@@ -29,6 +30,7 @@ interface AlbumViewProps {
   onToggleLike: (track: Track) => void;
   likedTrackIds: Set<string>;
   onNavigateArtist: (artistId: string, artistName: string) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
 }
 
@@ -46,6 +48,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
   onToggleLike,
   likedTrackIds,
   onNavigateArtist,
+  onContextMenuTrack,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -269,6 +272,11 @@ export const AlbumView: FC<AlbumViewProps> = ({
                   <div
                     key={`${track.id}-${idx}`}
                     onDoubleClick={() => onPlayTrack(track, tracks)}
+                    onContextMenu={(e) => {
+                      if (onContextMenuTrack) {
+                        onContextMenuTrack(track, e);
+                      }
+                    }}
                     className={`grid grid-cols-[40px_1fr_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
@@ -349,8 +357,8 @@ export const AlbumView: FC<AlbumViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Like Button */}
-                    <div className="flex items-center justify-center">
+                    {/* Like Button & More */}
+                    <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -368,6 +376,19 @@ export const AlbumView: FC<AlbumViewProps> = ({
                               : "text-neutral-400 opacity-0 group-hover:opacity-100 hover:text-white"
                           }`}
                         />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onContextMenuTrack) {
+                            onContextMenuTrack(track, e);
+                          }
+                        }}
+                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 transition-opacity cursor-pointer"
+                        title="Diğer seçenekler"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
                       </button>
                     </div>
 

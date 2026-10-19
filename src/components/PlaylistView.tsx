@@ -35,6 +35,7 @@ interface PlaylistViewProps {
     artistName?: string,
     thumbnail?: string
   ) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
 }
 
@@ -55,6 +56,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   onLoadMore,
   onNavigateArtist,
   onNavigateAlbum,
+  onContextMenuTrack,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -273,7 +275,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               </span>
               <span>BAŞLIK</span>
               <span>ALBÜM</span>
-              <span>EKLENME TARİHİ</span>
+              <span></span>
               <span className="text-center"></span>
               <span className="text-right flex items-center justify-end">
                 <Clock3 className="w-4 h-4" />
@@ -290,6 +292,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   <div
                     key={`${track.id}-${idx}`}
                     onDoubleClick={() => onPlayTrack(track)}
+                    onContextMenu={(e) => {
+                      if (onContextMenuTrack) {
+                        onContextMenuTrack(track, e);
+                      }
+                    }}
                     className={`grid grid-cols-[40px_1fr_1fr_140px_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
@@ -379,26 +386,31 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     </div>
 
                     {/* ALBÜM */}
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (track.album_id && onNavigateAlbum) {
-                          onNavigateAlbum(
-                            track.album_id,
-                            track.album || undefined,
-                            track.artist,
-                            track.thumbnail || undefined
-                          );
-                        }
-                      }}
-                      className={`text-xs truncate ${
-                        track.album_id ? "hover:underline cursor-pointer" : ""
-                      } ${
-                        isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-                      }`}
-                    >
-                      {track.album || "Single"}
-                    </div>
+                    {(() => {
+                      const isSingle = !track.album || track.album.toLowerCase() === "single";
+                      return (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isSingle && track.album_id && onNavigateAlbum) {
+                              onNavigateAlbum(
+                                track.album_id,
+                                track.album || undefined,
+                                track.artist,
+                                track.thumbnail || undefined
+                              );
+                            }
+                          }}
+                          className={`text-xs truncate ${
+                            !isSingle && track.album_id ? "hover:underline cursor-pointer" : ""
+                          } ${
+                            isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                          }`}
+                        >
+                          {!isSingle ? track.album : ""}
+                        </div>
+                      );
+                    })()}
 
                     {/* EKLENME TARİHİ */}
                     <div
@@ -431,7 +443,12 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                       </button>
 
                       <button
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onContextMenuTrack) {
+                            onContextMenuTrack(track, e);
+                          }
+                        }}
                         className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 transition-opacity cursor-pointer"
                         title="Diğer seçenekler"
                       >

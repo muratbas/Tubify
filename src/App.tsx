@@ -24,7 +24,8 @@ import {
   getPlaylistTracksPage,
 } from "./services/api";
 import type { Track, UserProfile, Playlist } from "./types/music";
-import { Loader2, Music2, Heart, Play, AlertCircle } from "lucide-react";
+import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
+import { Loader2, Music2, Heart, Play, AlertCircle, Check, MoreHorizontal } from "lucide-react";
 
 const INITIAL_RECOMMENDED: Track[] = [
   {
@@ -265,6 +266,25 @@ export const App: FC = () => {
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Global Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    track: Track;
+    position: ContextMenuPosition;
+  } | null>(null);
+
+  const handleOpenContextMenu = (track: Track, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      track,
+      position: { x: e.clientX, y: e.clientY },
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
 
   // Load User Profile on Startup
   useEffect(() => {
@@ -543,6 +563,7 @@ export const App: FC = () => {
                 onLoadMore={handleLoadMoreTracks}
                 onNavigateArtist={handleNavigateArtist}
                 onNavigateAlbum={handleNavigateAlbum}
+                onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
               />
             )}
@@ -563,6 +584,7 @@ export const App: FC = () => {
                 onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
                 likedTrackIds={player.likedTrackIds}
                 onNavigateAlbum={handleNavigateAlbum}
+                onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
               />
             )}
@@ -585,6 +607,7 @@ export const App: FC = () => {
                 onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
                 likedTrackIds={player.likedTrackIds}
                 onNavigateArtist={handleNavigateArtist}
+                onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
               />
             )}
@@ -647,6 +670,7 @@ export const App: FC = () => {
                         <div
                           key={`search-${track.id}-${idx}`}
                           onClick={() => player.playTrack(track, searchResults)}
+                          onContextMenu={(e) => handleOpenContextMenu(track, e)}
                           className={`flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer active:scale-[0.99] ${
                             isActive
                               ? isLight
@@ -728,6 +752,17 @@ export const App: FC = () => {
                                 }`}
                               />
                             </button>
+                            <button
+                              onClick={(e) => handleOpenContextMenu(track, e)}
+                              className={`p-1.5 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 ${
+                                isLight
+                                  ? "text-[#a1a1aa] hover:text-black"
+                                  : "text-white/40 hover:text-white"
+                              }`}
+                              title="Daha fazla seçenek"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
                             <span
                               className={`text-xs font-mono font-medium ${
                                 isLight ? "text-[#71717a]" : "text-white/50"
@@ -754,19 +789,21 @@ export const App: FC = () => {
                 isPlaying={player.playbackStatus === "playing"}
                 onPlayTrack={(t) => player.playTrack(t, [...player.recentTracks, ...INITIAL_RECOMMENDED])}
                 onNavigateArtist={handleNavigateArtist}
+                onContextMenuTrack={handleOpenContextMenu}
               />
             )}
           </main>
         </div>
 
         {/* Module 3: Sağ Panel */}
-        <RightDrawer />
+        <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
       </div>
 
       {/* Module 4: Alt Sabit Oynatıcı Barı */}
       <PlayerBar
         onNavigateArtist={handleNavigateArtist}
         onNavigateAlbum={handleNavigateAlbum}
+        onContextMenuTrack={handleOpenContextMenu}
       />
 
       {/* HUD mini-player overlay */}
@@ -789,6 +826,36 @@ export const App: FC = () => {
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
+
+      {/* Track Context Menu */}
+      {contextMenu && (
+        <TrackContextMenu
+          track={contextMenu.track}
+          position={contextMenu.position}
+          onClose={handleCloseContextMenu}
+          onNavigateArtist={handleNavigateArtist}
+          onNavigateAlbum={handleNavigateAlbum}
+          playlists={playlists}
+        />
+      )}
+
+      {/* Floating Toast Notification Pill */}
+      {player.toastMessage && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div
+            className={`px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2.5 text-xs font-semibold backdrop-blur-md border ${
+              isLight
+                ? "bg-neutral-900/90 text-white border-neutral-800"
+                : "bg-black/90 text-white border-white/20"
+            }`}
+          >
+            <div className="w-4 h-4 rounded-full bg-[#ff0000] flex items-center justify-center shrink-0">
+              <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+            </div>
+            <span>{player.toastMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
