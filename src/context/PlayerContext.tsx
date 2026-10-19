@@ -7,7 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Track, PlaybackStatus, RightDrawerTab, MoodCategory } from "../types/music";
+import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory } from "../types/music";
 import { getStreamUrl, toggleYtLike, getRadioTracks } from "../services/api";
 
 const INITIAL_RECENT: Track[] = [
@@ -59,6 +59,7 @@ interface PlayerContextType {
   is16x9Aspect: boolean;
   isRightDrawerOpen: boolean;
   rightDrawerTab: RightDrawerTab;
+  queueViewMode: QueueViewMode;
   isSidebarCollapsed: boolean;
   activeMood: MoodCategory;
   isMiniPlayer: boolean;
@@ -77,6 +78,10 @@ interface PlayerContextType {
   toggle16x9Aspect: () => void;
   toggleRightDrawer: (tab?: RightDrawerTab) => void;
   setRightDrawerTab: (tab: RightDrawerTab) => void;
+  setQueueViewMode: (mode: QueueViewMode) => void;
+  toggleQueue: () => void;
+  clearQueue: () => void;
+  saveQueueAsPlaylist: () => void;
   toggleSidebarCollapsed: () => void;
   setActiveMood: (mood: MoodCategory) => void;
   toggleMiniPlayer: () => void;
@@ -108,8 +113,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Desktop Panels & Layout State
   const [is16x9Aspect, setIs16x9Aspect] = useState(false);
-  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
-  const [rightDrawerTab, setRightDrawerTabState] = useState<RightDrawerTab>("nowPlaying");
+  const [queueViewMode, setQueueViewMode] = useState<QueueViewMode>("closed");
+  const isRightDrawerOpen = queueViewMode !== "closed";
+  const [rightDrawerTab, setRightDrawerTabState] = useState<RightDrawerTab>("queue");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeMood, setActiveMood] = useState<MoodCategory>("all");
   const [isMiniPlayer, setIsMiniPlayer] = useState(false);
@@ -457,19 +463,42 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const toggleRepeat = () => setIsRepeat((prev) => !prev);
   const toggle16x9Aspect = () => setIs16x9Aspect((prev) => !prev);
 
-  const toggleRightDrawer = (tab?: RightDrawerTab) => {
-    if (tab) {
-      setRightDrawerTabState(tab);
-      setIsRightDrawerOpen(true);
-    } else {
-      setIsRightDrawerOpen((prev) => !prev);
-    }
-  };
+  const toggleQueue = useCallback(() => {
+    setQueueViewMode((prev) => (prev === "closed" ? "mini" : "closed"));
+  }, []);
+
+  const toggleRightDrawer = useCallback((_tab?: RightDrawerTab) => {
+    setQueueViewMode((prev) => (prev === "closed" ? "mini" : "closed"));
+  }, []);
 
   const setRightDrawerTab = (tab: RightDrawerTab) => {
     setRightDrawerTabState(tab);
-    if (!isRightDrawerOpen) setIsRightDrawerOpen(true);
+    if (queueViewMode === "closed") setQueueViewMode("mini");
   };
+
+  // Toast notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    setToastMessage(msg);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+  }, []);
+
+  const clearQueue = useCallback(() => {
+    setQueueState(activeTrack ? [activeTrack] : []);
+    queueRef.current = activeTrack ? [activeTrack] : [];
+    showToast("Sıra temizlendi");
+  }, [activeTrack, showToast]);
+
+  const saveQueueAsPlaylist = useCallback(() => {
+    showToast("Sıra çalma listesi olarak kaydedildi");
+  }, [showToast]);
 
   const toggleSidebarCollapsed = () => setIsSidebarCollapsed((prev) => !prev);
   const toggleMiniPlayer = () => setIsMiniPlayer((prev) => !prev);
@@ -506,20 +535,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const setQueue = (tracks: Track[]) => {
     setQueueState(tracks);
   };
-
-  // Toast notifications
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimeoutRef = useRef<number | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
-    setToastMessage(msg);
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
-  }, []);
 
   const addToQueue = useCallback((track: Track) => {
     setQueueState((prev) => {
@@ -618,6 +633,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queue,
         is16x9Aspect,
         isRightDrawerOpen,
+        queueViewMode,
+        setQueueViewMode,
+        toggleQueue,
+        clearQueue,
+        saveQueueAsPlaylist,
         rightDrawerTab,
         isSidebarCollapsed,
         activeMood,

@@ -130,7 +130,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
     >
       {/* Hero Header */}
       <div
-        className={`relative px-8 pb-6 pt-20 flex flex-col gap-6 ${
+        className={`relative px-8 pb-6 pt-6 flex flex-col gap-6 ${
           isLight
             ? "bg-gradient-to-b from-[#e0e7ff]/60 via-[#f1f5f9]/30 to-white"
             : "bg-gradient-to-b from-[#1e1b4b]/80 via-[#0f172a]/40 to-[#121212]"

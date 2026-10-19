@@ -74,5 +74,6 @@ export interface Playlist {
 }
 
 export type RightDrawerTab = "nowPlaying" | "queue" | "lyrics";
+export type QueueViewMode = "closed" | "mini" | "expanded";
 
 export type MoodCategory = "all" | "relax" | "energize" | "focus" | "workout" | "commute";

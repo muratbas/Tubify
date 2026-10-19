@@ -1,22 +1,17 @@
-import type { FC } from "react";
+import { useRef, useEffect, type FC } from "react";
 import {
-  X,
+  ChevronLeft,
+  ChevronRight,
+  Shuffle,
+  Trash2,
+  ListPlus,
   Music2,
-  Tv,
-  Disc3,
-  Heart,
-  ExternalLink,
-  ListMusic,
-  FileText,
-  Play,
-  Share2,
   MoreHorizontal,
+  Volume2,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
-import { MicroVisualizer } from "./MicroVisualizer";
-import { openExternalUrl } from "../services/api";
 import type { Track } from "../types/music";
 
 interface RightDrawerProps {
@@ -28,14 +23,12 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
     activeTrack,
     playbackStatus,
     queue,
-    is16x9Aspect,
-    isRightDrawerOpen,
-    rightDrawerTab,
-    toggleRightDrawer,
-    setRightDrawerTab,
-    toggle16x9Aspect,
-    toggleLike,
-    likedTrackIds,
+    queueViewMode,
+    setQueueViewMode,
+    isShuffle,
+    toggleShuffle,
+    clearQueue,
+    saveQueueAsPlaylist,
     playTrack,
   } = usePlayer();
 
@@ -44,382 +37,373 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
   const isLight = theme === "light";
   const isPlaying = playbackStatus === "playing";
 
-  if (!isRightDrawerOpen) return null;
+  const activeTrackRef = useRef<HTMLDivElement>(null);
 
-  const isLiked = activeTrack ? likedTrackIds.has(activeTrack.id) : false;
+  // Auto-scroll active track into view when it changes
+  useEffect(() => {
+    if (activeTrackRef.current) {
+      activeTrackRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activeTrack?.id]);
 
-  const handleOpenYoutube = () => {
-    if (!activeTrack) return;
-    openExternalUrl(`https://music.youtube.com/watch?v=${activeTrack.id}`);
-  };
+  if (queueViewMode === "closed") return null;
 
-  const handleShare = () => {
-    if (!activeTrack) return;
-    navigator.clipboard?.writeText(`https://music.youtube.com/watch?v=${activeTrack.id}`);
-  };
+  const isMini = queueViewMode === "mini";
 
-  return (
-    <aside
-      className={`w-[340px] xl:w-[380px] h-full flex flex-col rounded-none overflow-hidden shrink-0 border-l transition-all duration-300 relative select-none ${
-        isLight
-          ? "bg-[#ffffff] border-[#e4e4e7] text-[#111111]"
-          : "bg-[#0a0a0a] border-white/10 text-white"
-      }`}
-    >
-      {/* Drawer Header with Tabs */}
-      <div
-        className={`px-4 py-3 flex items-center justify-between border-b shrink-0 ${
-          isLight ? "border-[#e4e4e7]" : "border-white/[0.08]"
+  // Find index of currently playing track
+  const activeIndex = activeTrack ? queue.findIndex((t) => t.id === activeTrack.id) : -1;
+
+  // -------------------------------------------------------------
+  // MINI STRIP MODE (w-[60px]) — Refer to Zuno Image 2
+  // -------------------------------------------------------------
+  if (isMini) {
+    return (
+      <aside
+        className={`w-[60px] h-full flex flex-col shrink-0 border-l transition-all duration-200 ease-in-out select-none relative z-20 ${
+          isLight
+            ? "bg-white border-neutral-200/80 text-neutral-900"
+            : "bg-[#0c0c0c] border-white/10 text-white"
         }`}
       >
-        <div className="flex items-center gap-1 bg-white/[0.04] p-1 rounded-xl">
+        {/* Top Header: Expand Button (<) */}
+        <div className="h-12 flex items-center justify-center shrink-0 border-b border-neutral-200/60 dark:border-white/10">
           <button
-            onClick={() => setRightDrawerTab("nowPlaying")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold tracking-tight transition-all cursor-pointer ${
-              rightDrawerTab === "nowPlaying"
-                ? isLight
-                  ? "bg-[#18181b] text-white shadow-sm"
-                  : "bg-white text-black shadow-sm"
-                : isLight
-                ? "text-[#71717a] hover:text-[#18181b]"
-                : "text-white/60 hover:text-white"
+            onClick={() => setQueueViewMode("expanded")}
+            title="Expand queue"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+              isLight
+                ? "text-neutral-600 hover:text-black hover:bg-neutral-100"
+                : "text-neutral-400 hover:text-white hover:bg-white/10"
             }`}
           >
-            {t.nowPlaying}
-          </button>
-          <button
-            onClick={() => setRightDrawerTab("queue")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold tracking-tight transition-all cursor-pointer flex items-center gap-1.5 ${
-              rightDrawerTab === "queue"
-                ? isLight
-                  ? "bg-[#18181b] text-white shadow-sm"
-                  : "bg-white text-black shadow-sm"
-                : isLight
-                ? "text-[#71717a] hover:text-[#18181b]"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            <span>{t.queue}</span>
-            {queue.length > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  rightDrawerTab === "queue"
-                    ? isLight
-                      ? "bg-white/20 text-white"
-                      : "bg-black/20 text-black"
-                    : isLight
-                    ? "bg-[#e4e4e7] text-[#52525b]"
-                    : "bg-white/[0.1] text-white/70"
-                }`}
-              >
-                {queue.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setRightDrawerTab("lyrics")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold tracking-tight transition-all cursor-pointer ${
-              rightDrawerTab === "lyrics"
-                ? isLight
-                  ? "bg-[#18181b] text-white shadow-sm"
-                  : "bg-white text-black shadow-sm"
-                : isLight
-                ? "text-[#71717a] hover:text-[#18181b]"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            {t.lyrics}
+            <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
 
-        <button
-          onClick={() => toggleRightDrawer()}
-          title="Close drawer"
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLight
-              ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-              : "text-white/60 hover:text-white hover:bg-white/[0.08]"
-          }`}
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Drawer Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-        {/* TAB 1: Now Playing */}
-        {rightDrawerTab === "nowPlaying" && (
-          <div className="space-y-6">
-            {activeTrack ? (
-              <>
-                {/* Artwork with Aspect Switch (1:1 vs 16:9 InnerTube) */}
-                <div className="relative group">
-                  <div
-                    className={`w-full overflow-hidden transition-all duration-300 shadow-2xl relative ${
-                      is16x9Aspect
-                        ? "aspect-video rounded-xl bg-black"
-                        : "aspect-square rounded-2xl bg-[#141416]"
-                    } ${isLight ? "ring-1 ring-black/5" : "ring-1 ring-white/10"}`}
-                  >
-                    {activeTrack.thumbnail ? (
-                      <img
-                        src={activeTrack.thumbnail}
-                        alt={activeTrack.title}
-                        className="w-full h-full object-cover select-none"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                        <Music2 className="w-12 h-12 text-[#ff0000]" />
-                      </div>
-                    )}
-
-                    {isPlaying && (
-                      <div className="absolute bottom-3 right-3 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-md flex items-center gap-1.5 border border-white/10">
-                        <MicroVisualizer isPlaying={isPlaying} />
-                        <span className="text-[10px] font-mono text-white/80">LIVE</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 1:1 vs 16:9 Aspect Ratio Toggle Button (InnerTube geek feature) */}
-                  <div className="mt-3 flex items-center justify-between">
-                    <button
-                      onClick={toggle16x9Aspect}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
-                        isLight
-                          ? "bg-white hover:bg-[#f4f4f5] border-[#e4e4e7] text-[#18181b]"
-                          : "bg-white/[0.06] hover:bg-white/[0.12] border-white/[0.08] text-white/90"
-                      }`}
-                      title="Switch aspect ratio between 1:1 Album and 16:9 Video"
-                    >
-                      {is16x9Aspect ? (
-                        <>
-                          <Disc3 className="w-3.5 h-3.5 text-[#ff0000]" />
-                          <span>{t.songMode}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Tv className="w-3.5 h-3.5 text-[#ff0000]" />
-                          <span>{t.videoMode}</span>
-                        </>
-                      )}
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => toggleLike(activeTrack)}
-                        className={`p-2 rounded-xl transition-all cursor-pointer ${
-                          isLiked
-                            ? "text-[#ff0000] bg-rose-500/10"
-                            : isLight
-                            ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                            : "text-white/60 hover:text-white hover:bg-white/[0.08]"
-                        }`}
-                        title={isLiked ? "Unlike" : "Like"}
-                      >
-                        <Heart
-                          className={`w-4 h-4 ${isLiked ? "fill-[#ff0000] text-[#ff0000]" : ""}`}
-                        />
-                      </button>
-
-                      <button
-                        onClick={handleOpenYoutube}
-                        className={`p-2 rounded-xl transition-all cursor-pointer ${
-                          isLight
-                            ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                            : "text-white/60 hover:text-white hover:bg-white/[0.08]"
-                        }`}
-                        title="Open on YouTube Music"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={handleShare}
-                        className={`p-2 rounded-xl transition-all cursor-pointer ${
-                          isLight
-                            ? "text-[#71717a] hover:text-[#18181b] hover:bg-[#f4f4f5]"
-                            : "text-white/60 hover:text-white hover:bg-white/[0.08]"
-                        }`}
-                        title="Copy YouTube URL"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Track Details */}
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3
-                      className={`text-lg font-black tracking-tight leading-snug ${
-                        isLight ? "text-[#18181b]" : "text-white"
-                      }`}
-                    >
-                      {activeTrack.title}
-                    </h3>
-                  </div>
-
-                  <p
-                    className={`text-sm font-semibold tracking-tight ${
-                      isLight ? "text-[#52525b]" : "text-white/70"
-                    }`}
-                  >
-                    {activeTrack.artist}
-                  </p>
-
-                  {activeTrack.album && activeTrack.album.toLowerCase() !== "single" && (
-                    <p
-                      className={`text-xs truncate ${
-                        isLight ? "text-[#71717a]" : "text-white/50"
-                      }`}
-                    >
-                      {activeTrack.album}
-                    </p>
-                  )}
-                </div>
-
-                {/* Next in Queue Preview Card */}
-                {queue.length > 1 && (
-                  <div
-                    className={`p-3.5 rounded-2xl border transition-all ${
-                      isLight
-                        ? "bg-[#f4f4f5]/60 border-[#e4e4e7]"
-                        : "bg-white/[0.03] border-white/[0.06]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold tracking-wider uppercase text-white/50">
-                        {t.queue} Preview
-                      </span>
-                      <button
-                        onClick={() => setRightDrawerTab("queue")}
-                        className="text-[11px] font-semibold text-[#ff0000] hover:underline cursor-pointer"
-                      >
-                        View all
-                      </button>
-                    </div>
-                    {(() => {
-                      const curIdx = queue.findIndex((t) => t.id === activeTrack.id);
-                      const next = curIdx !== -1 && curIdx + 1 < queue.length ? queue[curIdx + 1] : queue[0];
-                      if (!next) return null;
-                      return (
-                        <div
-                          onClick={() => playTrack(next)}
-                          className="flex items-center gap-3 cursor-pointer group"
-                        >
-                          <img
-                            src={next.thumbnail || ""}
-                            alt={next.title}
-                            className="w-10 h-10 rounded-lg object-cover shrink-0 bg-zinc-800"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <h5
-                              className={`text-xs font-bold truncate group-hover:text-[#ff0000] transition-colors ${
-                                isLight ? "text-[#18181b]" : "text-white"
-                              }`}
-                            >
-                              {next.title}
-                            </h5>
-                            <p
-                              className={`text-[11px] truncate ${
-                                isLight ? "text-[#71717a]" : "text-white/50"
-                              }`}
-                            >
-                              {next.artist}
-                            </p>
-                          </div>
-                          <Play className="w-3.5 h-3.5 text-white/40 group-hover:text-white transition-colors" />
-                        </div>
-                      );
-                    })()}
+        {/* Vertical Strip of Artwork Covers (Shows ALL tracks: past, active, upcoming) */}
+        <div className="flex-1 overflow-y-auto no-scrollbar py-3 px-2 flex flex-col items-center gap-2.5">
+          {/* If activeTrack is not in queue list, show it at top */}
+          {activeTrack && activeIndex === -1 && (
+            <div
+              ref={activeTrackRef}
+              onClick={() => playTrack(activeTrack)}
+              className="relative group cursor-pointer"
+              title={`Şu an çalan: ${activeTrack.title} • ${activeTrack.artist}`}
+            >
+              <div className="w-10 h-10 rounded-lg overflow-hidden ring-2 ring-[#FF0000] p-0.5 bg-neutral-900">
+                {activeTrack.thumbnail ? (
+                  <img
+                    src={activeTrack.thumbnail}
+                    alt={activeTrack.title}
+                    className="w-full h-full object-cover rounded-md"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-zinc-800 rounded-md">
+                    <Music2 className="w-4 h-4 text-[#FF0000]" />
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="py-20 text-center space-y-3">
-                <Music2 className="w-10 h-10 mx-auto text-white/20" />
-                <p className="text-xs text-white/50">No track playing right now.</p>
               </div>
-            )}
+              {isPlaying && (
+                <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center pointer-events-none">
+                  <div className="flex items-center gap-0.5">
+                    <div className="w-0.5 h-3 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
+                    <div className="w-0.5 h-4 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
+                    <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Render all queue tracks: past tracks are dimmed, active has red ring, upcoming have full opacity */}
+          {queue.map((track, idx) => {
+            const isActive = activeIndex !== -1 ? idx === activeIndex : activeTrack?.id === track.id;
+            const isPast = activeIndex !== -1 && idx < activeIndex;
+
+            if (isActive) {
+              return (
+                <div
+                  key={`mini-active-${track.id}-${idx}`}
+                  ref={activeTrackRef}
+                  onClick={() => playTrack(track)}
+                  className="relative group cursor-pointer"
+                  title={`Şu an çalan: ${track.title} • ${track.artist}`}
+                >
+                  <div className="w-10 h-10 rounded-lg overflow-hidden ring-2 ring-[#FF0000] p-0.5 bg-neutral-900">
+                    {track.thumbnail ? (
+                      <img
+                        src={track.thumbnail}
+                        alt={track.title}
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-zinc-800 rounded-md">
+                        <Music2 className="w-4 h-4 text-[#FF0000]" />
+                      </div>
+                    )}
+                  </div>
+                  {isPlaying ? (
+                    <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center pointer-events-none">
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-0.5 h-3 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
+                        <div className="w-0.5 h-4 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
+                        <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Volume2 className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={`mini-track-${track.id}-${idx}`}
+                onClick={() => playTrack(track)}
+                onContextMenu={(e) => onContextMenuTrack?.(track, e)}
+                className={`relative group cursor-pointer transition-all ${
+                  isPast
+                    ? "opacity-50 hover:opacity-100"
+                    : "opacity-100 hover:scale-105 active:scale-95"
+                }`}
+                title={`${isPast ? "(Önceki) " : ""}${track.title} • ${track.artist}`}
+              >
+                <div className="w-10 h-10 rounded-md overflow-hidden bg-neutral-200 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/5">
+                  {track.thumbnail ? (
+                    <img
+                      src={track.thumbnail}
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Music2 className="w-4 h-4 text-neutral-400" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // EXPANDED FULL QUEUE MODE (w-[300px]) — Refer to Zuno Image 1
+  // -------------------------------------------------------------
+  return (
+    <aside
+      className={`w-[300px] h-full flex flex-col shrink-0 border-l transition-all duration-200 ease-in-out select-none relative z-20 ${
+        isLight
+          ? "bg-white border-neutral-200/80 text-neutral-900"
+          : "bg-[#0c0c0c] border-white/10 text-white"
+      }`}
+    >
+      {/* Header: Collapse Button (>) + Title + Actions (Shuffle, Save, Clear) */}
+      <div className="h-12 px-3 flex items-center justify-between border-b border-neutral-200/60 dark:border-white/10 shrink-0">
+        {/* Left: Collapse Button + "Up next" Title */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={() => setQueueViewMode("mini")}
+            title="Collapse queue"
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+              isLight
+                ? "text-neutral-600 hover:text-black hover:bg-neutral-100"
+                : "text-neutral-400 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <h3 className="text-sm font-bold tracking-tight truncate leading-none">
+            {t.queue || "Up next"}
+          </h3>
+        </div>
+
+        {/* Right: Actions (Shuffle, Save, Clear) */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Shuffle Toggle */}
+          <button
+            onClick={toggleShuffle}
+            title={isShuffle ? "Karışık Çalma Açık" : "Sırayı Karıştır"}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              isShuffle
+                ? "text-[#FF0000] bg-rose-500/10"
+                : isLight
+                ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                : "text-neutral-400 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Save queue as playlist */}
+          <button
+            onClick={saveQueueAsPlaylist}
+            title="Sırayı çalma listesi olarak kaydet"
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              isLight
+                ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                : "text-neutral-400 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <ListPlus className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Clear queue */}
+          <button
+            onClick={clearQueue}
+            title="Sırayı temizle"
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              isLight
+                ? "text-neutral-500 hover:text-[#FF0000] hover:bg-rose-50"
+                : "text-neutral-400 hover:text-[#FF0000] hover:bg-rose-950/20"
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Queue Content (Scrollable) */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2.5 space-y-1">
+        {/* Fallback Now Playing Card if activeTrack is not part of queue array */}
+        {activeTrack && activeIndex === -1 && (
+          <div
+            ref={activeTrackRef}
+            className={`p-2.5 rounded-xl border transition-all mb-2 ${
+              isLight
+                ? "bg-rose-500/[0.06] border-rose-500/20 shadow-sm"
+                : "bg-rose-500/[0.1] border-rose-500/25"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[10px] font-bold text-[#FF0000] tracking-wider uppercase">
+                {isPlaying ? "PLAYING" : "PAUSED"}
+              </span>
+              {isPlaying && (
+                <div className="flex items-center gap-0.5">
+                  <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
+                  <div className="w-0.5 h-2.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
+                  <div className="w-0.5 h-1.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 bg-neutral-200 dark:bg-zinc-800 shadow-sm">
+                {activeTrack.thumbnail ? (
+                  <img
+                    src={activeTrack.thumbnail}
+                    alt={activeTrack.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Music2 className="w-4 h-4 text-[#FF0000]" />
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p
+                  className={`text-sm font-semibold truncate leading-normal py-0.5 ${
+                    isLight ? "text-neutral-900" : "text-white"
+                  }`}
+                >
+                  {activeTrack.title}
+                </p>
+                <p
+                  className={`text-xs truncate leading-normal py-0.5 ${
+                    isLight ? "text-neutral-500" : "text-neutral-400"
+                  }`}
+                >
+                  {activeTrack.artist}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* TAB 2: Queue */}
-        {rightDrawerTab === "queue" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50">
-                Playing Next ({queue.length})
-              </span>
-            </div>
+        {/* FULL QUEUE LIST: Past tracks + Active Track Card + Upcoming tracks */}
+        {queue.length === 0 && !activeTrack ? (
+          <div className="py-12 text-center space-y-2">
+            <p className="text-xs text-neutral-400 dark:text-neutral-500">
+              Sırada parça yok.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {queue.map((track, idx) => {
+              const isActive = activeIndex !== -1 ? idx === activeIndex : activeTrack?.id === track.id;
+              const isPast = activeIndex !== -1 && idx < activeIndex;
 
-            {queue.length === 0 ? (
-              <div className="py-20 text-center space-y-2 text-white/40">
-                <ListMusic className="w-10 h-10 mx-auto opacity-30" />
-                <p className="text-xs">Queue is currently empty.</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {queue.map((track, idx) => {
-                  const isActive = activeTrack?.id === track.id;
-                  const isTrackLiked = likedTrackIds.has(track.id);
-
-                  return (
-                    <div
-                      key={`queue-${track.id}-${idx}`}
-                      onClick={() => playTrack(track)}
-                      onContextMenu={(e) => {
-                        if (onContextMenuTrack) {
-                          onContextMenuTrack(track, e);
-                        }
-                      }}
-                      className={`flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer group ${
-                        isActive
-                          ? isLight
-                            ? "bg-[#ffffff] shadow-sm border border-[#e4e4e7]"
-                            : "bg-white/[0.08] border border-white/[0.1] text-white"
-                          : isLight
-                          ? "hover:bg-white/80 text-[#18181b]"
-                          : "hover:bg-white/[0.04] text-white/80"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-zinc-800">
-                          {track.thumbnail ? (
-                            <img
-                              src={track.thumbnail}
-                              alt={track.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Music2 className="w-4 h-4 text-white/40" />
-                            </div>
-                          )}
-                          {isActive && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                              <MicroVisualizer isPlaying={isPlaying} />
-                            </div>
-                          )}
+              // If this is the active track in queue -> Render the special Now Playing Card
+              if (isActive) {
+                return (
+                  <div
+                    key={`queue-active-${track.id}-${idx}`}
+                    ref={activeTrackRef}
+                    onClick={() => playTrack(track)}
+                    onContextMenu={(e) => onContextMenuTrack?.(track, e)}
+                    className={`p-2.5 rounded-xl border transition-all my-1.5 cursor-pointer ${
+                      isLight
+                        ? "bg-rose-500/[0.06] border-rose-500/20 shadow-sm"
+                        : "bg-rose-500/[0.1] border-rose-500/25"
+                    }`}
+                  >
+                    {/* Top Status Header */}
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[10px] font-bold text-[#FF0000] tracking-wider uppercase">
+                        {isPlaying ? "PLAYING" : "PAUSED"}
+                      </span>
+                      {isPlaying && (
+                        <div className="flex items-center gap-0.5">
+                          <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
+                          <div className="w-0.5 h-2.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
+                          <div className="w-0.5 h-1.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
                         </div>
+                      )}
+                    </div>
 
-                        <div className="min-w-0">
-                          <h4
-                            className={`text-xs font-bold truncate ${
-                              isActive
-                                ? "text-[#ff0000]"
-                                : isLight
-                                ? "text-[#18181b]"
-                                : "text-white"
-                            }`}
-                          >
-                            {track.title}
-                          </h4>
+                    {/* Active Song Row: EXACT typography matching PlaylistView */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 bg-neutral-200 dark:bg-zinc-800 shadow-sm">
+                        {track.thumbnail ? (
+                          <img
+                            src={track.thumbnail}
+                            alt={track.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Music2 className="w-4 h-4 text-[#FF0000]" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`text-sm font-semibold truncate leading-normal py-0.5 text-[#FF0000]`}
+                        >
+                          {track.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                          {track.is_explicit && (
+                            <span
+                              title="Explicit"
+                              className="w-3.5 h-3.5 rounded-[2px] bg-neutral-500 text-white text-[9px] font-black shrink-0 inline-flex items-center justify-center leading-none"
+                            >
+                              E
+                            </span>
+                          )}
                           <p
-                            className={`text-[11px] truncate ${
-                              isLight ? "text-[#71717a]" : "text-white/50"
+                            className={`text-xs truncate leading-normal py-0.5 ${
+                              isLight ? "text-neutral-600" : "text-neutral-300"
                             }`}
                           >
                             {track.artist}
@@ -427,74 +411,108 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      {onContextMenuTrack && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleLike(track);
+                            onContextMenuTrack(track, e);
                           }}
-                          className={`p-1 transition-colors cursor-pointer ${
-                            isTrackLiked
-                              ? "text-[#ff0000]"
-                              : "text-white/20 group-hover:text-white/60"
-                          }`}
+                          className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                          title="Daha fazla seçenek"
                         >
-                          <Heart
-                            className={`w-3.5 h-3.5 ${
-                              isTrackLiked ? "fill-[#ff0000] text-[#ff0000]" : ""
-                            }`}
-                          />
+                          <MoreHorizontal className="w-4 h-4" />
                         </button>
-                        {onContextMenuTrack && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onContextMenuTrack(track, e);
-                            }}
-                            className="p-1 transition-colors cursor-pointer text-white/30 group-hover:text-white/70 hover:text-white"
-                            title="Daha fazla seçenek"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <span className="text-[11px] font-mono text-white/40">
-                          {track.duration || "3:30"}
-                        </span>
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                  </div>
+                );
+              }
 
-        {/* TAB 3: Lyrics */}
-        {rightDrawerTab === "lyrics" && (
-          <div className="h-full flex flex-col justify-center items-center py-10 px-4 text-center space-y-4">
-            <FileText className="w-10 h-10 text-white/20" />
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-white/80">Lyrics Stream</h4>
-              <p className="text-xs text-white/40 max-w-xs">
-                {activeTrack
-                  ? `Real-time synced lyrics for "${activeTrack.title}" by ${activeTrack.artist}.`
-                  : "Play a song to view available lyrics and liner notes."}
-              </p>
-            </div>
-            {activeTrack && (
-              <div className="w-full pt-4 space-y-3 font-medium text-xs text-white/60">
-                <p className="opacity-40">{activeTrack.artist}</p>
-                <p className="text-sm text-white font-bold tracking-tight">
-                  {activeTrack.title}
-                </p>
-                {activeTrack.album && activeTrack.album.toLowerCase() !== "single" && (
-                  <p className="opacity-70 text-[11px]">{activeTrack.album}</p>
-                )}
-              </div>
-            )}
+              // Normal Track Row (Past tracks have opacity-50, upcoming tracks have 100% FULL opacity and playlist typography)
+              return (
+                <div
+                  key={`queue-track-${track.id}-${idx}`}
+                  onClick={() => playTrack(track)}
+                  onContextMenu={(e) => onContextMenuTrack?.(track, e)}
+                  className={`flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer group ${
+                    isPast ? "opacity-50 hover:opacity-100" : "opacity-100"
+                  } ${
+                    isLight
+                      ? "hover:bg-neutral-200/60"
+                      : "hover:bg-white/10"
+                  }`}
+                >
+                  {/* Artwork */}
+                  <div className="relative w-10 h-10 rounded-md overflow-hidden shrink-0 bg-neutral-200 dark:bg-zinc-800 shadow-sm">
+                    {track.thumbnail ? (
+                      <img
+                        src={track.thumbnail}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 className="w-4 h-4 text-neutral-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info: EXACT text style & color from PlaylistView */}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-sm font-semibold truncate leading-normal py-0.5 ${
+                        isLight ? "text-neutral-900" : "text-white"
+                      } group-hover:text-[#ff0000] transition-colors`}
+                    >
+                      {track.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                      {track.is_explicit && (
+                        <span
+                          title="Explicit"
+                          className="w-3.5 h-3.5 rounded-[2px] bg-neutral-500 text-white text-[9px] font-black shrink-0 inline-flex items-center justify-center leading-none"
+                        >
+                          E
+                        </span>
+                      )}
+                      <p
+                        className={`text-xs truncate leading-normal py-0.5 ${
+                          isLight
+                            ? "text-neutral-500 hover:text-neutral-900"
+                            : "text-neutral-400 hover:text-white"
+                        }`}
+                      >
+                        {track.artist}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* More Context Options on hover */}
+                  {onContextMenuTrack && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextMenuTrack(track, e);
+                      }}
+                      className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                        isLight
+                          ? "text-neutral-500 hover:text-black hover:bg-black/5"
+                          : "text-neutral-400 hover:text-white hover:bg-white/10"
+                      }`}
+                      title="Daha fazla seçenek"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
     </aside>
   );
 };
+
+export default RightDrawer;

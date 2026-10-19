@@ -503,12 +503,13 @@ export const App: FC = () => {
             canGoForward={canGoForward}
           />
 
-          {/* Module 2 İçerik: Ana İçerik Paneli */}
-          <main
-            className={`flex-1 flex flex-col h-full overflow-hidden relative ${
-              isLight ? "bg-[#ffffff]" : "bg-[#121212]"
-            }`}
-          >
+          {/* Module 2 İçerik: Ana İçerik Paneli ve Sağ Panel */}
+          <div className="flex-1 flex overflow-hidden min-h-0 relative">
+            <main
+              className={`flex-1 flex flex-col h-full overflow-hidden relative ${
+                isLight ? "bg-[#ffffff]" : "bg-[#121212]"
+              }`}
+            >
             {/* Apple Music Style Ambient Blur Background */}
             <AmbientBackground thumbnail={player.activeTrack?.thumbnail} />
 
@@ -615,7 +616,7 @@ export const App: FC = () => {
             {/* VIEW 5: Search View */}
             {currentNav.type === "search" && (
               <div
-                className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-20 space-y-6 pb-28 relative ${
+                className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-6 space-y-6 pb-28 relative ${
                   isLight ? "text-[#111111]" : "text-white"
                 }`}
               >
@@ -792,11 +793,12 @@ export const App: FC = () => {
                 onContextMenuTrack={handleOpenContextMenu}
               />
             )}
-          </main>
-        </div>
+            </main>
 
-        {/* Module 3: Sağ Panel */}
-        <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
+            {/* Module 3: Sağ Panel (Queue / Lyrics / NowPlaying) */}
+            <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
+          </div>
+        </div>
       </div>
 
       {/* Module 4: Alt Sabit Oynatıcı Barı */}

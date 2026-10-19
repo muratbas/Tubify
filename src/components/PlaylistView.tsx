@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
+import { usePlayer } from "../context/PlayerContext";
 import type { Track, Playlist } from "../types/music";
 
 interface PlaylistViewProps {
@@ -60,6 +61,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const { queueViewMode } = usePlayer();
   const isLight = theme === "light";
 
   const [filterQuery, setFilterQuery] = useState("");
@@ -81,6 +83,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   });
 
   const renderedTracks = displayTracks.slice(0, visibleCount);
+
+  const isQueueExpanded = queueViewMode === "expanded";
+  const gridTemplate = isQueueExpanded
+    ? "grid-cols-[40px_minmax(200px,1fr)_70px_50px] xl:grid-cols-[40px_minmax(200px,1fr)_140px_70px_50px]"
+    : "grid-cols-[40px_minmax(200px,1.5fr)_minmax(120px,1fr)_70px_50px]";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -112,7 +119,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
     >
       {/* Top Hero Banner with Soft Gradient melting into pure white */}
       <div
-        className={`relative px-8 pb-6 pt-20 flex flex-col gap-6 ${
+        className={`relative px-8 pb-6 pt-6 flex flex-col gap-6 ${
           isLight
             ? "bg-gradient-to-b from-[#b4c6fc]/70 via-[#e0e7ff]/40 to-white"
             : "bg-gradient-to-b from-[#351b6d] via-[#1f103d] to-[#121212]"
@@ -262,8 +269,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
         ) : (
           <div className="w-full">
             {/* Table Header: # ▲, BAŞLIK, ALBÜM, EKLENME TARİHİ, 🕒 */}
+            {/* Table Header */}
             <div
-              className={`grid grid-cols-[40px_1fr_1fr_140px_70px_60px] gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-b ${
+              className={`grid ${gridTemplate} gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-b ${
                 isLight
                   ? "text-neutral-500 border-neutral-200/60"
                   : "text-neutral-400 border-white/10"
@@ -273,9 +281,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                 <span>#</span>
                 <span className="text-[#ff0000] text-[9px] ml-1">▲</span>
               </span>
-              <span>BAŞLIK</span>
-              <span>ALBÜM</span>
-              <span></span>
+              <span className="min-w-[200px]">BAŞLIK</span>
+              <span className={isQueueExpanded ? "hidden xl:block truncate" : "truncate"}>ALBÜM</span>
               <span className="text-center"></span>
               <span className="text-right flex items-center justify-end">
                 <Clock3 className="w-4 h-4" />
@@ -297,7 +304,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                         onContextMenuTrack(track, e);
                       }
                     }}
-                    className={`grid grid-cols-[40px_1fr_1fr_140px_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
+                    className={`grid ${gridTemplate} gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
                           ? "bg-neutral-100/90 text-neutral-900"
@@ -331,7 +338,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     </div>
 
                     {/* BAŞLIK: Artwork + Title + Explicit + Artist */}
-                    <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="flex items-center gap-3.5 min-w-[200px] overflow-hidden">
                       {track.thumbnail ? (
                         <img
                           src={track.thumbnail}
@@ -347,7 +354,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                           <Music2 className="w-4 h-4 text-[#ff0000]" />
                         </div>
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p
                           className={`text-sm font-semibold truncate leading-normal py-0.5 ${
                             isActive
@@ -402,6 +409,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             }
                           }}
                           className={`text-xs truncate ${
+                            isQueueExpanded ? "hidden xl:block w-[140px]" : "w-full"
+                          } ${
                             !isSingle && track.album_id ? "hover:underline cursor-pointer" : ""
                           } ${
                             isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
@@ -411,15 +420,6 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                         </div>
                       );
                     })()}
-
-                    {/* EKLENME TARİHİ */}
-                    <div
-                      className={`text-xs truncate ${
-                        isLight ? "text-neutral-500" : "text-neutral-400"
-                      }`}
-                    >
-                      {track.added_at || "—"}
-                    </div>
 
                     {/* LIKE BUTTON + MORE OPTIONS on Hover */}
                     <div className="flex items-center justify-center gap-1">

@@ -109,7 +109,11 @@ export const TitleBar: FC<TitleBarProps> = ({
     <header
       data-tauri-drag-region
       onMouseDown={handleMouseDown}
-      className="h-14 w-full select-none flex items-center justify-between px-5 z-30 shrink-0 bg-transparent transition-colors absolute top-0 left-0 right-0"
+      className={`h-14 w-full select-none flex items-center justify-between px-5 z-40 shrink-0 transition-colors relative border-b ${
+        isLight
+          ? "bg-white/80 border-neutral-200/80 text-[#111111]"
+          : "bg-[#0a0a0a]/80 border-white/10 text-white"
+      } backdrop-blur-md`}
     >
       {/* Left: Navigation Buttons (< and >) and Search Bar */}
       <div className="flex items-center gap-2 shrink-0">
@@ -147,8 +151,8 @@ export const TitleBar: FC<TitleBarProps> = ({
           <ChevronRight className="w-5 h-5" />
         </button>
 
-        {/* Extended Spotifast Search Bar */}
-        <div className="relative w-80 md:w-96 lg:w-[440px] ml-1 group">
+        {/* Extended Spotifast Search Bar - Flexible and responsive */}
+        <div className="relative w-44 sm:w-60 md:w-80 lg:w-[420px] max-w-[420px] min-w-[120px] flex-1 ml-1 group">
           <Search
             className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
               isLight
@@ -169,7 +173,7 @@ export const TitleBar: FC<TitleBarProps> = ({
                 : "bg-[#242424] text-white placeholder-neutral-400 border-transparent focus:border-white/20"
             }`}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+          <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center pointer-events-none">
             <kbd
               className={`px-1.5 py-0.2 text-[10px] font-mono font-medium rounded ${
                 isLight ? "bg-neutral-100 text-neutral-500" : "bg-white/10 text-white/40"
@@ -181,15 +185,15 @@ export const TitleBar: FC<TitleBarProps> = ({
         </div>
       </div>
 
-      {/* Broad Middle Draggable Region - Allows instant dragging anywhere between search and right buttons */}
+      {/* Broad Middle Draggable Region */}
       <div
         data-tauri-drag-region
         onMouseDown={handleMouseDown}
-        className="flex-1 h-full min-w-8 cursor-default"
+        className="flex-1 h-full min-w-4 cursor-default"
       />
 
-      {/* Right: Settings, User Avatar, and Window Controls (- □ ×) */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Settings and Profile */}
+      <div className="flex items-center gap-2 shrink-0 mr-28">
         {/* Settings Button */}
         <button
           onClick={() => onOpenSettings("account")}
@@ -282,35 +286,35 @@ export const TitleBar: FC<TitleBarProps> = ({
             </button>
           )}
         </div>
+      </div>
 
-        {/* Windows Native Controls (- □ ×) */}
-        <div className="flex items-center -mr-2">
-          <button
-            onClick={() => minimizeWindow()}
-            title="Simge Durumuna Küçült"
-            className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => toggleMaximizeWindow()}
-            title="Büyüt / Geri Yükle"
-            className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Square className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => closeWindow()}
-            title="Kapat"
-            className="w-10 h-9 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Windows Native Controls (- □ ×) - PERMANENTLY ANCHORED to top-right corner of window, NEVER pushed off-screen */}
+      <div className="absolute right-0 top-0 h-14 flex items-center z-50 pr-2">
+        <button
+          onClick={() => minimizeWindow()}
+          title="Simge Durumuna Küçült"
+          className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
+            isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => toggleMaximizeWindow()}
+          title="Büyüt / Geri Yükle"
+          className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
+            isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Square className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => closeWindow()}
+          title="Kapat"
+          className="w-10 h-9 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );

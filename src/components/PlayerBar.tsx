@@ -330,7 +330,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
       <div className="flex items-center gap-3 w-[30%] justify-end">
         {/* Lyrics */}
         <button
-          onClick={() => player.setRightDrawerTab("lyrics")}
+          onClick={() => player.toggleRightDrawer("lyrics")}
           title="Şarkı Sözleri"
           className={`p-1.5 transition-colors cursor-pointer ${
             player.isRightDrawerOpen && player.rightDrawerTab === "lyrics"
@@ -345,10 +345,10 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
 
         {/* Queue */}
         <button
-          onClick={() => player.setRightDrawerTab("queue")}
+          onClick={() => player.toggleQueue()}
           title="Sıradaki Şarkılar"
           className={`p-1.5 transition-colors cursor-pointer ${
-            player.isRightDrawerOpen && player.rightDrawerTab === "queue"
+            player.queueViewMode !== "closed"
               ? "text-[#ff0000]"
               : isLight
               ? "text-neutral-500 hover:text-neutral-900"

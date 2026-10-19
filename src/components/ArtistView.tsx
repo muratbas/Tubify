@@ -145,7 +145,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
     >
       {/* Hero Header with ambient backdrop */}
       <div
-        className={`relative px-8 pb-6 pt-20 flex flex-col gap-6 ${
+        className={`relative px-8 pb-6 pt-6 flex flex-col gap-6 ${
           isLight
             ? "bg-gradient-to-b from-[#fecaca]/40 via-[#fee2e2]/20 to-white"
             : "bg-gradient-to-b from-[#450a0a] via-[#1c0606] to-[#121212]"
