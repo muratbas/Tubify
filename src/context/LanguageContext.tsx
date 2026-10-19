@@ -70,6 +70,21 @@ export interface Translations {
   miniPlayerDesc: string;
   readyToUse: string;
   shortcutsSubtitle: string;
+
+  // Hybrid Desktop UI Additions
+  queue: string;
+  nowPlaying: string;
+  lyrics: string;
+  videoMode: string;
+  songMode: string;
+  collapseSidebar: string;
+  expandSidebar: string;
+  moodAll: string;
+  moodRelax: string;
+  moodEnergize: string;
+  moodFocus: string;
+  moodWorkout: string;
+  moodCommute: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -91,7 +106,7 @@ export const translations: Record<Language, Translations> = {
     recentlyPlayed: "Recently played",
     moreRecommendations: "More recommendations",
     listenAgain: "Listen again",
-    searchPlaceholder: "Search artists, songs, playlists, and albums",
+    searchPlaceholder: "Search artists, songs, playlists, and albums (Ctrl+K)",
     searchResultsFor: "Results for",
     noResultsFound: "No results found.",
     backToHome: "Back to Home",
@@ -136,6 +151,20 @@ export const translations: Record<Language, Translations> = {
     miniPlayerDesc: "Compact overlay player for gaming and multitasking.",
     readyToUse: "Ready to use",
     shortcutsSubtitle: "Customize desktop keyboard controls.",
+
+    queue: "Queue",
+    nowPlaying: "Now Playing",
+    lyrics: "Lyrics",
+    videoMode: "Video 16:9",
+    songMode: "Song 1:1",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
+    moodAll: "All",
+    moodRelax: "Relax",
+    moodEnergize: "Energize",
+    moodFocus: "Focus",
+    moodWorkout: "Workout",
+    moodCommute: "Commute",
   },
   tr: {
     settings: "Ayarlar",
@@ -155,7 +184,7 @@ export const translations: Record<Language, Translations> = {
     recentlyPlayed: "Recently played",
     moreRecommendations: "More recommendations",
     listenAgain: "Listen again",
-    searchPlaceholder: "Sanatçı, şarkı, çalma listesi veya albüm arayın",
+    searchPlaceholder: "Sanatçı, şarkı, çalma listesi veya albüm arayın (Ctrl+K)",
     searchResultsFor: "Sonuçlar:",
     noResultsFound: "Sonuç bulunamadı.",
     backToHome: "Ana Sayfaya Dön",
@@ -200,6 +229,20 @@ export const translations: Record<Language, Translations> = {
     miniPlayerDesc: "Oyun oynarken ekranda kompakt yarı saydam oynatıcı.",
     readyToUse: "Kullanıma Hazır",
     shortcutsSubtitle: "Masaüstü klavye kısayollarını özelleştirin.",
+
+    queue: "Sıradaki Şarkılar",
+    nowPlaying: "Şu An Çalan",
+    lyrics: "Şarkı Sözleri",
+    videoMode: "Video 16:9",
+    songMode: "Şarkı 1:1",
+    collapseSidebar: "Kenar çubuğunu daralt",
+    expandSidebar: "Kenar çubuğunu genişlet",
+    moodAll: "Tümü",
+    moodRelax: "Dinlenme",
+    moodEnergize: "Enerji",
+    moodFocus: "Odaklanma",
+    moodWorkout: "Egzersiz",
+    moodCommute: "Yolculuk",
   },
 };
 

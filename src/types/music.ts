@@ -33,3 +33,7 @@ export interface Playlist {
   thumbnail?: string | null;
   track_count?: string | null;
 }
+
+export type RightDrawerTab = "nowPlaying" | "queue" | "lyrics";
+
+export type MoodCategory = "all" | "relax" | "energize" | "focus" | "workout" | "commute";

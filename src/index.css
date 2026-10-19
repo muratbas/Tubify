@@ -51,3 +51,29 @@
     background: #aaaaaa;
   }
 }
+
+@keyframes visualizer-bounce {
+  0%, 100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-visualizer-1 {
+  animation: visualizer-bounce 0.75s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.animate-visualizer-2 {
+  animation: visualizer-bounce 0.55s ease-in-out infinite 0.15s;
+  transform-origin: bottom;
+}
+.animate-visualizer-3 {
+  animation: visualizer-bounce 0.85s ease-in-out infinite 0.3s;
+  transform-origin: bottom;
+}
+.animate-visualizer-4 {
+  animation: visualizer-bounce 0.65s ease-in-out infinite 0.1s;
+  transform-origin: bottom;
+}

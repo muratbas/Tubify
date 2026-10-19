@@ -1,62 +1,28 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo, type FC } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
 import { PlaylistView } from "./components/PlaylistView";
 import { SettingsView } from "./components/SettingsView";
 import { PlayerBar } from "./components/PlayerBar";
+import { RightDrawer } from "./components/RightDrawer";
+import { AmbientBackground } from "./components/AmbientBackground";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
 import { LoginModal } from "./components/LoginModal";
+import { MicroVisualizer } from "./components/MicroVisualizer";
 import { useTheme } from "./context/ThemeContext";
 import { useLanguage } from "./context/LanguageContext";
+import { usePlayer } from "./context/PlayerContext";
 import {
   searchMusic,
-  getStreamUrl,
   getUserProfile,
   logoutGoogle,
   getYtLikedSongs,
   getYtPlaylists,
   getPlaylistTracks,
-  toggleYtLike,
 } from "./services/api";
-import type { Track, PlaybackStatus, UserProfile, Playlist } from "./types/music";
+import type { Track, UserProfile, Playlist } from "./types/music";
 import { Loader2, Music2, Heart, Play, AlertCircle } from "lucide-react";
-
-// Curated initial recommendations matching Screenshot 1 & 4 aesthetics
-const INITIAL_RECENT: Track[] = [
-  {
-    id: "ViwtNLUqkMY",
-    title: "Crazy In Love (feat. JAY-Z)",
-    artist: "Beyoncé",
-    album: "Dangerously in Love",
-    thumbnail: "https://i.ytimg.com/vi/ViwtNLUqkMY/mqdefault.jpg",
-    duration: "3:55",
-  },
-  {
-    id: "gN9O1k_iV9Q",
-    title: "Sesinde Aşk Var",
-    artist: "Yalın",
-    album: "Herşey Sensin",
-    thumbnail: "https://i.ytimg.com/vi/gN9O1k_iV9Q/mqdefault.jpg",
-    duration: "3:42",
-  },
-  {
-    id: "bU_kF9_H7g4",
-    title: "Sugar On My Tongue",
-    artist: "Tyler, The Creator",
-    album: "CHROMAKOPIA",
-    thumbnail: "https://i.ytimg.com/vi/bU_kF9_H7g4/mqdefault.jpg",
-    duration: "2:50",
-  },
-  {
-    id: "0Wc2J3Y9s8w",
-    title: "See You Again (feat. Kali Uchis)",
-    artist: "Tyler, The Creator",
-    album: "Flower Boy",
-    thumbnail: "https://i.ytimg.com/vi/0Wc2J3Y9s8w/mqdefault.jpg",
-    duration: "3:00",
-  },
-];
 
 const INITIAL_RECOMMENDED: Track[] = [
   {
@@ -163,9 +129,10 @@ const EPISODES_TRACKS: Track[] = [
   },
 ];
 
-export function App() {
+export const App: FC = () => {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const player = usePlayer();
   const isLight = theme === "light";
 
   // Navigation View: "home" | "playlist" | "search" | "settings"
@@ -180,17 +147,6 @@ export function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Audio Playback
-  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
-  const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>("idle");
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [isRepeat, setIsRepeat] = useState(false);
-
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -201,77 +157,6 @@ export function App() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
-
-  // Local Liked Track IDs
-  const [likedTrackIds, setLikedTrackIds] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem("tubify_liked_ids");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  // Recently played history
-  const [recentTracks, setRecentTracks] = useState<Track[]>(() => {
-    try {
-      const saved = localStorage.getItem("tubify_recent_tracks");
-      return saved ? JSON.parse(saved) : INITIAL_RECENT;
-    } catch {
-      return INITIAL_RECENT;
-    }
-  });
-
-  // HUD mini-player
-  const [isMiniPlayer, setIsMiniPlayer] = useState(false);
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize Audio Element
-  useEffect(() => {
-    const audio = new Audio();
-    audio.volume = volume;
-    audioRef.current = audio;
-
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleDurationChange = () => setDuration(audio.duration || 0);
-    const handlePlay = () => setPlaybackStatus("playing");
-    const handlePause = () => setPlaybackStatus("paused");
-    const handleEnded = () => {
-      setPlaybackStatus("paused");
-      handleNextTrack();
-    };
-    const handleError = () => {
-      setPlaybackStatus("error");
-      setPlaybackError("Audio stream could not be loaded. Trying backup route...");
-    };
-
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("durationchange", handleDurationChange);
-    audio.addEventListener("play", handlePlay);
-    audio.addEventListener("pause", handlePause);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", handleError);
-
-    return () => {
-      audio.pause();
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("durationchange", handleDurationChange);
-      audio.removeEventListener("play", handlePlay);
-      audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", handleError);
-    };
-  }, []);
-
-  // Save liked IDs
-  useEffect(() => {
-    try {
-      localStorage.setItem("tubify_liked_ids", JSON.stringify(Array.from(likedTrackIds)));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [likedTrackIds]);
 
   // Load User Profile on Startup
   useEffect(() => {
@@ -290,11 +175,7 @@ export function App() {
       const [liked, pls] = await Promise.allSettled([getYtLikedSongs(), getYtPlaylists()]);
       if (liked.status === "fulfilled" && liked.value.length > 0) {
         setLikedSongs(liked.value);
-        setLikedTrackIds((prev) => {
-          const next = new Set(prev);
-          liked.value.forEach((t) => next.add(t.id));
-          return next;
-        });
+        player.syncLikedIds(liked.value.map((t) => t.id));
       }
       if (pls.status === "fulfilled" && pls.value.length > 0) {
         setPlaylists(pls.value);
@@ -325,80 +206,13 @@ export function App() {
     setUserProfile({ is_authenticated: false });
     setLikedSongs([]);
     setPlaylists([]);
-    setLikedTrackIds(new Set());
     if (selectedPlaylist?.id === "liked") {
       setSelectedPlaylist(null);
       setCurrentView("home");
     }
   };
 
-  // Play a track
-  const playTrack = async (track: Track) => {
-    if (!audioRef.current) return;
-    setActiveTrack(track);
-    setPlaybackStatus("loading");
-    setPlaybackError(null);
-
-    // Save to recently played
-    setRecentTracks((prev) => {
-      const filtered = prev.filter((t) => t.id !== track.id);
-      const updated = [track, ...filtered].slice(0, 8);
-      try {
-        localStorage.setItem("tubify_recent_tracks", JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-      return updated;
-    });
-
-    try {
-      const stream = await getStreamUrl(track.id);
-      if (audioRef.current) {
-        audioRef.current.src = stream.url;
-        await audioRef.current.play();
-        setPlaybackStatus("playing");
-      }
-    } catch (err: unknown) {
-      setPlaybackStatus("error");
-      setPlaybackError(err instanceof Error ? err.message : "Failed to load audio stream");
-    }
-  };
-
-  const handlePlayPause = () => {
-    if (!audioRef.current || !activeTrack) return;
-    if (playbackStatus === "playing") {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(console.error);
-    }
-  };
-
-  const handleSeek = (time: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = time;
-    setCurrentTime(time);
-  };
-
-  const handleVolumeChange = (vol: number) => {
-    setVolume(vol);
-    setIsMuted(vol === 0);
-    if (audioRef.current) {
-      audioRef.current.volume = vol;
-    }
-  };
-
-  const handleToggleMute = () => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      audioRef.current.volume = volume || 0.8;
-      setIsMuted(false);
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
-  };
-
-  // Next / Prev track resolver
+  // Next / Prev track queue resolver
   const currentQueue = useMemo(() => {
     if (currentView === "playlist") {
       if (selectedPlaylist?.id === "liked") return likedSongs;
@@ -408,58 +222,15 @@ export function App() {
     if (currentView === "search") {
       return searchResults;
     }
-    return [...recentTracks, ...INITIAL_RECOMMENDED];
-  }, [currentView, selectedPlaylist, likedSongs, playlistTracks, searchResults, recentTracks]);
+    return [...player.recentTracks, ...INITIAL_RECOMMENDED];
+  }, [currentView, selectedPlaylist, likedSongs, playlistTracks, searchResults, player.recentTracks]);
 
-  const handleNextTrack = () => {
-    if (!activeTrack || currentQueue.length === 0) return;
-    if (isShuffle) {
-      const randIdx = Math.floor(Math.random() * currentQueue.length);
-      playTrack(currentQueue[randIdx]);
-      return;
+  // Keep queue synced to player context
+  useEffect(() => {
+    if (currentQueue.length > 0) {
+      player.setQueue(currentQueue);
     }
-    const idx = currentQueue.findIndex((t) => t.id === activeTrack.id);
-    if (idx !== -1 && idx + 1 < currentQueue.length) {
-      playTrack(currentQueue[idx + 1]);
-    } else if (isRepeat && currentQueue.length > 0) {
-      playTrack(currentQueue[0]);
-    }
-  };
-
-  const handlePrevTrack = () => {
-    if (!activeTrack || currentQueue.length === 0) return;
-    const idx = currentQueue.findIndex((t) => t.id === activeTrack.id);
-    if (idx > 0) {
-      playTrack(currentQueue[idx - 1]);
-    }
-  };
-
-  // Toggle Like with YouTube sync
-  const handleToggleLike = async (track: Track) => {
-    const isCurrentlyLiked = likedTrackIds.has(track.id);
-    const nextState = !isCurrentlyLiked;
-
-    setLikedTrackIds((prev) => {
-      const next = new Set(prev);
-      if (nextState) next.add(track.id);
-      else next.delete(track.id);
-      return next;
-    });
-
-    if (nextState) {
-      setLikedSongs((prev) => [track, ...prev.filter((t) => t.id !== track.id)]);
-    } else {
-      setLikedSongs((prev) => prev.filter((t) => t.id !== track.id));
-    }
-
-    if (userProfile.is_authenticated) {
-      try {
-        await toggleYtLike(track.id, nextState);
-      } catch (e) {
-        console.error("YouTube like sync error:", e);
-      }
-    }
-  };
+  }, [currentQueue]);
 
   // Search handler
   const handleSearchSubmit = async () => {
@@ -526,11 +297,11 @@ export function App() {
 
   return (
     <div
-      className={`flex flex-col h-screen w-screen overflow-hidden select-none font-sans transition-colors ${
-        isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
+      className={`h-screen w-screen overflow-hidden select-none flex flex-col p-2 md:p-2.5 gap-2 md:gap-2.5 transition-colors font-sans ${
+        isLight ? "bg-[#eaeaea] text-[#111111]" : "bg-[#030303] text-white"
       }`}
     >
-      {/* 1. Custom Title Bar matching Screenshot 1, 3, 4 */}
+      {/* 1. Custom Title Bar */}
       <TitleBar
         searchQuery={searchQuery}
         onSearchChange={(q) => {
@@ -542,7 +313,7 @@ export function App() {
         onSearchSubmit={handleSearchSubmit}
         userProfile={userProfile}
         currentView={currentView}
-        currentTabTitle={selectedPlaylist?.title || activeTrack?.title}
+        currentTabTitle={selectedPlaylist?.title || player.activeTrack?.title}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenSettings={handleOpenSettings}
         onNavigateHome={() => {
@@ -551,9 +322,9 @@ export function App() {
         }}
       />
 
-      {/* 2. Main Middle Workspace: Sidebar + Dynamic Content View */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Spotify-style Sidebar */}
+      {/* 2. Bento Middle Workspace: Sol Sidebar + Orta Ana Panel + Sağ Drawer */}
+      <div className="flex-1 flex gap-2 md:gap-2.5 overflow-hidden min-h-0 relative">
+        {/* Module 1: Sol Panel (Daraltılabilir Sidebar) */}
         <Sidebar
           selectedPlaylistId={selectedPlaylist ? selectedPlaylist.id : null}
           onSelectPlaylist={handleSelectPlaylist}
@@ -563,28 +334,34 @@ export function App() {
           onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
-        {/* Right: Dynamic Views (Home, Playlist Detail, Search, or Full Page Settings) */}
+        {/* Module 2: Orta Ana Panel (Kendi İçinde Bağımsız Scrollable Bento Card) */}
         <main
-          className={`flex-1 flex flex-col h-full overflow-hidden relative transition-colors ${
-            isLight ? "bg-[#f0f0f0]" : "bg-[#030303]"
+          className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden border relative transition-all duration-300 shadow-xl ${
+            isLight
+              ? "bg-[#ffffff]/85 border-[#e4e4e7]"
+              : "bg-[#09090c]/85 border-white/[0.08] backdrop-blur-xl"
           }`}
         >
-          {playbackError && (
-            <div className="mx-6 mt-3 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between">
+          {/* Apple Music Style Ambient Blur Background */}
+          <AmbientBackground thumbnail={player.activeTrack?.thumbnail} />
+
+          {/* Audio error banner */}
+          {player.playbackError && (
+            <div className="mx-6 mt-3 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between z-20">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-[#ff0000]" />
-                <span>{playbackError}</span>
+                <span>{player.playbackError}</span>
               </div>
               <button
-                onClick={() => setPlaybackError(null)}
-                className="text-xs text-slate-400 hover:text-white"
+                onClick={player.clearPlaybackError}
+                className="text-xs text-white/50 hover:text-white cursor-pointer"
               >
                 Close
               </button>
             </div>
           )}
 
-          {/* VIEW 1: Full-Page Settings View (Screenshot 1 Match!) */}
+          {/* VIEW 1: Settings View */}
           {currentView === "settings" && (
             <SettingsView
               initialTab={settingsInitialTab}
@@ -596,23 +373,23 @@ export function App() {
             />
           )}
 
-          {/* VIEW 2: Playlist Detail View (Screenshot 3 Match) */}
+          {/* VIEW 2: Playlist Detail View */}
           {currentView === "playlist" && selectedPlaylist && (
             <PlaylistView
               playlist={selectedPlaylist}
               tracks={activePlaylistTracks}
-              activeTrack={activeTrack}
-              isPlaying={playbackStatus === "playing"}
-              onPlayTrack={playTrack}
+              activeTrack={player.activeTrack}
+              isPlaying={player.playbackStatus === "playing"}
+              onPlayTrack={(t) => player.playTrack(t, activePlaylistTracks)}
               onPlayAll={() => {
                 if (activePlaylistTracks.length > 0) {
-                  playTrack(activePlaylistTracks[0]);
+                  player.playTrack(activePlaylistTracks[0], activePlaylistTracks);
                 }
               }}
-              onToggleShuffle={() => setIsShuffle((prev) => !prev)}
-              isShuffle={isShuffle}
-              onToggleLike={handleToggleLike}
-              likedTrackIds={likedTrackIds}
+              onToggleShuffle={player.toggleShuffle}
+              isShuffle={player.isShuffle}
+              onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
+              likedTrackIds={player.likedTrackIds}
               isLoadingTracks={isLoadingTracks}
               onBackToHome={() => {
                 setSelectedPlaylist(null);
@@ -624,14 +401,14 @@ export function App() {
           {/* VIEW 3: Search View */}
           {currentView === "search" && (
             <div
-              className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-8 space-y-6 pb-24 transition-colors ${
-                isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
+              className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-6 pb-28 relative ${
+                isLight ? "text-[#111111]" : "text-white"
               }`}
             >
               <div className="flex items-center justify-between">
                 <h2
-                  className={`text-2xl font-extrabold tracking-tight ${
-                    isLight ? "text-[#111111]" : "text-white"
+                  className={`text-2xl font-black tracking-tight ${
+                    isLight ? "text-[#18181b]" : "text-white"
                   }`}
                 >
                   {t.searchResultsFor} "{searchQuery}"
@@ -639,7 +416,9 @@ export function App() {
                 <button
                   onClick={() => setCurrentView("home")}
                   className={`text-xs font-semibold transition-colors cursor-pointer ${
-                    isLight ? "text-[#71717a] hover:text-[#111111]" : "text-[#888] hover:text-white"
+                    isLight
+                      ? "text-[#71717a] hover:text-[#111111]"
+                      : "text-white/60 hover:text-white"
                   }`}
                 >
                   {t.backToHome}
@@ -649,7 +428,7 @@ export function App() {
               {isSearching ? (
                 <div
                   className={`py-24 flex flex-col items-center justify-center gap-3 ${
-                    isLight ? "text-[#71717a]" : "text-slate-400"
+                    isLight ? "text-[#71717a]" : "text-white/60"
                   }`}
                 >
                   <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
@@ -662,35 +441,35 @@ export function App() {
               ) : searchResults.length === 0 ? (
                 <div
                   className={`py-24 text-center space-y-2 ${
-                    isLight ? "text-[#71717a]" : "text-slate-500"
+                    isLight ? "text-[#71717a]" : "text-white/40"
                   }`}
                 >
                   <p className="text-sm font-semibold">{t.noResultsFound}</p>
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {searchResults.map((track, idx) => {
-                    const isActive = activeTrack?.id === track.id;
-                    const isLiked = likedTrackIds.has(track.id);
+                    const isActive = player.activeTrack?.id === track.id;
+                    const isLiked = player.likedTrackIds.has(track.id);
 
                     return (
                       <div
                         key={`search-${track.id}-${idx}`}
-                        onClick={() => playTrack(track)}
-                        className={`flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer ${
+                        onClick={() => player.playTrack(track, searchResults)}
+                        className={`flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer active:scale-[0.99] ${
                           isActive
                             ? isLight
-                              ? "bg-[#ffffff] shadow-sm text-black"
-                              : "bg-[#202020] text-white"
+                              ? "bg-[#ffffff] shadow-sm border border-[#e4e4e7] text-black"
+                              : "bg-white/[0.12] border border-white/[0.1] text-white"
                             : isLight
                             ? "hover:bg-[#ffffff]/80 text-[#18181b]"
-                            : "hover:bg-[#141414] text-slate-200"
+                            : "hover:bg-white/[0.04] text-white/80"
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
                           <div
-                            className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 ${
-                              isLight ? "bg-[#e4e4e7]" : "bg-[#222]"
+                            className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm ${
+                              isLight ? "bg-[#e4e4e7]" : "bg-zinc-800"
                             }`}
                           >
                             {track.thumbnail ? (
@@ -707,6 +486,11 @@ export function App() {
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <Play className="w-4 h-4 fill-white text-white ml-0.5" />
                             </div>
+                            {isActive && player.playbackStatus === "playing" && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <MicroVisualizer isPlaying={true} />
+                              </div>
+                            )}
                           </div>
 
                           <div className="min-w-0">
@@ -723,7 +507,7 @@ export function App() {
                             </h4>
                             <p
                               className={`text-[11px] truncate mt-0.5 ${
-                                isLight ? "text-[#71717a]" : "text-[#888888]"
+                                isLight ? "text-[#71717a]" : "text-white/60"
                               }`}
                             >
                               {track.artist}
@@ -735,12 +519,12 @@ export function App() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleToggleLike(track);
+                              player.toggleLike(track, userProfile.is_authenticated);
                             }}
                             className={`p-1.5 transition-colors cursor-pointer ${
                               isLight
                                 ? "text-[#a1a1aa] hover:text-[#ff0000]"
-                                : "text-[#666] hover:text-[#ff0000]"
+                                : "text-white/40 hover:text-[#ff0000]"
                             }`}
                           >
                             <Heart
@@ -751,7 +535,7 @@ export function App() {
                           </button>
                           <span
                             className={`text-xs font-mono font-medium ${
-                              isLight ? "text-[#71717a]" : "text-[#777]"
+                              isLight ? "text-[#71717a]" : "text-white/50"
                             }`}
                           >
                             {track.duration || "3:30"}
@@ -765,59 +549,41 @@ export function App() {
             </div>
           )}
 
-          {/* VIEW 4: Home View (Screenshot 4 Match) */}
+          {/* VIEW 4: Home View */}
           {currentView === "home" && (
             <HomeView
-              recentlyPlayed={recentTracks}
+              recentlyPlayed={player.recentTracks}
               recommendations={INITIAL_RECOMMENDED}
               listenAgain={INITIAL_LISTEN_AGAIN}
-              activeTrack={activeTrack}
-              isPlaying={playbackStatus === "playing"}
-              onPlayTrack={playTrack}
+              activeTrack={player.activeTrack}
+              isPlaying={player.playbackStatus === "playing"}
+              onPlayTrack={(t) => player.playTrack(t, [...player.recentTracks, ...INITIAL_RECOMMENDED])}
             />
           )}
         </main>
+
+        {/* Module 3: Sağ Panel (Açılıp Kapanabilir Drawer: Now Playing 1:1/16:9, Queue, Lyrics) */}
+        <RightDrawer />
       </div>
 
-      {/* 3. Bottom Player Bar matching Screenshot 1, 3, 4 */}
-      <PlayerBar
-        track={activeTrack}
-        status={playbackStatus}
-        currentTime={currentTime}
-        duration={duration}
-        volume={volume}
-        isMuted={isMuted}
-        isMiniPlayer={isMiniPlayer}
-        isLiked={activeTrack ? likedTrackIds.has(activeTrack.id) : false}
-        isShuffle={isShuffle}
-        isRepeat={isRepeat}
-        onPlayPause={handlePlayPause}
-        onNext={handleNextTrack}
-        onPrev={handlePrevTrack}
-        onSeek={handleSeek}
-        onVolumeChange={handleVolumeChange}
-        onToggleMute={handleToggleMute}
-        onToggleMiniPlayer={() => setIsMiniPlayer((prev) => !prev)}
-        onToggleLike={() => activeTrack && handleToggleLike(activeTrack)}
-        onToggleShuffle={() => setIsShuffle((prev) => !prev)}
-        onToggleRepeat={() => setIsRepeat((prev) => !prev)}
-      />
+      {/* Module 4: Alt Sabit/Yüzen Oynatıcı Barı (Bento Docked Card) */}
+      <PlayerBar />
 
-      {/* 4. Mini Player HUD overlay for gaming */}
-      {isMiniPlayer && activeTrack && (
+      {/* HUD mini-player overlay */}
+      {player.isMiniPlayer && player.activeTrack && (
         <MiniPlayerHUD
-          track={activeTrack}
-          status={playbackStatus}
-          currentTime={currentTime}
-          duration={duration}
-          onPlayPause={handlePlayPause}
-          onNext={handleNextTrack}
-          onPrev={handlePrevTrack}
-          onClose={() => setIsMiniPlayer(false)}
+          track={player.activeTrack}
+          status={player.playbackStatus}
+          currentTime={player.currentTime}
+          duration={player.duration}
+          onPlayPause={player.togglePlayPause}
+          onNext={player.nextTrack}
+          onPrev={player.prevTrack}
+          onClose={player.toggleMiniPlayer}
         />
       )}
 
-      {/* 5. Google Login Modal */}
+      {/* Google Login Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
@@ -825,6 +591,6 @@ export function App() {
       />
     </div>
   );
-}
+};
 
 export default App;
