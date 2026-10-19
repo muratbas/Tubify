@@ -120,7 +120,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         <button
           onClick={onNavigateBack || onNavigateHome}
           disabled={!canGoBack}
-          title="Geri"
+          {...(canGoBack ? { "data-tooltip": "Geri", "data-tooltip-side": "bottom" } : {})}
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
             canGoBack
               ? isLight
@@ -137,7 +137,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         <button
           onClick={onNavigateForward}
           disabled={!canGoForward}
-          title="İleri"
+          {...(canGoForward ? { "data-tooltip": "İleri", "data-tooltip-side": "bottom" } : {})}
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
             canGoForward
               ? isLight
@@ -197,7 +197,8 @@ export const TitleBar: FC<TitleBarProps> = ({
         {/* Settings Button */}
         <button
           onClick={() => onOpenSettings("account")}
-          title={t.settings}
+          data-tooltip={t.settings}
+          data-tooltip-side="bottom"
           className={`p-2 rounded-full transition-colors cursor-pointer ${
             isLight
               ? "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
@@ -213,7 +214,8 @@ export const TitleBar: FC<TitleBarProps> = ({
             <>
               <button
                 onClick={() => setIsAvatarMenuOpen((p) => !p)}
-                title={userProfile.name || "Kullanıcı"}
+                data-tooltip={userProfile.name || "Kullanıcı"}
+                data-tooltip-side="bottom"
                 className="flex items-center p-0.5 rounded-full hover:scale-105 transition-all cursor-pointer ring-2 ring-transparent hover:ring-[#ff0000]"
               >
                 {userProfile.avatar_url ? (
@@ -292,7 +294,8 @@ export const TitleBar: FC<TitleBarProps> = ({
       <div className="absolute right-0 top-0 h-14 flex items-center z-50 pr-2">
         <button
           onClick={() => minimizeWindow()}
-          title="Simge Durumuna Küçült"
+          data-tooltip="Simge Durumuna Küçült"
+          data-tooltip-side="bottom"
           className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
             isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
           }`}
@@ -301,7 +304,8 @@ export const TitleBar: FC<TitleBarProps> = ({
         </button>
         <button
           onClick={() => toggleMaximizeWindow()}
-          title="Büyüt / Geri Yükle"
+          data-tooltip="Büyüt / Geri Yükle"
+          data-tooltip-side="bottom"
           className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
             isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
           }`}
@@ -310,7 +314,8 @@ export const TitleBar: FC<TitleBarProps> = ({
         </button>
         <button
           onClick={() => closeWindow()}
-          title="Kapat"
+          data-tooltip="Kapat"
+          data-tooltip-side="bottom"
           className="w-10 h-9 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />

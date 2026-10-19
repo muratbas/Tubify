@@ -24,6 +24,7 @@ import {
   getPlaylistTracksPage,
 } from "./services/api";
 import { initSmoothScroll } from "./utils/smoothScroll";
+import { CustomTooltip } from "./components/CustomTooltip";
 import type { Track, UserProfile, Playlist } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { Loader2, Music2, Heart, Play, AlertCircle, Check, MoreHorizontal } from "lucide-react";
@@ -863,6 +864,9 @@ export const App: FC = () => {
           </div>
         </div>
       )}
+
+      {/* Global Custom Tooltip System */}
+      <CustomTooltip />
     </div>
   );
 };

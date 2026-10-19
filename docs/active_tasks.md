@@ -167,5 +167,11 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Her iki slider'a da hover durumunda (`group-hover`) veya sürüklerken çubuğun tam ucunda beliren Spotify masaüstü tarzı beyaz yuvarlak tutamaç (knob / thumb) eklendi.
   - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 24:** Görseldeki Spotify/MacOS Tarzı Özel Kayan Tooltip (Custom Tooltip) Sistemi:
+    - **`CustomTooltip.tsx` Modülü Geliştirildi:** İşletim sisteminin çirkin ve yavaş (1.5sn gecikmeli) varsayılan sarı/gri kutusu yerine; ekteki görselde yer alan pürüzsüz yuvarlatılmış köşeli (`rounded-xl`), yumuşak gölgeli (`shadow-xl`), ferah paddingli ve mikro-animasyonlu özel floating tooltip sistemi kuruldu.
+    - **Global ve Hafif Dinleyici (`data-tooltip`):** DOM şişmesini ve gereksiz wrapper div karmaşasını önlemek için dinamik `data-tooltip` ve `data-tooltip-side` öznitelikleri dinlendi. Fare üzerine geldiğinde ~160ms içinde anında ve pürüzsüzce belirir, tıklandığında anında kapanır.
+    - **Tüm Üst ve Alt Kontrollere Uygulandı:** `TitleBar.tsx` (Simge Durumuna Küçült, Büyüt/Geri Yükle, Kapat, Ayarlar, Geri/İleri) ve `PlayerBar.tsx` (Oynat/Duraklat, Sıradaki, Karışık, Tekrar, Ses, vb.) üzerindeki tüm yerel `title` öznitelikleri yeni özel tooltip yapısına taşındı.
+  - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
