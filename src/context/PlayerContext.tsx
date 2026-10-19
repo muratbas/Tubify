@@ -110,8 +110,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolumeState] = useState(0.85);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("tubify_volume");
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 0 && val <= 1) return val;
+      }
+    } catch {}
+    return 0.85;
+  });
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("tubify_muted") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [queue, setQueueState] = useState<Track[]>([]);
@@ -172,6 +187,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.error("Failed to store liked track IDs:", e);
     }
   }, [likedTrackIds]);
+
+  // Sync volume and mute settings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("tubify_volume", String(volume));
+      localStorage.setItem("tubify_muted", String(isMuted));
+    } catch {}
+  }, [volume, isMuted]);
 
   // Determine the upcoming candidate track in queue
   const getUpcomingTrack = useCallback((): Track | null => {
@@ -239,8 +262,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [getUpcomingTrack]);
 
-  // Next track resolver
+  const lastNextTimeRef = useRef(0);
+  const lastPrevTimeRef = useRef(0);
+
+  // Next track resolver with debounce guard
   const nextTrack = useCallback(() => {
+    const now = Date.now();
+    if (now - lastNextTimeRef.current < 450) {
+      return;
+    }
+    lastNextTimeRef.current = now;
+
     const curQueue = queueRef.current;
     const curTrack = currentTrackRef.current;
     if (!curTrack || curQueue.length === 0) return;
@@ -275,9 +307,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const prevTrack = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPrevTimeRef.current < 450) {
+      return;
+    }
+    lastPrevTimeRef.current = now;
+
     const curQueue = queueRef.current;
     const curTrack = currentTrackRef.current;
     if (!curTrack || curQueue.length === 0) return;
+
+    // If currently playing track has played for more than 3 seconds, rewind to the beginning
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      setCurrentTime(0);
+      return;
+    }
 
     const idx = curQueue.findIndex((t) => t.id === curTrack.id);
     if (idx > 0) {
@@ -361,10 +406,55 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [activeTrack?.id, playbackStatus, queue, isShuffle, isRepeat, preloadUpcoming]);
 
-  // Listen for Windows Media Keys and System Tray actions
+  // Listen for Windows Media Keys, System Tray actions, and MediaSession actions
   useEffect(() => {
     const unlisteners: (() => void)[] = [];
 
+    // 1. Web MediaSession action handlers (vital for Chromium/WebView2 hardware media key capture)
+    if ("mediaSession" in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler("nexttrack", () => {
+          nextTrackRef.current();
+        });
+        navigator.mediaSession.setActionHandler("previoustrack", () => {
+          prevTrackRef.current();
+        });
+        navigator.mediaSession.setActionHandler("play", () => {
+          if (audioRef.current && audioRef.current.paused) {
+            audioRef.current.play().catch(console.error);
+          }
+        });
+        navigator.mediaSession.setActionHandler("pause", () => {
+          if (audioRef.current && !audioRef.current.paused) {
+            audioRef.current.pause();
+          }
+        });
+      } catch (err) {
+        console.warn("MediaSession action handler setup failed:", err);
+      }
+    }
+
+    // 2. Hardware Keyboard Media Key listener (catches MediaTrackNext / MediaTrackPrevious / MediaPlayPause)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "MediaTrackNext") {
+        e.preventDefault();
+        nextTrackRef.current();
+      } else if (e.key === "MediaTrackPrevious") {
+        e.preventDefault();
+        prevTrackRef.current();
+      } else if (e.key === "MediaPlayPause") {
+        e.preventDefault();
+        togglePlayPauseRef.current();
+      } else if (e.key === "MediaStop") {
+        e.preventDefault();
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    // 3. Tauri IPC listeners for Taskbar Thumbnail Toolbar & System Tray
     const setupListener = async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
@@ -409,13 +499,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setupListener();
 
     return () => {
+      window.removeEventListener("keydown", handleKeyDown);
       unlisteners.forEach((u) => u());
     };
   }, []);
 
-  // Sync currently playing track & playback status with OS (System Tray tooltip & SMTC)
+  // Sync currently playing track & playback status with OS (System Tray tooltip, SMTC & MediaSession)
   useEffect(() => {
     if (!activeTrack) {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = "none";
+      }
       updateMediaMetadata({
         title: "",
         artist: "",
@@ -434,6 +529,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         durationSecs = parts[0] * 60 + parts[1];
       } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
         durationSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    }
+
+    if ("mediaSession" in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: activeTrack.title,
+          artist: activeTrack.artist,
+          album: activeTrack.album || undefined,
+          artwork: activeTrack.thumbnail
+            ? [{ src: activeTrack.thumbnail, sizes: "512x512", type: "image/jpeg" }]
+            : [],
+        });
+        navigator.mediaSession.playbackState = playbackStatus === "playing" ? "playing" : "paused";
+      } catch (err) {
+        console.warn("MediaSession metadata update failed:", err);
       }
     }
 
@@ -547,6 +658,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const clamped = Math.max(0, Math.min(1, num));
     setVolumeState(clamped);
     setIsMuted(clamped === 0);
+    try {
+      localStorage.setItem("tubify_volume", clamped.toString());
+      localStorage.setItem("tubify_muted", (clamped === 0).toString());
+    } catch {}
     if (audioRef.current) {
       audioRef.current.volume = clamped;
     }
@@ -558,9 +673,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const vol = volume > 0 ? Math.min(1, volume) : 0.85;
       audioRef.current.volume = vol;
       setIsMuted(false);
+      try {
+        localStorage.setItem("tubify_muted", "false");
+      } catch {}
     } else {
       audioRef.current.volume = 0;
       setIsMuted(true);
+      try {
+        localStorage.setItem("tubify_muted", "true");
+      } catch {}
     }
   };
 

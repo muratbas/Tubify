@@ -45,15 +45,7 @@ export interface Translations {
   notConnectedTitle: string;
   notConnectedDesc: string;
   
-  // Last.fm
-  lastFmTitle: string;
-  lastFmDesc: string;
-  scrobblePlays: string;
-  scrobbleDesc: string;
-  accountConnection: string;
-  connectLastFm: string;
-  browserWindowOpen: string;
-  
+
   // Appearance
   appearanceSubtitle: string;
   themeSelection: string;
@@ -128,15 +120,7 @@ export const translations: Record<Language, Translations> = {
     connectGoogle: "Connect with Google",
     notConnectedTitle: "Google & YouTube Music Not Connected",
     notConnectedDesc: "Sign in with your Google account to access your playlists and liked songs.",
-    
-    lastFmTitle: "Last.fm",
-    lastFmDesc: "Connect Last.fm to scrobble your listening history.",
-    scrobblePlays: "Scrobble plays",
-    scrobbleDesc: "Send now playing updates and scrobbles after a track reaches the Last.fm listening threshold.",
-    accountConnection: "Account connection",
-    connectLastFm: "Connect Last.fm",
-    browserWindowOpen: "A browser window will open so you can approve this app on Last.fm.",
-    
+
     appearanceSubtitle: "Manage theme, language, and motion preferences.",
     themeSelection: "Theme",
     darkTheme: "Dark (OLED)",
@@ -206,15 +190,7 @@ export const translations: Record<Language, Translations> = {
     connectGoogle: "Google ile Giriş Yap",
     notConnectedTitle: "Google & YouTube Music Bağlı Değil",
     notConnectedDesc: "Tüm çalma listelerinize ve beğendiğiniz şarkılara erişmek için Google hesabınızla giriş yapın.",
-    
-    lastFmTitle: "Last.fm",
-    lastFmDesc: "Dinleme geçmişinizi scrobble etmek için Last.fm'i bağlayın.",
-    scrobblePlays: "Oynatmaları scrobble et",
-    scrobbleDesc: "Parça dinleme eşiğine ulaştığında şimdi çalınan güncellemelerini Last.fm'e gönder.",
-    accountConnection: "Hesap bağlantısı",
-    connectLastFm: "Last.fm'i Bağla",
-    browserWindowOpen: "Last.fm üzerinde uygulamayı onaylamanız için bir tarayıcı penceresi açılacak.",
-    
+
     appearanceSubtitle: "Uygulama temasını, dilini ve hareket ayarlarını yönetin.",
     themeSelection: "Tema",
     darkTheme: "Koyu Tema (OLED)",

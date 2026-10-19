@@ -45,7 +45,6 @@ export const SettingsView: FC<SettingsViewProps> = ({
     "account" | "appearance" | "playback" | "library" | "window" | "shortcuts"
   >(initialTab);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [scrobblePlays, setScrobblePlays] = useState(false);
 
   const handleLogoutClick = async () => {
     setIsLoggingOut(true);
@@ -361,83 +360,6 @@ export const SettingsView: FC<SettingsViewProps> = ({
                 )}
               </div>
 
-              {/* Last.fm Box (Matching Screenshot 1) */}
-              <div
-                className={`p-6 rounded-3xl border transition-all shadow-sm space-y-5 ${
-                  isLight ? "bg-[#ffffff] border-[#e4e4e7]" : "bg-[#101010] border-[#222222]"
-                }`}
-              >
-                {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-inherit">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-[#d51007] flex items-center justify-center font-black text-xs">
-                      as
-                    </div>
-                    <div>
-                      <h3 className={`text-sm font-bold ${isLight ? "text-[#111111]" : "text-white"}`}>
-                        {t.lastFmTitle}
-                      </h3>
-                      <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                        {t.lastFmDesc}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className={`text-xs font-medium ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                    {t.signedOut}
-                  </span>
-                </div>
-
-                {/* Scrobble plays Toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="max-w-md">
-                    <p className={`text-xs font-semibold ${isLight ? "text-[#18181b]" : "text-white"}`}>
-                      {t.scrobblePlays}
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                      {t.scrobbleDesc}
-                    </p>
-                  </div>
-
-                  {/* iOS Style Toggle Switch */}
-                  <button
-                    onClick={() => setScrobblePlays((p) => !p)}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      scrobblePlays
-                        ? "bg-[#ff0000]"
-                        : isLight
-                        ? "bg-[#e4e4e7]"
-                        : "bg-[#282828]"
-                    }`}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                        scrobblePlays ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Account connection */}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="max-w-md">
-                    <p className={`text-xs font-semibold ${isLight ? "text-[#18181b]" : "text-white"}`}>
-                      {t.accountConnection}
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                      {t.browserWindowOpen}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => openExternalUrl("https://www.last.fm/api/auth")}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#ff0000] hover:bg-[#e60000] text-white rounded-full text-xs font-bold transition-all shadow-md shadow-red-500/20 active:scale-95 cursor-pointer shrink-0"
-                  >
-                    <span className="font-bold text-[11px]">as</span>
-                    <span>{t.connectLastFm}</span>
-                  </button>
-                </div>
-              </div>
             </>
           )}
 

@@ -1,4 +1,4 @@
-import { type FC, type ChangeEvent } from "react";
+import { type FC, type ChangeEvent, useState } from "react";
 import {
   Play,
   Pause,
@@ -92,6 +92,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
 
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
+  const [isVolumeInteracting, setIsVolumeInteracting] = useState(false);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
@@ -369,7 +370,11 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         </button>
 
         {/* Volume */}
-        <div className="flex items-center gap-2 group">
+        <div
+          className="flex items-center gap-2 group relative"
+          onMouseEnter={() => setIsVolumeInteracting(true)}
+          onMouseLeave={() => setIsVolumeInteracting(false)}
+        >
           <button
             onClick={onToggleMute}
             className={`p-1 transition-colors cursor-pointer ${
@@ -379,30 +384,48 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           >
             <VolumeIcon className="w-4 h-4" />
           </button>
-          <div
-            className={`w-24 h-1 group-hover:h-1.5 rounded-full overflow-hidden relative cursor-pointer transition-all ${
-              isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
-            }`}
-          >
+          <div className="relative flex items-center">
+            {/* Tooltip bubble right above the thumb */}
             <div
-              className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
-                isLight ? "bg-neutral-800" : "bg-white"
+              className={`absolute -top-7 text-[11px] font-medium bg-black/90 text-white px-2 py-0.5 rounded shadow-md pointer-events-none whitespace-nowrap transition-all duration-150 -translate-x-1/2 ${
+                isVolumeInteracting ? "opacity-100 scale-100" : "opacity-0 scale-90"
               }`}
-              style={{ width: `${isMuted ? 0 : volume * 100}%` }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val)) onVolumeChange(val);
+              style={{
+                left: `${isMuted ? 0 : Math.round(volume * 100)}%`,
               }}
-              aria-label="Ses seviyesi"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-            />
+            >
+              %{isMuted ? 0 : Math.round(volume * 100)}
+            </div>
+
+            <div
+              className={`w-24 h-1 group-hover:h-1.5 rounded-full overflow-hidden relative cursor-pointer transition-all ${
+                isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
+              }`}
+            >
+              <div
+                className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
+                  isLight ? "bg-neutral-800" : "bg-white"
+                }`}
+                style={{ width: `${isMuted ? 0 : volume * 100}%` }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onMouseDown={() => setIsVolumeInteracting(true)}
+                onMouseUp={() => setIsVolumeInteracting(false)}
+                onTouchStart={() => setIsVolumeInteracting(true)}
+                onTouchEnd={() => setIsVolumeInteracting(false)}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (!isNaN(val)) onVolumeChange(val);
+                }}
+                aria-label="Ses seviyesi"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+            </div>
           </div>
         </div>
       </div>

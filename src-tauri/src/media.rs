@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use tauri::{
     menu::{MenuBuilder, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Wry,
+    AppHandle, Emitter, Manager,
 };
 
 #[cfg(target_os = "windows")]
@@ -16,8 +16,6 @@ pub struct TaskbarIcons {
 
 pub struct MediaState {
     pub smtc: Mutex<Option<souvlaki::MediaControls>>,
-    pub play_pause_item: Mutex<Option<MenuItem<Wry>>>,
-    pub track_info_item: Mutex<Option<MenuItem<Wry>>>,
     #[cfg(target_os = "windows")]
     pub main_hwnd: Mutex<Option<isize>>,
     #[cfg(target_os = "windows")]
@@ -153,22 +151,13 @@ fn update_thumbbar_buttons(hwnd_val: isize, is_playing: bool, icons: TaskbarIcon
 pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle().clone();
 
-    // 1. Build Tray Menu Items
-    let track_info_item = MenuItem::with_id(app, "track_info", "Tubify - Hazır", false, None::<&str>)?;
-    let play_pause_item = MenuItem::with_id(app, "play_pause", "Oynat", true, None::<&str>)?;
-    let next_item = MenuItem::with_id(app, "next", "Sonraki Parça", true, None::<&str>)?;
-    let prev_item = MenuItem::with_id(app, "prev", "Önceki Parça", true, None::<&str>)?;
+    // 1. Build Tray Menu Items (Only "Tubify'ı Göster" and "Kapat")
     let show_item = MenuItem::with_id(app, "show", "Tubify'ı Göster", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Kapat", true, None::<&str>)?;
 
     let menu = MenuBuilder::new(app)
-        .item(&track_info_item)
-        .separator()
-        .item(&play_pause_item)
-        .item(&next_item)
-        .item(&prev_item)
-        .separator()
         .item(&show_item)
+        .separator()
         .item(&quit_item)
         .build()?;
 
@@ -179,18 +168,6 @@ pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn s
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
-                "play_pause" => {
-                    let _ = app.emit("player-toggle-play", ());
-                    let _ = app.emit("media-control-action", "play_pause");
-                }
-                "next" => {
-                    let _ = app.emit("player-next", ());
-                    let _ = app.emit("media-control-action", "next");
-                }
-                "prev" => {
-                    let _ = app.emit("player-previous", ());
-                    let _ = app.emit("media-control-action", "prev");
-                }
                 "show" => {
                     if let Some(win) = app.get_webview_window("main") {
                         let _ = win.show();
@@ -249,6 +226,25 @@ pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn s
 
     #[cfg(not(target_os = "windows"))]
     let (hwnd_ptr, hwnd_isize): (Option<*mut std::ffi::c_void>, Option<isize>) = (None, None);
+
+    // Set window icon explicitly for Windows Taskbar & Alt+Tab
+    if let Some(win) = app.get_webview_window("main") {
+        if let Some(icon) = app.default_window_icon() {
+            let _ = win.set_icon(icon.clone());
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Some(hwnd_val) = hwnd_isize {
+        use windows::Win32::Foundation::{HWND, WPARAM, LPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{SendMessageW, WM_SETICON, ICON_BIG, ICON_SMALL};
+        if let Some(hicon) = create_hicon_from_png(include_bytes!("../icons/icon.png")) {
+            unsafe {
+                SendMessageW(HWND(hwnd_val as *mut _), WM_SETICON, Some(WPARAM(ICON_BIG as usize)), Some(LPARAM(hicon.0 as isize)));
+                SendMessageW(HWND(hwnd_val as *mut _), WM_SETICON, Some(WPARAM(ICON_SMALL as usize)), Some(LPARAM(hicon.0 as isize)));
+            }
+        }
+    }
 
     let config = souvlaki::PlatformConfig {
         dbus_name: "tubify",
@@ -370,8 +366,6 @@ pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn s
     // 5. Save to App State
     let media_state = MediaState {
         smtc: Mutex::new(smtc_controls),
-        play_pause_item: Mutex::new(Some(play_pause_item)),
-        track_info_item: Mutex::new(Some(track_info_item)),
         #[cfg(target_os = "windows")]
         main_hwnd: Mutex::new(hwnd_isize),
         #[cfg(target_os = "windows")]
@@ -400,27 +394,7 @@ pub fn update_media_metadata(
         let _ = tray.set_tooltip(Some(tooltip));
     }
 
-    // 2. Update Tray Menu Items
-    if let Ok(item_lock) = state.play_pause_item.lock() {
-        if let Some(ref item) = *item_lock {
-            let label = if payload.is_playing { "Duraklat" } else { "Oynat" };
-            let _ = item.set_text(label);
-        }
-    }
-    if let Ok(info_lock) = state.track_info_item.lock() {
-        if let Some(ref item) = *info_lock {
-            let info = if !payload.title.is_empty() && !payload.artist.is_empty() {
-                format!("{} - {}", payload.title, payload.artist)
-            } else if !payload.title.is_empty() {
-                payload.title.clone()
-            } else {
-                "Tubify - Hazır".to_string()
-            };
-            let _ = item.set_text(info);
-        }
-    }
-
-    // 3. Update SMTC (souvlaki)
+    // 2. Update SMTC (souvlaki)
     if let Ok(mut smtc_guard) = state.smtc.lock() {
         if let Some(ref mut controls) = *smtc_guard {
             let metadata = souvlaki::MediaMetadata {
@@ -441,7 +415,7 @@ pub fn update_media_metadata(
         }
     }
 
-    // 4. Update Windows Taskbar Thumbnail Play/Pause Button
+    // 3. Update Windows Taskbar Thumbnail Play/Pause Button
     #[cfg(target_os = "windows")]
     {
         let hwnd_opt = state.main_hwnd.lock().ok().and_then(|h| *h);
@@ -463,15 +437,7 @@ pub fn update_playback_status(
     state: tauri::State<'_, MediaState>,
     is_playing: bool,
 ) -> Result<(), String> {
-    // 1. Update Tray Menu
-    if let Ok(item_lock) = state.play_pause_item.lock() {
-        if let Some(ref item) = *item_lock {
-            let label = if is_playing { "Duraklat" } else { "Oynat" };
-            let _ = item.set_text(label);
-        }
-    }
-
-    // 2. Update SMTC
+    // 1. Update SMTC
     if let Ok(mut smtc_guard) = state.smtc.lock() {
         if let Some(ref mut controls) = *smtc_guard {
             let playback = if is_playing {
@@ -483,7 +449,7 @@ pub fn update_playback_status(
         }
     }
 
-    // 3. Update Taskbar Thumbnail Toolbar
+    // 2. Update Taskbar Thumbnail Toolbar
     #[cfg(target_os = "windows")]
     {
         let hwnd_opt = state.main_hwnd.lock().ok().and_then(|h| *h);

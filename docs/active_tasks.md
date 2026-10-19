@@ -137,6 +137,27 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **Çift Tetiklenme (Double Trigger / Double Play) Giderildi:** Görev çubuğundaki ve SMTC üzerindeki butonlara tıklandığında hem `player-next`/`player-toggle-play` hem de `media-control-action` olaylarının eşzamanlı fırlatılmasından kaynaklanan çift çalışma sorunu çözüldü. Her bir eylem tekil ve bağımsız event yapısına kavuşturuldu; frontend dinleyicilerindeki çakışmalar temizlendi.
   - `cargo check`, `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 20:** UI/UX İyileştirmeleri, Logo/İkon Güncellemesi, Kısayollar ve Sistem Entegrasyonu:
+    - **Dinamik Scrollbar Davranışı & Pürüzsüz Kaydırma:** `index.css` üzerinde scrollbar varsayılan durumda 6px ve düşük opaklıkta tutuldu; hover durumunda 10px'e genişleyen ve kontrastı artan akıcı geçiş (`transition-all`) eklendi. `html` ve `.custom-scrollbar` container'larına `scroll-smooth` entegre edildi.
+    - **Ses Çubuğu (Volume Slider) Yüzde Tooltip'i:** Slider thumb'ı üzerine gelindiğinde ve sürüklenirken anlık ses yüzdesini (`%75`, `%100` vb.) gösteren ve thumb pozisyonunu takip eden şık tooltip balonu eklendi.
+    - **Uygulama ve Taskbar İkonlarının Güncellenmesi:** `yeni/favicon.ico` kaynak alınarak `tauri icon` ile `src-tauri/icons/` ve `public/` altındaki tüm platform ikonları güncellendi. `public/tubify.ico` ve geçici `yeni/` klasörü silindi.
+    - **System Tray Menü Sadeleştirmesi:** Sistem tepsisi menüsü sadece "Tubify'ı Göster" ve "Kapat" seçeneklerine indirgendi.
+    - **Last.fm Tamamen Temizlendi:** `SettingsView.tsx` ve `LanguageContext.tsx` içindeki Last.fm kartı, state'leri ve çeviri anahtarları sıfır ölü kod prensibiyle kaldırıldı.
+    - **Evrensel Donanımsal Medya Kısayolları (Media Keys):** Klavyedeki donanımsal medya tuşları (`MediaTrackNext`, `MediaTrackPrevious`, `MediaPlayPause`) ve `navigator.mediaSession` eylemleri bağlandı. "Önceki Parça" mantığı; çalan şarkı 3 saniyenin üzerindeyse şarkıyı başa saracak (`currentTime = 0`), ilk 3 saniye içindeyse önceki şarkıya geçecek şekilde güncellendi.
+  - `cargo check`, `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 21:** Scrollbar Restorasyonu, Donanımsal Medya Tuşları Multi-Skip Giderilmesi & Taskbar İkon Zorlaması:
+    - **Scrollbar ve Kaydırma Orijinal Haline Getirildi:** Kullanıcı isteği doğrultusunda dinamik genişleme ve yapay smooth-scroll kaldırıldı; `src/index.css` içindeki sade, 6px genişliğindeki doğal kaydırma çubuğuna geri dönüldü.
+    - **Medya Tuşlarında Çoklu Şarkı Atlama (3-4 Şarkı Atlama) Kesin Olarak Çözüldü:** Hem `window.onkeydown`, hem `navigator.mediaSession`, hem de Rust `souvlaki` sistemlerinin aynı anda tetiklenmesinden kaynaklanan 3 kat çalışma engellendi. Fazla dinleyiciler temizlendi; `nextTrack` ve `prevTrack` fonksiyonlarına 450ms'lik debounce bariyeri konularak tek bir basışta yalnızca tek bir şarkı geçişi garanti altına alındı.
+    - **Taskbar ve Uygulama İkonu Runtime Seviyesinde Zorlandı:** `build.rs` yeniden tetiklendi; `media.rs` içinde ana pencere HWND'sine `WM_SETICON` mesajları (`ICON_BIG` ve `ICON_SMALL`) gönderilerek Windows görev çubuğu ve Alt+Tab önbellekleri bypass edilip yeni logo çalışma anında doğrudan pencereye bağlandı. `public/logo.png` güncellendi.
+  - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 22:** Yağ Gibi Pürüzsüz Momentum Kaydırma, Kalıcı Ses Seviyesi, Animasyonlu 3 Nokta & Medya Tuşları Tamiri:
+    - **Akıcı Momentum Mouse Wheel Kaydırma ("Yağ Gibi"):** `src/utils/smoothScroll.ts` yazılarak `requestAnimationFrame` ve lerp fizik interpolasyonu ile donanımsal fare tekerleğinin ayrık adımları yumuşatılarak ipeksi bir kayma hissiyatı sağlandı. `App.tsx` genelinde aktifleştirildi.
+    - **Kalıcı Ses Seviyesi (Volume Memory):** Program kapatıldığında veya ses değiştirildiğinde anlık değer `localStorage` (`tubify_volume` ve `tubify_muted`) içerisine yazılıyor; program her açıldığında önceki oturumdaki ses seviyesi otomatik olarak yüklenip audio elementine uygulanıyor.
+    - **Oynatılan Şarkıda Animasyonlu 3 Nokta İndikatörü:** Playlist, Album ve Artist görünümlerinde çalmakta olan şarkının sıra numarası (`#`) sütununda statik play üçgeni yerine YouTube Music kırmızısı (`#ff0000`) ile senkronize zıplayan/dalgalanan 3 nokta animasyonu (`animate-tubify-dot-1/2/3`) entegre edildi.
+    - **Medya Tuşları Onarımı (Tek Tık = Tek Şarkı):** WebView2 Chromium motorunun donanımsal tuşları yakalaması için `navigator.mediaSession` ve `keydown` dinleyicileri 450ms'lik debounce kalkanıyla yeniden bağlandı. Medya tuşuna basıldığında hiç atlamama sorunu çözüldü ve her basışta tam olarak tek bir şarkı atlaması sağlandı.
+  - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
 

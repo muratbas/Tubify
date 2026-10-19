@@ -287,10 +287,18 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         : "hover:bg-white/10 text-neutral-400"
                     }`}
                   >
-                    {/* Index or Play button */}
+                    {/* Index or Animated 3 Dots */}
                     <div className="text-sm font-medium flex items-center">
                       <span className={`group-hover:hidden ${isActive ? "text-[#ff0000] font-bold" : ""}`}>
-                        {isActive && isPlaying ? "▶" : idx + 1}
+                        {isActive && isPlaying ? (
+                          <span className="flex items-center gap-1 h-3.5 px-0.5" title="Oynatılıyor">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-1" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-2" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-3" />
+                          </span>
+                        ) : (
+                          idx + 1
+                        )}
                       </span>
                       <button
                         onClick={(e) => {

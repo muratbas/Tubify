@@ -23,6 +23,7 @@ import {
   getYtPlaylists,
   getPlaylistTracksPage,
 } from "./services/api";
+import { initSmoothScroll } from "./utils/smoothScroll";
 import type { Track, UserProfile, Playlist } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { Loader2, Music2, Heart, Play, AlertCircle, Check, MoreHorizontal } from "lucide-react";
@@ -188,6 +189,11 @@ export const App: FC = () => {
   const handleGoForward = () => {
     if (canGoForward) setHistoryIndex((prev) => prev + 1);
   };
+
+  // Buttery Smooth Momentum Wheel Scrolling across all views
+  useEffect(() => {
+    return initSmoothScroll();
+  }, []);
 
   // Mouse 4 / 5 (Browser Back & Forward) Hardware Navigation
   useEffect(() => {
