@@ -120,7 +120,6 @@ export const ArtistView: FC<ArtistViewProps> = ({
         }`}
       >
         <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
-        <p className="text-xs font-medium">Sanatçı profili yükleniyor...</p>
       </div>
     );
   }

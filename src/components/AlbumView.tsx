@@ -260,7 +260,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
               }`}
             >
               <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
-              <p className="text-xs font-medium">Albüm şarkıları yükleniyor...</p>
             </div>
           ) : (
             <div className="pt-2 space-y-0.5">

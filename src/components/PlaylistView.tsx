@@ -256,7 +256,6 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             }`}
           >
             <div className="w-8 h-8 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-medium">Şarkılar yükleniyor...</p>
           </div>
         ) : displayTracks.length === 0 ? (
           <div
@@ -480,9 +479,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             {/* Infinite Scroll Sentinel */}
             <div ref={sentinelRef} className="h-10 w-full flex items-center justify-center pt-2">
               {isLoadingMore && (
-                <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
-                  <div className="w-4 h-4 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
-                  <span>Daha fazla şarkı yükleniyor...</span>
+                <div className="flex items-center justify-center py-2">
+                  <div className="w-5 h-5 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>

@@ -343,7 +343,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           }`}
         >
           <User className="w-4 h-4 shrink-0" />
-          <span className="truncate">Sanatçıya Git ({track.artist})</span>
+          <span>Sanatçıya Git</span>
         </button>
       )}
 
@@ -356,7 +356,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           }`}
         >
           <Disc className="w-4 h-4 shrink-0" />
-          <span className="truncate">Albüme Git ({track.album})</span>
+          <span>Albüme Git</span>
         </button>
       )}
 

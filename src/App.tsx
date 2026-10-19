@@ -653,7 +653,6 @@ export const App: FC = () => {
                     }`}
                   >
                     <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
-                    <p className="text-xs font-medium">Searching YouTube Music...</p>
                   </div>
                 ) : searchError ? (
                   <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">

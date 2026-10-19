@@ -1,4 +1,4 @@
-import { type FC, type ChangeEvent, useState } from "react";
+import { type FC, useState } from "react";
 import {
   Play,
   Pause,
@@ -93,14 +93,13 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
   const [isVolumeInteracting, setIsVolumeInteracting] = useState(false);
+  const [isDraggingSeek, setIsDraggingSeek] = useState(false);
+  const [dragSeekTime, setDragSeekTime] = useState(0);
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const displayTime = isDraggingSeek ? dragSeekTime : currentTime;
+  const progressPercent = duration > 0 ? (displayTime / duration) * 100 : 0;
+  const volumePercent = isMuted ? 0 : Math.min(100, Math.max(0, volume * 100));
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
-
-  const handleSeekChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    onSeek(val);
-  };
 
   return (
     <footer
@@ -291,27 +290,62 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               isLight ? "text-neutral-500" : "text-neutral-400"
             }`}
           >
-            {formatTime(currentTime)}
+            {formatTime(displayTime)}
           </span>
 
-          <div
-            className={`flex-1 h-1 hover:h-1.5 rounded-full overflow-hidden relative group cursor-pointer transition-all ${
-              isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
-            }`}
-          >
+          <div className="flex-1 relative flex items-center group cursor-pointer py-2">
+            {/* Background Track */}
             <div
-              className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
-                isLight ? "bg-neutral-800" : "bg-white"
+              className={`w-full h-1 group-hover:h-1.5 rounded-full overflow-hidden transition-all ${
+                isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
               }`}
-              style={{ width: `${progressPercent}%` }}
+            >
+              {/* Filled Track: Real-time width with ZERO transition lag */}
+              <div
+                className={`h-full group-hover:bg-[#ff0000] rounded-full transition-colors duration-150 ${
+                  isLight ? "bg-neutral-800" : "bg-white"
+                }`}
+                style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+              />
+            </div>
+
+            {/* Slider Thumb Knob: Appears on hover or when dragging */}
+            <div
+              className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-md pointer-events-none transition-opacity ${
+                isDraggingSeek ? "opacity-100 scale-110" : "opacity-0 group-hover:opacity-100"
+              }`}
+              style={{ left: `${Math.min(100, Math.max(0, progressPercent))}%` }}
             />
+
             <input
               type="range"
               min={0}
               max={duration || 100}
               step={0.1}
-              value={currentTime}
-              onChange={handleSeekChange}
+              value={displayTime}
+              onMouseDown={() => {
+                setIsDraggingSeek(true);
+                setDragSeekTime(currentTime);
+              }}
+              onTouchStart={() => {
+                setIsDraggingSeek(true);
+                setDragSeekTime(currentTime);
+              }}
+              onInput={(e) => {
+                const val = parseFloat((e.target as HTMLInputElement).value);
+                setDragSeekTime(val);
+              }}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setDragSeekTime(val);
+                onSeek(val);
+              }}
+              onMouseUp={() => {
+                setIsDraggingSeek(false);
+              }}
+              onTouchEnd={() => {
+                setIsDraggingSeek(false);
+              }}
               aria-label="Şarkı ilerleme çubuğu"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
@@ -371,7 +405,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
 
         {/* Volume */}
         <div
-          className="flex items-center gap-2 group relative"
+          className="flex items-center gap-2 group relative py-2"
           onMouseEnter={() => setIsVolumeInteracting(true)}
           onMouseLeave={() => setIsVolumeInteracting(false)}
         >
@@ -387,27 +421,40 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <div className="relative flex items-center">
             {/* Tooltip bubble right above the thumb */}
             <div
-              className={`absolute -top-7 text-[11px] font-medium bg-black/90 text-white px-2 py-0.5 rounded shadow-md pointer-events-none whitespace-nowrap transition-all duration-150 -translate-x-1/2 ${
+              className={`absolute -top-7 text-[11px] font-medium bg-black/90 text-white px-2 py-0.5 rounded shadow-md pointer-events-none whitespace-nowrap transition-all duration-150 -translate-x-1/2 z-10 ${
                 isVolumeInteracting ? "opacity-100 scale-100" : "opacity-0 scale-90"
               }`}
               style={{
-                left: `${isMuted ? 0 : Math.round(volume * 100)}%`,
+                left: `${volumePercent}%`,
               }}
             >
-              %{isMuted ? 0 : Math.round(volume * 100)}
+              %{Math.round(volumePercent)}
             </div>
 
-            <div
-              className={`w-24 h-1 group-hover:h-1.5 rounded-full overflow-hidden relative cursor-pointer transition-all ${
-                isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
-              }`}
-            >
+            <div className="w-24 relative flex items-center cursor-pointer">
+              {/* Background Track */}
               <div
-                className={`h-full group-hover:bg-[#ff0000] rounded-full transition-all ${
-                  isLight ? "bg-neutral-800" : "bg-white"
+                className={`w-full h-1 group-hover:h-1.5 rounded-full overflow-hidden transition-all ${
+                  isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
                 }`}
-                style={{ width: `${isMuted ? 0 : volume * 100}%` }}
+              >
+                {/* Filled Track: Real-time width with ZERO transition lag */}
+                <div
+                  className={`h-full group-hover:bg-[#ff0000] rounded-full transition-colors duration-150 ${
+                    isLight ? "bg-neutral-800" : "bg-white"
+                  }`}
+                  style={{ width: `${volumePercent}%` }}
+                />
+              </div>
+
+              {/* Slider Thumb Knob: Appears on hover or interacting */}
+              <div
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-md pointer-events-none transition-opacity ${
+                  isVolumeInteracting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+                style={{ left: `${volumePercent}%` }}
               />
+
               <input
                 type="range"
                 min={0}
@@ -418,12 +465,16 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
                 onMouseUp={() => setIsVolumeInteracting(false)}
                 onTouchStart={() => setIsVolumeInteracting(true)}
                 onTouchEnd={() => setIsVolumeInteracting(false)}
+                onInput={(e) => {
+                  const val = parseFloat((e.target as HTMLInputElement).value);
+                  if (!isNaN(val)) onVolumeChange(val);
+                }}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   if (!isNaN(val)) onVolumeChange(val);
                 }}
                 aria-label="Ses seviyesi"
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
             </div>
           </div>

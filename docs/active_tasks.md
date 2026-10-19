@@ -158,10 +158,14 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **Medya Tuşları Onarımı (Tek Tık = Tek Şarkı):** WebView2 Chromium motorunun donanımsal tuşları yakalaması için `navigator.mediaSession` ve `keydown` dinleyicileri 450ms'lik debounce kalkanıyla yeniden bağlandı. Medya tuşuna basıldığında hiç atlamama sorunu çözüldü ve her basışta tam olarak tek bir şarkı atlaması sağlandı.
   - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 23:** Yükleniyor Metinlerinin Temizlenmesi, Context Menu Sadeleştirmesi ve Slider Anlık Tepki (Responsiveness) İyileştirmesi:
+    - **Yükleniyor Metinleri Kaldırıldı:** `PlaylistView.tsx` (ilk yükleme ve infinite scroll sentinel), `AlbumView.tsx`, `ArtistView.tsx` ve `App.tsx` (arama) bileşenlerindeki "Daha fazla şarkı yükleniyor...", "Şarkılar yükleniyor..." vb. metinler kaldırıldı; sadece şık, dönen kırmızı spinner animasyonu bırakıldı.
+    - **Sağ Tık Menüsü (Context Menu) Sadeleştirildi:** `TrackContextMenu.tsx` içindeki "Sanatçıya Git (*isim*)" ve "Albüme Git (*isim*)" butonlarındaki parantez içi isim kalabalığı kaldırılarak düz ve sade "Sanatçıya Git" ve "Albüme Git" haline getirildi.
+    - **Şarkı İlerleme ve Ses Slider'ı Gecikmesiz & Anlık Yapıldı (0ms Latency):**
+      - CSS `transition-all` kaldırıldı; genişlik artık fare imlecini 60/120fps gecikmesiz birebir takip ediyor ("geriden gelme" hissi tamamen ortadan kaldırıldı).
+      - Timeline slider'ına scrubbing state'i (`isDraggingSeek`) eklendi; sürükleme anında zaman sayacı ve çubuk eş zamanlı akar.
+      - Her iki slider'a da hover durumunda (`group-hover`) veya sürüklerken çubuğun tam ucunda beliren Spotify masaüstü tarzı beyaz yuvarlak tutamaç (knob / thumb) eklendi.
+  - `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
-
-
-
-
-
