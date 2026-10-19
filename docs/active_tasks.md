@@ -40,6 +40,14 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
   - Hero ve Tracklist: `192x192px` kapak, `text-6xl font-extrabold` başlık, aksiyon barında `w-14 h-14` kırmızı Play butonu, `# ▲` kırmızı sıralama oku, satır hover'ında yumuşak gri zemin (`hover:bg-neutral-200/60 rounded-lg`), sıra numarası yerine siyah `▶` play ikonu, kırmızı kalp ve üç nokta (`...`).
   - Alt Oynatıcı: `h-[84px]`, `56x56px` kapak, ortada `w-9 h-9` siyah daire içinde beyaz Play butonu, ince ve zarif progress bar (`h-1 bg-neutral-200`).
   - `npm run build` ile sıfır hata doğrulandı.
+- [x] **Aşama 10:** Tipografi, İkon Kalınlığı ve İnce Detay Düzeltmeleri:
+  - Sol üstteki `h-12` gereksiz boşluk kaldırıldı; "Ana Sayfa" ve "Ara" doğrudan üstten (`pt-3.5`) başlatıldı.
+  - Arama çubuğu genişliği görsel doğrultusunda uzatıldı (`w-80 md:w-96 lg:w-[440px]`).
+  - Sol bardaki filtre hapları yatay kaydırma çubuğu yerine görseldeki gibi 2 satır halinde aşağı kaydırıldı (Satır 1: Çalma Listeleri + Albümler, Satır 2: Sanatçılar + Podcast'ler, Satır 3: `v Son çalınanlar` butonu).
+  - Tipografi / Font: `index.html` içerisindeki harici Google Fonts (Inter) bağlantıları tamamen temizlendi; `index.css` üzerinde `@theme` ve evrensel `*` seçici ile tüm arayüz strictly `SpotifyMix` fontuna bağlandı.
+  - Metin Kesilme (Clipping) Hataları: "Beğenilenler" başlığındaki `ğ` harfinin ve satırlardaki Türkçe karakterlerin alttan kesilmesi, `leading-snug pb-2 pt-1` ve `leading-normal py-0.5` verilerek tamamen giderildi.
+  - İkon Kalınlığı: Tüm Lucide ikonları global olarak `stroke-width: 2.25px !important` kuralıyla tok, dolgun ve premium desktop hissi verecek şekilde kalınlaştırıldı.
+  - `npm run build` ile sıfır hata doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı deneyimini izlemek ve talep edilen ince ayarları uygulamak.

@@ -133,8 +133,8 @@ export const TitleBar: FC<TitleBarProps> = ({
           <ChevronRight className="w-5 h-5" />
         </button>
 
-        {/* Round Spotifast Search Bar (w-[280px]) */}
-        <div className="relative w-[280px] ml-1 group">
+        {/* Extended Spotifast Search Bar */}
+        <div className="relative w-80 md:w-96 lg:w-[440px] ml-1 group">
           <Search
             className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
               isLight

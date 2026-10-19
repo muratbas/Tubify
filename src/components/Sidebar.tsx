@@ -4,11 +4,12 @@ import {
   Search,
   Library,
   Plus,
-  ArrowUpDown,
   Pin,
   Music2,
   FolderPlus,
   LayoutGrid,
+  ChevronDown,
+  PanelLeft,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTheme } from "../context/ThemeContext";
@@ -40,7 +41,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const { theme } = useTheme();
   const isLight = theme === "light";
 
-  const [activeFilter, setActiveFilter] = useState<"all" | "playlists" | "albums" | "artists">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "playlists" | "albums" | "artists" | "podcasts">("all");
   const [filterText, setFilterText] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -80,22 +81,19 @@ export const Sidebar: FC<SidebarProps> = ({
           : "bg-[#121212] border-white/10 text-white"
       }`}
     >
-      {/* 0. Top Window Drag Header (Logo removed as requested, smooth window drag) */}
+      {/* 1. Top Section: Ana Sayfa & Ara (No empty gap above it, immediate start) */}
       <div
         data-tauri-drag-region
         onMouseDown={handleMouseDown}
-        className="h-12 w-full shrink-0 cursor-default"
-      />
-
-      {/* 1. Top Section: Ana Sayfa & Ara */}
-      <div className="px-5 space-y-3.5 shrink-0">
+        className="px-5 pt-3.5 space-y-3.5 shrink-0"
+      >
         <button
           onClick={onNavigateHome}
-          className={`w-full flex items-center gap-4 text-sm font-medium transition-colors cursor-pointer text-left ${
+          className={`w-full flex items-center gap-4 text-sm font-semibold transition-colors cursor-pointer text-left ${
             isHomeActive
               ? "text-[#ff0000]"
               : isLight
-              ? "text-neutral-600 hover:text-neutral-900"
+              ? "text-neutral-700 hover:text-neutral-900"
               : "text-neutral-400 hover:text-white"
           }`}
         >
@@ -105,11 +103,11 @@ export const Sidebar: FC<SidebarProps> = ({
 
         <button
           onClick={onNavigateSearch}
-          className={`w-full flex items-center gap-4 text-sm font-medium transition-colors cursor-pointer text-left ${
+          className={`w-full flex items-center gap-4 text-sm font-semibold transition-colors cursor-pointer text-left ${
             isSearchActive
               ? "text-[#ff0000]"
               : isLight
-              ? "text-neutral-600 hover:text-neutral-900"
+              ? "text-neutral-700 hover:text-neutral-900"
               : "text-neutral-400 hover:text-white"
           }`}
         >
@@ -127,10 +125,10 @@ export const Sidebar: FC<SidebarProps> = ({
 
       {/* 2. Library Section: Kitaplık, Filtreler, Çalma Listeleri */}
       <div className="flex-1 flex flex-col px-3 overflow-hidden min-h-0">
-        {/* Kitaplık Header */}
+        {/* Kitaplık Header (Matching screenshot 2: Kitaplık + Search + Plus + LayoutGrid + PanelLeft) */}
         <div
-          className={`flex items-center justify-between px-2 py-1.5 ${
-            isLight ? "text-neutral-600" : "text-neutral-400"
+          className={`flex items-center justify-between px-2 py-1 ${
+            isLight ? "text-neutral-700" : "text-neutral-300"
           }`}
         >
           <button
@@ -174,14 +172,22 @@ export const Sidebar: FC<SidebarProps> = ({
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
+            <button
+              title="Daralt"
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 px-2 py-2 overflow-x-auto no-scrollbar shrink-0">
+        {/* Filter Pills (wrapped into 2 clean rows with no scrollbar, exactly matching user screenshot 2) */}
+        <div className="flex flex-wrap gap-1.5 px-2 py-2 shrink-0">
           <button
             onClick={() => setActiveFilter((prev) => (prev === "playlists" ? "all" : "playlists"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer ${
               activeFilter === "playlists"
                 ? "bg-black text-white"
                 : isLight
@@ -193,7 +199,7 @@ export const Sidebar: FC<SidebarProps> = ({
           </button>
           <button
             onClick={() => setActiveFilter((prev) => (prev === "albums" ? "all" : "albums"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer ${
               activeFilter === "albums"
                 ? "bg-black text-white"
                 : isLight
@@ -205,7 +211,7 @@ export const Sidebar: FC<SidebarProps> = ({
           </button>
           <button
             onClick={() => setActiveFilter((prev) => (prev === "artists" ? "all" : "artists"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer shrink-0 ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer ${
               activeFilter === "artists"
                 ? "bg-black text-white"
                 : isLight
@@ -215,14 +221,22 @@ export const Sidebar: FC<SidebarProps> = ({
           >
             Sanatçılar
           </button>
+          <button
+            onClick={() => setActiveFilter((prev) => (prev === "podcasts" ? "all" : "podcasts"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight transition-colors cursor-pointer ${
+              activeFilter === "podcasts"
+                ? "bg-black text-white"
+                : isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/15 text-white/80"
+            }`}
+          >
+            Podcast'ler
+          </button>
         </div>
 
-        {/* Sort Row */}
-        <div
-          className={`flex items-center justify-between px-2 py-1.5 text-xs ${
-            isLight ? "text-neutral-500" : "text-neutral-400"
-          }`}
-        >
+        {/* Sort Pill Row (matches screenshot 2: v Son çalınanlar) */}
+        <div className="px-2 py-1 shrink-0">
           {isSearchOpen ? (
             <div className="w-full relative">
               <input
@@ -248,18 +262,20 @@ export const Sidebar: FC<SidebarProps> = ({
             </div>
           ) : (
             <button
-              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isLight ? "hover:text-neutral-900" : "hover:text-white"
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                isLight
+                  ? "bg-neutral-100/90 text-neutral-700 hover:bg-neutral-200"
+                  : "bg-white/10 text-white/80 hover:bg-white/15"
               }`}
               title="Sıralama ölçütü"
             >
+              <ChevronDown className="w-3.5 h-3.5" />
               <span>Son çalınanlar</span>
-              <ArrowUpDown className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Playlist List (Scrollable, 44x44 thumbnails) */}
+        {/* Playlist List (Scrollable, 44x44 thumbnails, zero text clipping) */}
         <div className="flex-1 overflow-y-auto px-1 py-1 space-y-0.5 custom-scrollbar">
           {/* Pinned: Beğenilenler */}
           <div
@@ -286,7 +302,7 @@ export const Sidebar: FC<SidebarProps> = ({
 
               <div className="min-w-0">
                 <h4
-                  className={`text-sm font-semibold truncate leading-tight ${
+                  className={`text-sm font-semibold truncate leading-normal py-0.5 ${
                     selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
                       ? "text-[#ff0000]"
                       : isLight
@@ -297,7 +313,7 @@ export const Sidebar: FC<SidebarProps> = ({
                   Beğenilenler
                 </h4>
                 <p
-                  className={`text-xs truncate mt-0.5 ${
+                  className={`text-xs truncate leading-normal py-0.5 ${
                     isLight ? "text-neutral-500" : "text-neutral-400"
                   }`}
                 >
@@ -347,7 +363,7 @@ export const Sidebar: FC<SidebarProps> = ({
 
                   <div className="min-w-0">
                     <h4
-                      className={`text-sm font-semibold truncate leading-tight ${
+                      className={`text-sm font-semibold truncate leading-normal py-0.5 ${
                         isSelected
                           ? "text-[#ff0000]"
                           : isLight
@@ -358,7 +374,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       {pl.title}
                     </h4>
                     <p
-                      className={`text-xs truncate mt-0.5 ${
+                      className={`text-xs truncate leading-normal py-0.5 ${
                         isLight ? "text-neutral-500" : "text-neutral-400"
                       }`}
                     >

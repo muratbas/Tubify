@@ -110,7 +110,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               Çalma Listesi
             </span>
             <h1
-              className={`text-6xl font-extrabold tracking-tight truncate leading-tight ${
+              className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 ${
                 isLight ? "text-neutral-900" : "text-white"
               }`}
             >
@@ -297,7 +297,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                       )}
                       <div className="min-w-0">
                         <p
-                          className={`text-sm font-semibold truncate leading-tight ${
+                          className={`text-sm font-semibold truncate leading-normal py-0.5 ${
                             isActive
                               ? "text-[#ff0000]"
                               : isLight
@@ -317,7 +317,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             </span>
                           )}
                           <p
-                            className={`text-xs truncate hover:underline ${
+                            className={`text-xs truncate leading-normal py-0.5 hover:underline ${
                               isLight ? "text-neutral-500" : "text-neutral-400"
                             }`}
                           >

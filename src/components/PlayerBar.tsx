@@ -123,7 +123,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         <div className="min-w-0 max-w-[200px]">
           <h4
             title={track?.title}
-            className={`text-sm font-semibold truncate leading-tight hover:underline cursor-pointer ${
+            className={`text-sm font-semibold truncate leading-normal py-0.5 hover:underline cursor-pointer ${
               isLight ? "text-neutral-900" : "text-white"
             }`}
           >
@@ -131,7 +131,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           </h4>
           <p
             title={track?.artist}
-            className={`text-xs truncate mt-0.5 hover:underline cursor-pointer ${
+            className={`text-xs truncate leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
               isLight ? "text-neutral-500" : "text-neutral-400"
             }`}
           >
