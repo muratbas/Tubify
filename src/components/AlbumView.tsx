@@ -209,7 +209,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
           <button
             onClick={() => onPlayAll(tracks)}
             disabled={tracks.length === 0}
-            className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#e60000] hover:scale-105 active:scale-95 text-white flex items-center justify-center shadow-xl shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50"
+            className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#cc0000] active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
             title="Tümünü Oynat"
           >
             {isPlaying && activeTrack && tracks.some((t) => t.id === activeTrack.id) ? (

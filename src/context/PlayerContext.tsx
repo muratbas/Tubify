@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory } from "../types/music";
-import { getStreamUrl, toggleYtLike, getRadioTracks } from "../services/api";
+import {
+  getStreamUrl,
+  toggleYtLike,
+  getRadioTracks,
+  updateMediaMetadata,
+} from "../services/api";
 
 const INITIAL_RECENT: Track[] = [
   {
@@ -286,6 +291,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nextTrackRef = useRef(nextTrack);
   nextTrackRef.current = nextTrack;
 
+  const prevTrackRef = useRef(prevTrack);
+  prevTrackRef.current = prevTrack;
+
+  const togglePlayPauseRef = useRef<() => void>(() => {});
+
   // Initialize HTMLAudioElement ONCE on mount
   useEffect(() => {
     const audio = new Audio();
@@ -350,6 +360,100 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timer);
     };
   }, [activeTrack?.id, playbackStatus, queue, isShuffle, isRepeat, preloadUpcoming]);
+
+  // Listen for Windows Media Keys and System Tray actions
+  useEffect(() => {
+    const unlisteners: (() => void)[] = [];
+
+    const setupListener = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+
+        unlisteners.push(
+          await listen<void>("player-toggle-play", () => {
+            togglePlayPauseRef.current();
+          })
+        );
+
+        unlisteners.push(
+          await listen<void>("player-next", () => {
+            nextTrackRef.current();
+          })
+        );
+
+        unlisteners.push(
+          await listen<void>("player-previous", () => {
+            prevTrackRef.current();
+          })
+        );
+
+        unlisteners.push(
+          await listen<string>("media-control-action", (event) => {
+            const action = event.payload;
+            if (action === "play") {
+              if (audioRef.current && audioRef.current.paused) {
+                audioRef.current.play().catch(console.error);
+              }
+            } else if (action === "pause") {
+              if (audioRef.current && !audioRef.current.paused) {
+                audioRef.current.pause();
+              }
+            }
+          })
+        );
+      } catch (err) {
+        console.warn("Failed to attach player control listeners:", err);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      unlisteners.forEach((u) => u());
+    };
+  }, []);
+
+  // Sync currently playing track & playback status with OS (System Tray tooltip & SMTC)
+  useEffect(() => {
+    if (!activeTrack) {
+      updateMediaMetadata({
+        title: "",
+        artist: "",
+        album: "",
+        cover_url: "",
+        duration_secs: 0,
+        is_playing: false,
+      });
+      return;
+    }
+
+    let durationSecs = Math.round(duration);
+    if ((!durationSecs || durationSecs <= 0) && activeTrack.duration) {
+      const parts = activeTrack.duration.split(":").map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        durationSecs = parts[0] * 60 + parts[1];
+      } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        durationSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    }
+
+    updateMediaMetadata({
+      title: activeTrack.title,
+      artist: activeTrack.artist,
+      album: activeTrack.album || undefined,
+      cover_url: activeTrack.thumbnail || undefined,
+      duration_secs: durationSecs > 0 ? durationSecs : undefined,
+      is_playing: playbackStatus === "playing",
+    });
+  }, [
+    activeTrack?.id,
+    activeTrack?.title,
+    activeTrack?.artist,
+    activeTrack?.album,
+    activeTrack?.thumbnail,
+    playbackStatus,
+    duration,
+  ]);
 
   const playTrackInternal = async (track: Track) => {
     if (!audioRef.current) return;
@@ -430,6 +534,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audioRef.current.play().catch(console.error);
     }
   };
+  togglePlayPauseRef.current = togglePlayPause;
 
   const seek = (time: number) => {
     if (!audioRef.current) return;

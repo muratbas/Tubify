@@ -258,3 +258,35 @@ export async function closeWindow(): Promise<void> {
     }
   }
 }
+
+export interface MediaMetadataPayload {
+  title: string;
+  artist: string;
+  album?: string;
+  cover_url?: string;
+  duration_secs?: number;
+  is_playing: boolean;
+}
+
+export async function updateMediaMetadata(payload: MediaMetadataPayload): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_media_metadata", { payload });
+    } catch (e) {
+      console.warn("Failed to update media metadata:", e);
+    }
+  }
+}
+
+export async function updatePlaybackStatus(isPlaying: boolean): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_playback_status", { isPlaying });
+    } catch (e) {
+      console.warn("Failed to update playback status:", e);
+    }
+  }
+}
+

@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod media;
 pub mod search;
 pub mod stream;
 
@@ -6,6 +7,10 @@ use auth::{AlbumDetails, ArtistDetails, Playlist, PlaylistTracksResult, UserProf
 use search::Track;
 use stream::StreamInfo;
 use tauri::{AppHandle, Manager};
+
+
+
+
 
 #[tauri::command]
 async fn search_music(query: String) -> Result<Vec<Track>, String> {
@@ -136,6 +141,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(media::setup_system_tray_and_media)
         .invoke_handler(tauri::generate_handler![
             search_music,
             get_stream_url,
@@ -156,7 +162,9 @@ pub fn run() {
             open_external_url,
             minimize_window,
             toggle_maximize_window,
-            close_window
+            close_window,
+            media::update_media_metadata,
+            media::update_playback_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tubify tauri application");

@@ -281,19 +281,6 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                 : "bg-rose-500/[0.1] border-rose-500/25"
             }`}
           >
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-[10px] font-bold text-[#FF0000] tracking-wider uppercase">
-                {isPlaying ? "PLAYING" : "PAUSED"}
-              </span>
-              {isPlaying && (
-                <div className="flex items-center gap-0.5">
-                  <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
-                  <div className="w-0.5 h-2.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
-                  <div className="w-0.5 h-1.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
-                </div>
-              )}
-            </div>
-
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 bg-neutral-200 dark:bg-zinc-800 shadow-sm">
                 {activeTrack.thumbnail ? (
@@ -311,20 +298,35 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
 
               <div className="min-w-0 flex-1">
                 <p
-                  className={`text-sm font-semibold truncate leading-normal py-0.5 ${
-                    isLight ? "text-neutral-900" : "text-white"
-                  }`}
+                  className="text-sm font-semibold truncate leading-normal py-0.5 text-[#FF0000]"
                 >
                   {activeTrack.title}
                 </p>
                 <p
                   className={`text-xs truncate leading-normal py-0.5 ${
-                    isLight ? "text-neutral-500" : "text-neutral-400"
+                    isLight ? "text-neutral-600" : "text-neutral-300"
                   }`}
                 >
                   {activeTrack.artist}
                 </p>
               </div>
+
+              {onContextMenuTrack && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onContextMenuTrack(activeTrack, e);
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                    isLight
+                      ? "text-neutral-500 hover:text-black hover:bg-black/5"
+                      : "text-neutral-300 hover:text-white hover:bg-white/10"
+                  }`}
+                  title="Daha fazla seçenek"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -356,20 +358,6 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                         : "bg-rose-500/[0.1] border-rose-500/25"
                     }`}
                   >
-                    {/* Top Status Header */}
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[10px] font-bold text-[#FF0000] tracking-wider uppercase">
-                        {isPlaying ? "PLAYING" : "PAUSED"}
-                      </span>
-                      {isPlaying && (
-                        <div className="flex items-center gap-0.5">
-                          <div className="w-0.5 h-2 bg-[#FF0000] rounded-full animate-bounce [animation-delay:0ms]" />
-                          <div className="w-0.5 h-2.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:150ms]" />
-                          <div className="w-0.5 h-1.5 bg-[#FF0000] rounded-full animate-bounce [animation-delay:300ms]" />
-                        </div>
-                      )}
-                    </div>
-
                     {/* Active Song Row: EXACT typography matching PlaylistView */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 bg-neutral-200 dark:bg-zinc-800 shadow-sm">
@@ -417,7 +405,11 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                             e.stopPropagation();
                             onContextMenuTrack(track, e);
                           }}
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                            isLight
+                              ? "text-neutral-500 hover:text-black hover:bg-black/5"
+                              : "text-neutral-300 hover:text-white hover:bg-white/10"
+                          }`}
                           title="Daha fazla seçenek"
                         >
                           <MoreHorizontal className="w-4 h-4" />

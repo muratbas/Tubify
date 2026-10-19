@@ -107,7 +107,40 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **Tipografi ve Renk Uyumu:** Queue parça satırlarının metin stili `PlaylistView` ile birebir eşitlendi: Başlıklar `text-sm font-semibold text-neutral-900 dark:text-white` (tam beyaz/siyah, tam opaklık), sanatçılar `text-xs text-neutral-500 dark:text-neutral-400`, açık/koyu mod hover zeminleri `hover:bg-neutral-200/60 dark:hover:bg-white/10` ve Explicit (`E`) rozetleri eklendi.
   - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 16:** Queue Now Playing Kartı Temizliği & Üç Nokta Kontrastı:
+    - **Queue Now Playing Kartından `PLAYING` / `PAUSED` Rozetinin Kaldırılması:** Sağ sıradaki şarkılar (Queue) panelindeki Now Playing kartının üzerinde yer alan ve gereksiz yer kaplayan `PLAYING` / `PAUSED` metin etiketi ve üst çubuğu tamamen kaldırıldı. Kart; albüm kapağı, YouTube Music kırmızı renkli şarkı başlığı, sanatçı ve aksiyon butonu ile ferah ve derli toplu bir görünüme kavuşturuldu.
+    - **Üç Nokta (`...`) Butonu Görünürlük (Contrast) Düzeltmesi:** Açık modda kart zemininde kaybolan ve hover yapıldığında `text-white` nedeniyle tamamen görünmez hale gelen üç nokta butonu `text-neutral-500 hover:text-black hover:bg-black/5` (koyu modda `text-neutral-300 hover:text-white hover:bg-white/10`) sınıflarına geçirilerek kontrast sorunu kesin olarak giderildi.
+    - **Ana Playlist Zemin Rengi:** Kullanıcı isteği doğrultusunda playlist şarkı tablosundaki aktif satır zemini sade ve doğal orijinal haline (`bg-neutral-100/90` / `bg-white/15`) geri alındı.
+  - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 17:** Play Butonu Sadeleştirmesi & Windows Medya Kontrolleri / System Tray Entegrasyonu:
+    - **Play Butonu Görsel İyileştirmesi:** Çalma listesi, albüm ve sanatçı başlıklarındaki büyük kırmızı Play butonundaki gölge/glow efekti (`shadow-xl shadow-red-600/30`) ve hover büyütme (`hover:scale-105`) kaldırıldı; yerine hover durumunda bir tık koyu kırmızı ton (`hover:bg-[#cc0000]`) ve `transition-colors` uygulandı.
+    - **System Tray (Sistem Tepsisi) Dinamik Yönetimi:**
+      - Tray ikonu başlatıldığında veya şarkı değiştiğinde tooltip değeri anlık olarak `[Şarkı Adı] - [Sanatçı]` formatında güncelleniyor.
+      - Tray sağ tık menüsüne durum duyarlı `Oynat / Duraklat` (`play_pause`), `Sonraki Parça` (`next`), `Önceki Parça` (`prev`), `Tubify'ı Göster` ve `Çıkış` aksiyonları eklendi.
+      - Tray ikonuna sol tıklandığında uygulamanın minimize durumdan çıkarılıp öne getirilmesi (`unminimize` + `set_focus`) sağlandı.
+    - **Windows Medya Tuşları & SMTC / Taskbar Entegrasyonu (`souvlaki`):**
+      - Hafif ve yerel `souvlaki` crate'i ile Windows System Media Transport Controls (SMTC) entegre edildi.
+      - Donanım medya tuşları (klavyedeki Play, Pause, Next, Previous) ve Windows ses açma arayüzündeki medya kontrolleri doğrudan Tauri IPC event'i (`media-control-action`) üzerinden `PlayerContext` eylemlerine bağlandı.
+      - Çalan şarkı değiştikçe başlık, sanatçı, albüm adı, kapak resmi URL'si ve süre bilgisi Windows SMTC arayüzüne ve bildirim alanına aktarılıyor.
+  - [x] **Aşama 18:** Windows Taskbar Thumbnail Toolbar (Görev Çubuğu Küçük Resim Önizleme Butonları):
+    - **Windows Win32 Shell & TaskbarList3 Entegrasyonu:** `Cargo.toml` içerisine `windows 0.62` (`Win32_UI_Shell`, `Win32_Foundation`, `Win32_UI_WindowsAndMessaging`, `Win32_System_Com`) entegre edildi.
+    - **Native 16x16 Medya İkonları:** `CreateIcon` ile Win32 standartlarında 1-bit monochrome ve saydam arka planlı Prev (`⏮`), Play (`▶`), Pause (`❚❚`), Next (`⏭`) ikonları üretildi.
+    - **Taskbar Thumbnail Butonları (`ITaskbarList3`):** Uygulama penceresi açıldığında yerel `HWND` üzerinden `ITaskbarList3::ThumbBarAddButtons` ile 3 buton (Önceki Parça: 100, Oynat/Duraklat: 101, Sonraki Parça: 102) görev çubuğu önizlemesine eklendi.
+    - **Tıklama Dinleyicisi (`SetWindowSubclass`):** `SetWindowSubclass` ile ana pencerenin `WM_COMMAND` mesajları dinlendi; `THBN_CLICKED` (0x1800) bildirimleri yakalanarak frontend'e `player-previous`, `player-toggle-play`, `player-next` ve `media-control-action` olayları iletildi.
+    - **Dinamik Play/Pause Güncellemesi:** Şarkı çalma/duraklama durumu değiştikçe orta butonun ikonu `ThumbBarUpdateButtons` çağrısıyla UI thread üzerinde anlık olarak `Play` ve `Pause` arasında güncelleniyor.
+    - **Frontend Bağlantısı:** `PlayerContext.tsx` içerisine `player-toggle-play`, `player-next`, `player-previous` dinleyicileri eklenerek görev çubuğundan gelen tüm etkileşimler anında oynatıcı fonksiyonlarına bağlandı.
+  - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 19:** Taskbar Thumbnail Toolbar Yüksek Çözünürlüklü Antialiased İkonlar & Çift Tetiklenme (Double Trigger) Düzeltmesi:
+    - **48x48 Yüksek Çözünürlüklü & Antialiased PNG İkonlar:** Eski 16x16 1-bit pikselli maske ikonları yerine 8x8 supersampling (64 alt örnek) ile kenar yumuşatılmış, 32-bit alfa kanallı 48x48 modern PNG ikonları (`thumb_prev.png`, `thumb_play.png`, `thumb_pause.png`, `thumb_next.png`) oluşturuldu. `CreateIconFromResourceEx` ile Win32 katmanında yüksek DPI uyumlu native `HICON` nesneleri elde edildi.
+    - **Çift Tetiklenme (Double Trigger / Double Play) Giderildi:** Görev çubuğundaki ve SMTC üzerindeki butonlara tıklandığında hem `player-next`/`player-toggle-play` hem de `media-control-action` olaylarının eşzamanlı fırlatılmasından kaynaklanan çift çalışma sorunu çözüldü. Her bir eylem tekil ve bağımsız event yapısına kavuşturuldu; frontend dinleyicilerindeki çakışmalar temizlendi.
+  - `cargo check`, `npx tsc --noEmit` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+
+
+
 
 
