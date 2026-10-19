@@ -36,7 +36,6 @@ interface ArtistViewProps {
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
-  onCoverResolved?: (url: string) => void;
 }
 
 export const ArtistView: FC<ArtistViewProps> = ({
@@ -53,7 +52,6 @@ export const ArtistView: FC<ArtistViewProps> = ({
   onNavigateAlbum,
   onContextMenuTrack,
   onScroll,
-  onCoverResolved,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -96,9 +94,6 @@ export const ArtistView: FC<ArtistViewProps> = ({
 
         if (!isCancelled) {
           setArtistData(details);
-          if (details.thumbnail && onCoverResolved) {
-            onCoverResolved(details.thumbnail);
-          }
         }
       } catch (e: unknown) {
         if (!isCancelled) {
@@ -117,7 +112,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [artistId, artistName, onCoverResolved]);
+  }, [artistId, artistName]);
 
   if (isLoading) {
     return (
@@ -159,7 +154,6 @@ export const ArtistView: FC<ArtistViewProps> = ({
               <img
                 src={artistData.thumbnail}
                 alt={artistData.name}
-                crossOrigin="anonymous"
                 className="w-full h-full object-cover bg-neutral-200"
               />
             ) : (
@@ -326,7 +320,6 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         <img
                           src={track.thumbnail}
                           alt={track.title}
-                          crossOrigin="anonymous"
                           className="w-10 h-10 rounded object-cover shrink-0 bg-neutral-200"
                         />
                       ) : (

@@ -201,7 +201,18 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **4. Tablo ve Satır Kontrast Uyumu (`PlaylistView.tsx`, `AlbumView.tsx`, `ArtistView.tsx`):**
       - Tablo başlık satırı (`# ▲`, `BAŞLIK`, `ALBÜM`, vb.) `text-neutral-700 font-bold border-b border-black/10` ile şeffaf zemin üzerinde net okunur kılındı.
       - Şarkı satırlarında katı renk yerine ambiyansla uyumlu yarı saydam vurgu (`hover:bg-black/[0.05]`, aktif şarkıda `bg-black/[0.07]`) uygulandı; arkadaki pastel zemin satırların içinden zarifçe hissedilmeye devam ediyor.
-      - Tüm kapak ve parça `<img>` etiketlerine `crossOrigin="anonymous"` eklendi.
+    - **5. Sayfa Bazlı Ambiyans İzolasyonu (Ana Sayfa Saf Beyaz):**
+      - Dinamik ambient arka plan katmanı yalnızca çalma listelerinde (`playlist`, `album`, `artist`) devreye girecek şekilde sınırlandırıldı (`AmbientBackground isActive={isAmbientActive}`).
+      - Ana Sayfa (`home`), Arama ve Ayarlar sayfaları saf beyaz (`bg-white` / koyu modda `bg-[#0c0c0c]`) olarak korundu; arka planda çalan şarkı Ana Sayfa'nın rengini bozamaz.
+      - `TitleBar` da sayfa duyarlı hale getirildi: Ana Sayfa kaydırıldığında beyaz buzlu cam (`rgba(255, 255, 255, 0.88)` + `backdrop-blur-md`), Çalma listeleri kaydırıldığında ise ilgili listenin pastel ambiyans rengi (`rgba(var(--ambient-rgb), 0.92)`) aktifleşir.
+    - **6. Playlist Ambiyans Sisteminin Tamamen Kaldırılması (Rollback):**
+      - Kullanıcı talebi doğrultusunda playlist ambiyans sistemi tamamen temizlendi ve projeden çıkartıldı.
+      - `src/components/AmbientBackground.tsx` ve `src/utils/colorExtractor.ts` silindi.
+      - `fast-average-color` npm paketi uninstalled edildi (`package.json` temizlendi).
+      - `App.tsx` içerisindeki tüm ambient state'leri (`ambientRgb`, `resolvedCover`), color extraction `useEffect`'leri, stil değişkenleri (`--ambient-rgb`) ve `AmbientBackground` JSX çağrısı kaldırıldı.
+      - `TitleBar.tsx` temiz, standart şeffaf / kaydırıldığında sade buzlu cam (`bg-white/90` / `bg-[#121212]/90`) tasarımına geri getirildi; `isAmbientActive` ve inline ambient arka plan mantığı silindi.
+      - `AlbumView.tsx` ve `ArtistView.tsx` içerisinden `onCoverResolved` kaldırıldı; kapak ve thumbnail görselleri DOM'da temiz ve stabil bir şekilde render edilmeye devam ediyor.
+      - `src/index.css` içerisinden `--ambient-color-raw` temizlendi.
   - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar

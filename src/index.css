@@ -38,14 +38,12 @@ svg.lucide :is(path, circle, line, rect, polyline, polygon) {
     --bg-main: #000000;
     --bg-surface: #121212;
     --accent: #ff0000;
-    --ambient-color-raw: 147, 51, 234;
   }
 
   :root.light {
     --bg-main: #ffffff;
     --bg-surface: #ffffff;
     --accent: #ff0000;
-    --ambient-color-raw: 147, 51, 234;
   }
 
   body {

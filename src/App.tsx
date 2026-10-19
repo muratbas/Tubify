@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback, type FC } from "react";
-import { extractDominantColor, setAmbientColor } from "./utils/colorExtractor";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
@@ -9,7 +8,6 @@ import { AlbumView } from "./components/AlbumView";
 import { SettingsView } from "./components/SettingsView";
 import { PlayerBar } from "./components/PlayerBar";
 import { RightDrawer } from "./components/RightDrawer";
-import { AmbientBackground } from "./components/AmbientBackground";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
 import { LoginModal } from "./components/LoginModal";
 import { MicroVisualizer } from "./components/MicroVisualizer";
@@ -158,9 +156,6 @@ export const App: FC = () => {
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
 
-  const [ambientRgb, setAmbientRgb] = useState<string>("210, 205, 245");
-  const [resolvedCover, setResolvedCover] = useState<string | null>(null);
-
   const navigateTo = (
     entry:
       | { type: "home" }
@@ -185,14 +180,12 @@ export const App: FC = () => {
     const newHistory = history.slice(0, historyIndex + 1).concat(entry);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-    setResolvedCover(null);
     setIsScrolled(false);
   };
 
   const handleGoBack = () => {
     if (canGoBack) {
       setHistoryIndex((prev) => prev - 1);
-      setResolvedCover(null);
       setIsScrolled(false);
     }
   };
@@ -200,7 +193,6 @@ export const App: FC = () => {
   const handleGoForward = () => {
     if (canGoForward) {
       setHistoryIndex((prev) => prev + 1);
-      setResolvedCover(null);
       setIsScrolled(false);
     }
   };
@@ -473,50 +465,6 @@ export const App: FC = () => {
       ? EPISODES_TRACKS
       : playlistTracks;
 
-  // Dynamic Spotifast Soft Pastel Color Extraction
-  useEffect(() => {
-    let coverUrl: string | null | undefined = resolvedCover;
-
-    if (!coverUrl) {
-      if (currentNav.type === "playlist") {
-        if (currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM") {
-          coverUrl = activePlaylistTracks[0]?.thumbnail || player.activeTrack?.thumbnail;
-        } else {
-          coverUrl =
-            currentNav.playlist.thumbnail ||
-            activePlaylistTracks[0]?.thumbnail ||
-            player.activeTrack?.thumbnail;
-        }
-      } else if (currentNav.type === "album") {
-        coverUrl = currentNav.thumbnail || player.activeTrack?.thumbnail;
-      } else if (currentNav.type === "artist") {
-        coverUrl = currentNav.thumbnail || player.activeTrack?.thumbnail;
-      } else {
-        coverUrl = player.activeTrack?.thumbnail;
-      }
-    }
-
-    if (coverUrl) {
-      extractDominantColor(coverUrl).then((rgb) => {
-        const rgbStr = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
-        setAmbientRgb(rgbStr);
-        setAmbientColor(rgb);
-      });
-    } else {
-      setAmbientRgb("210, 205, 245");
-      setAmbientColor([210, 205, 245]);
-    }
-  }, [
-    currentNav,
-    currentNav.type === "playlist" ? currentNav.playlist.thumbnail : null,
-    currentNav.type === "playlist" ? currentNav.playlist.id : null,
-    currentNav.type === "album" ? currentNav.thumbnail : null,
-    currentNav.type === "artist" ? currentNav.thumbnail : null,
-    resolvedCover,
-    activePlaylistTracks[0]?.thumbnail,
-    player.activeTrack?.thumbnail,
-  ]);
-
   return (
     <div
       className={`h-screen w-screen overflow-hidden select-none flex flex-col ${
@@ -543,17 +491,13 @@ export const App: FC = () => {
           onNavigateSearch={() => navigateTo({ type: "search", query: searchQuery })}
         />
 
-        {/* Module 2: Sağ Alan (Ana Kapsayıcı: style={{ '--ambient-rgb': ambientRgb }}) */}
+        {/* Module 2: Sağ Alan */}
         <div
           className={`relative flex-1 flex flex-col h-full overflow-hidden min-w-0 ${
             isLight ? "bg-white" : "bg-[#0c0c0c]"
           }`}
-          style={{ "--ambient-rgb": ambientRgb } as React.CSSProperties}
         >
-          {/* KATMAN 1 — Sabit Ambient Arka Plan (Asla Scroll Olmaz!) */}
-          <AmbientBackground />
-
-          {/* KATMAN 2 — Sabit Üst Titlebar / Header (z-20) */}
+          {/* Header / TitleBar (z-20) */}
           <div className="absolute top-0 left-0 right-0 z-20 pointer-events-auto">
             <TitleBar
               searchQuery={searchQuery}
@@ -667,7 +611,6 @@ export const App: FC = () => {
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
                 onScroll={handleViewScroll}
-                onCoverResolved={(url) => setResolvedCover(url)}
               />
             )}
 
@@ -692,7 +635,6 @@ export const App: FC = () => {
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
                 onScroll={handleViewScroll}
-                onCoverResolved={(url) => setResolvedCover(url)}
               />
             )}
 

@@ -33,7 +33,6 @@ interface AlbumViewProps {
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
-  onCoverResolved?: (url: string) => void;
 }
 
 export const AlbumView: FC<AlbumViewProps> = ({
@@ -52,7 +51,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
   onNavigateArtist,
   onContextMenuTrack,
   onScroll,
-  onCoverResolved,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -71,9 +69,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
         const details = await getAlbumDetails(albumId);
         if (!isCancelled) {
           setAlbumData(details);
-          if (details.thumbnail && onCoverResolved) {
-            onCoverResolved(details.thumbnail);
-          }
         }
       } catch (e: unknown) {
         if (!isCancelled) {
@@ -92,7 +87,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [albumId, onCoverResolved]);
+  }, [albumId]);
 
   const displayTitle =
     (albumData?.title && albumData.title !== "Albüm" ? albumData.title : albumTitle) || "Albüm";
@@ -145,7 +140,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
               <img
                 src={displayThumbnail}
                 alt={displayTitle}
-                crossOrigin="anonymous"
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -326,7 +320,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
                         <img
                           src={track.thumbnail}
                           alt=""
-                          crossOrigin="anonymous"
                           className="w-10 h-10 rounded object-cover shrink-0"
                           loading="lazy"
                         />
