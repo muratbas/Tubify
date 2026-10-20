@@ -594,7 +594,7 @@ export const Sidebar: FC<SidebarProps> = ({
           </div>
 
           {/* Collapsed Vertical Single Column Covers */}
-          <div className="flex-1 overflow-y-auto px-1 py-1.5 space-y-2.5 custom-scrollbar flex flex-col items-center w-full">
+          <div className="flex-1 overflow-y-auto px-1 py-1.5 space-y-2.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col items-center w-full">
             {/* Beğenilenler */}
             <div
               onClick={() => handlePlaylistClick("liked")}

@@ -381,8 +381,54 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **2. Çok Katmanlı & Dilden Bağımsız Çözüm:**
       - Hem Rust backend (`auth.rs` / `is_listen_again_shelf`) hem de frontend (`HomeView.tsx` / `DynamicShelf`) içinde; `VLLM`, `LM`, `FEmusic_liked` browse ID'leri ve çok dilli başlık eşleşmeleri (`beğendiğim müzik`, `liked songs`, `beğenilenler`) filtrelendi.
       - "Yeniden dinleyin" rafında sadece kullanıcının dinlediği gerçek parçalar sıralandı.
-    - **3. Doğrulama:**
-      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 39:** UI/UX & Arama Mimarisi Revizyonu: Spotifast Tarzı Çoklu Kategori Arama Ekranı (`SearchView`):
+    - **1. Hatalı Metinlerin ve Çakışmaların Temizlenmesi:**
+      - Titlebar ile çakışan `"Sonuçlar:"` başlığı ve pencere kontrollerinin altında görünen `"Ana Sayfaya Dön"` butonu tamamen kaldırıldı; navigasyon sol menü ve geçmiş butonlarıyla bütünleştirildi.
+      - Arama kutusu boşken çıkan çiğ `"Sonuç bulunamadı."` yazısı kaldırıldı; yerine Spotify tarzı renkli kategori kartları ("Hepsine göz at") ve son aramalar ("Son aramalar") keşif alanı eklendi.
+    - **2. Arama Kategori Filtreleri (Pill Filter Bar):**
+      - Yatay kaydırılabilir kategori hapları eklendi: `Tümü`, `Şarkılar`, `Sanatçılar`, `Albümler`, `Çalma Listeleri`, `Podcast'ler`.
+      - Seçili buton Spotify koyu/açık mod standardına (`bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-medium`), pasif butonlar soft yuvarlak haplara dönüştürüldü.
+      - `Tümü` seçiliyken hibrit bento düzeni; tek bir kategori seçildiğinde ise o kategoriye ait tüm sonuçların tam ızgara/liste olarak sergilenmesi sağlandı.
+    - **3. "En İyi Sonuç" ve "Şarkılar" İkili Izgarası (Top Result & Top Songs):**
+      - `col-span-5` sol sütun: Kare kapak, büyük kalın başlık, `Şarkı • Sanatçı Adı` veya `Sanatçı` etiketi ve hover durumunda sağ alttan yukarı kayan gölgeli YouTube kırmızısı (`#ff0000`) dairesel oynat butonu.
+      - `col-span-7` sağ sütun: En alakalı ilk 4 şarkıyı barındıran kompakt satırlar (`w-11 h-11` küçük kare kapak, başlık, sanatçı, Explicit `E` rozeti, süre ve hover Like + Context Menu aksiyonları).
+    - **4. "Sanatçılar" Rafı (Dairesel Avatarlar):**
+      - Arama sonuçlarından ayıklanan benzersiz sanatçılar için tam daire avatar (`w-32 h-32 rounded-full`), merkezde hover play butonu, sanatçı adı ve `Sanatçı` alt etiketi; tıklandığında doğrudan Sanatçı Detay sayfasına yönlendirme.
+    - **5. "Albümler" ve "Çalma Listeleri" Rafları:**
+      - Kare kapaklı (`aspect-square w-36 rounded-xl`) yatay kaydırma kartları, hover play butonu ve albüm/çalma listesi detay navigasyonu.
+    - **6. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 40:** UI/UX & Mikro-Etkileşim Revizyonu: Masaüstü Deneyim Kalitesi (Polish & Edge Cases):
+    - **1. Sol Alttaki Oynatıcıda (Player Bar) Kayan Metin (Marquee / Auto-Scroll on Hover):**
+      - `MarqueeText.tsx` bileşeni geliştirildi; `ResizeObserver` ile metnin gerçekte konteyneri aşıp aşmadığı (`scrollWidth > clientWidth`) dinamik ölçülüyor.
+      - Kullanıcı talebi doğrultusunda metin varsayılanda sabit durur; yalnızca taşan metinlerin **üzerine fareyle gelindiğinde (`hover`)** yumuşak kayma animasyonu devreye girer.
+      - Hover anında 0.6 saniye bekledikten sonra sola doğru akıcı (`linear`, ~24px/s) bir hızda kayar; sonda 1.2 saniye bekler ve döngüyü sürdürür.
+      - Fare metnin üzerinden çekildiği anda `transform 0.35s ease-out` ile pürüzsüzce başlangıç konumuna geri döner.
+      - Normal durumda sağ tarafta hafif bir solma degrade maskesi, kayma anında ise her iki kenarda çift taraflı yumuşak maskeleme uygulanır.
+      - `PlayerBar.tsx` içerisindeki parça adı ve sanatçı metinlerine tam uyumla bağlandı; tıklama ve hover stilleri korundu.
+    - **2. Daraltılmış (Collapsed) Sol Menüde Kaydırma Çubuğunun (Scrollbar) Gizlenmesi:**
+      - `index.css` içerisine motor bağımsız `.scrollbar-none` (`scrollbar-width: none`, `-ms-overflow-style: none`, `::-webkit-scrollbar: none`) utility sınıfı eklendi.
+      - Mini-sidebar (`w-[72px]`) modundaki dikey kapak taşıyıcı konteynerine `scrollbar-none` ve `[&::-webkit-scrollbar]:hidden` sınıfları verildi.
+      - Dikey fare tekerleği (`wheel`) kaydırması akıcı şekilde çalışmaya devam ederken tarayıcının veya sistemin hiçbir kaydırma çubuğu veya izi kesinlikle görünmez hale getirildi.
+    - **3. WebView / Tauri Varsayılan Sağ Tık (Context Menu) Engelleyici:**
+      - `App.tsx` içerisine en üst `document` seviyesinde global `contextmenu` dinleyicisi kuruldu.
+      - Özel context menu bağlanmamış boş alanlarda, butonlarda ve arkaplanda Edge/Chromium WebView2'nin varsayılan tarayıcı sağ tık menüsü (İncele / Inspect, Geri, İleri, Yenile vb.) `e.preventDefault()` ile tamamen engellendi.
+      - Özel `TrackContextMenu` ve `PlaylistContextMenu` React bileşenlerinin sağ tık ile açılması kesintisiz ve hatasız çalışmaya devam ediyor.
+    - **4. "Beğenilenler" Listesinden Şarkı Kaldırıldığında Anında UI Güncellemesi (Optimistic UI & Rollback):**
+      - `App.tsx` seviyesinde merkezi `handleToggleLike` mimarisi kuruldu ve `PlayerBar`, `TrackContextMenu`, `PlaylistView`, `ArtistView`, `AlbumView` bileşenlerine bağlandı.
+      - Beğeni kaldırıldığında kullanıcı o sırada "Beğenilenler" çalma listesi sayfasındaysa, kaldırılan parça satırı anında tablodan (`filter`) silinir.
+      - Sayfanın üst başlığındaki toplam parça sayısı (`murat • X şarkı`) ve sol menüdeki `likedSongsCount` sayacı anında `-1` güncellenip `localStorage`'a yazılır.
+      - YouTube Music IPC / ağ çağrısı başarısız olursa önceki liste state'i ve sayaçlar `catch` bloğunda anında geri yüklenir (rollback) ve kullanıcıya toast bildirimi verilir.
+    - **5. Üç Nokta (`...`) ile Kısaltılan Metinler İçin Akıllı Tooltip (Auto-Truncate Tooltip):**
+      - `CustomTooltip.tsx` küresel dinleyicisi genişletilerek `truncate`, `line-clamp` ve `data-tooltip-truncate` taşıyan tüm öğeleri otomatik inceleyecek şekilde güncellendi.
+      - **Akıllı Tespit:** Sadece metin gerçekten taştıysa (`scrollWidth > clientWidth + 1` veya `scrollHeight > clientHeight + 1`) ~350ms gecikmeyle şık, minimal özel tooltip açılır; taşmayan kısa metinlerde hover olsa bile tooltip açılmaz.
+      - Tarayıcının varsayılan sarı kutusunun özel tooltip üzerine binmesini önlemek için yerel `title` özniteliği geçici olarak `data-orig-title` içine alınır ve fare ayrıldığında geri yüklenir.
+      - Fare tıklandığında, fare ayrıldığında veya sayfa kaydırıldığında (`scroll` / `wheel`) tooltip anında temizlenir.
+    - **6. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+
+

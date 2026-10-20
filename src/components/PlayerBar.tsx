@@ -20,6 +20,7 @@ import {
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
 import type { Track, PlaybackStatus, RepeatMode } from "../types/music";
+import { MarqueeText } from "./MarqueeText";
 
 interface PlayerBarProps {
   track?: Track | null;
@@ -143,7 +144,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           )}
         </div>
 
-        <div className="min-w-0 max-w-[200px]">
+        <div className="min-w-0 flex-1 max-w-[200px] overflow-hidden flex flex-col justify-center">
           {(() => {
             const hasAlbum = !!(
               track?.album_id &&
@@ -151,7 +152,9 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               track.album.toLowerCase() !== "single"
             );
             return (
-              <h4
+              <MarqueeText
+                text={track ? track.title : "Tubify"}
+                title={track?.title}
                 onClick={() => {
                   if (hasAlbum && props.onNavigateAlbum) {
                     props.onNavigateAlbum(
@@ -162,28 +165,24 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
                     );
                   }
                 }}
-                title={track?.title}
-                className={`text-sm font-semibold truncate leading-normal py-0.5 ${
+                className={`text-sm font-semibold leading-normal py-0.5 ${
                   hasAlbum ? "hover:underline cursor-pointer" : ""
                 } ${isLight ? "text-neutral-900" : "text-white"}`}
-              >
-                {track ? track.title : "Tubify"}
-              </h4>
+              />
             );
           })()}
-          <p
+          <MarqueeText
+            text={track ? track.artist : "Çalmaya başlamak için bir parça seçin"}
+            title={track?.artist}
             onClick={() => {
               if (track && props.onNavigateArtist) {
                 props.onNavigateArtist(track.artist_id || track.artist, track.artist);
               }
             }}
-            title={track?.artist}
-            className={`text-xs truncate leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
+            className={`text-xs leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
               isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
-          >
-            {track ? track.artist : "Çalmaya başlamak için bir parça seçin"}
-          </p>
+          />
         </div>
 
         {track && (

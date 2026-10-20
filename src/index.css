@@ -134,3 +134,15 @@ svg.lucide :is(path, circle, line, rect, polyline, polygon) {
   animation: tubify-dot-bounce 1s ease-in-out 0.32s infinite;
 }
 
+/* Scrollbar None Utility */
+.scrollbar-none {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+

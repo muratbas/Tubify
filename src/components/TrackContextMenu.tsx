@@ -35,6 +35,7 @@ export interface TrackContextMenuProps {
   playlists?: Playlist[];
   onAddToPlaylist?: (pl: Playlist | "liked", track: Track) => Promise<void> | void;
   onRemoveFromPlaylist?: (track: Track) => Promise<void> | void;
+  onToggleLike?: (track: Track) => Promise<void> | void;
 }
 
 function getClampedPosition(pos: ContextMenuPosition | null) {
@@ -67,6 +68,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
   playlists = [],
   onAddToPlaylist,
   onRemoveFromPlaylist,
+  onToggleLike,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -143,14 +145,18 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
     onClose();
   };
 
-  const handleToggleLike = () => {
-    player.toggleLike(track, true);
-    player.showToast(
-      isLiked
-        ? `"${track.title}" Beğenilenler'den kaldırıldı`
-        : `"${track.title}" Beğenilenler'e eklendi`
-    );
+  const handleToggleLike = async () => {
     onClose();
+    if (onToggleLike) {
+      await onToggleLike(track);
+    } else {
+      await player.toggleLike(track, true);
+      player.showToast(
+        isLiked
+          ? `"${track.title}" Beğenilenler'den kaldırıldı`
+          : `"${track.title}" Beğenilenler'e eklendi`
+      );
+    }
   };
 
   const handleAddToPlaylist = async (pl: Playlist | "liked") => {
@@ -161,8 +167,12 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
     }
 
     if (pl === "liked" || pl.id === "LM" || pl.id === "VLLM") {
-      player.toggleLike(track, true);
-      player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+      if (onToggleLike) {
+        await onToggleLike(track);
+      } else {
+        await player.toggleLike(track, true);
+        player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+      }
       return;
     }
 

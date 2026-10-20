@@ -29,9 +29,62 @@ export const CustomTooltip: FC = () => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      const el = target.closest<HTMLElement>("[data-tooltip]");
-      if (!el) {
+      // 1. Check for explicit data-tooltip element
+      const explicitEl = target.closest<HTMLElement>("[data-tooltip]");
+
+      // 2. Check for auto-truncate candidate (.truncate, line-clamp, etc.)
+      const truncateEl = target.closest<HTMLElement>(
+        '.truncate, [class*="truncate"], [class*="line-clamp"], [data-tooltip-truncate]'
+      );
+
+      let elToUse: HTMLElement | null = null;
+      let textToUse = "";
+      let isTruncateTooltip = false;
+
+      if (explicitEl) {
+        elToUse = explicitEl;
+        textToUse = explicitEl.getAttribute("data-tooltip") || "";
+      } else if (truncateEl) {
+        // Smart Truncation Detection:
+        // Only trigger if text actually overflows horizontally or vertically
+        const isHorizontallyTruncated =
+          truncateEl.scrollWidth > truncateEl.clientWidth + 1 ||
+          target.scrollWidth > target.clientWidth + 1;
+        const isVerticallyTruncated =
+          truncateEl.scrollHeight > truncateEl.clientHeight + 1;
+
+        if (isHorizontallyTruncated || isVerticallyTruncated) {
+          elToUse = truncateEl;
+          isTruncateTooltip = true;
+
+          // Retrieve text from title or textContent
+          const rawTitle =
+            truncateEl.getAttribute("title") ||
+            truncateEl.getAttribute("data-orig-title") ||
+            target.getAttribute("title") ||
+            target.getAttribute("data-orig-title");
+
+          if (rawTitle && rawTitle.trim()) {
+            textToUse = rawTitle.trim();
+          } else {
+            textToUse = (truncateEl.textContent || "").replace(/\s+/g, " ").trim();
+          }
+
+          // Temporarily remove native title to prevent default yellow browser tooltip
+          if (truncateEl.hasAttribute("title")) {
+            truncateEl.setAttribute("data-orig-title", truncateEl.getAttribute("title") || "");
+            truncateEl.removeAttribute("title");
+          }
+          if (target.hasAttribute("title")) {
+            target.setAttribute("data-orig-title", target.getAttribute("title") || "");
+            target.removeAttribute("title");
+          }
+        }
+      }
+
+      if (!elToUse || !textToUse) {
         if (activeElRef.current) {
+          restoreOriginalTitle(activeElRef.current);
           activeElRef.current = null;
           if (timerRef.current) window.clearTimeout(timerRef.current);
           setTooltip((prev) => ({ ...prev, visible: false }));
@@ -39,24 +92,29 @@ export const CustomTooltip: FC = () => {
         return;
       }
 
-      if (activeElRef.current === el) return;
-      activeElRef.current = el;
+      if (activeElRef.current === elToUse) return;
 
-      const text = el.getAttribute("data-tooltip");
-      if (!text) {
-        setTooltip((prev) => ({ ...prev, visible: false }));
-        return;
+      if (activeElRef.current) {
+        restoreOriginalTitle(activeElRef.current);
       }
+      activeElRef.current = elToUse;
 
       if (timerRef.current) window.clearTimeout(timerRef.current);
 
-      // 1-second delay so tooltips only show when intentionally hovering for 1s
+      // Snappy, desktop-grade delay (~350ms for truncate, ~450ms for action buttons)
+      const delay = isTruncateTooltip ? 350 : 450;
+
       timerRef.current = window.setTimeout(() => {
         if (!activeElRef.current) return;
 
         const rect = activeElRef.current.getBoundingClientRect();
-        const attrSide = activeElRef.current.getAttribute("data-tooltip-side") as "top" | "bottom" | "right" | null;
-        const preferredSide: "top" | "bottom" | "right" = attrSide || (rect.top < 100 ? "bottom" : "top");
+        const attrSide = activeElRef.current.getAttribute("data-tooltip-side") as
+          | "top"
+          | "bottom"
+          | "right"
+          | null;
+        const preferredSide: "top" | "bottom" | "right" =
+          attrSide || (rect.top < 65 ? "bottom" : "top");
 
         let x = 0;
         let y = 0;
@@ -64,50 +122,65 @@ export const CustomTooltip: FC = () => {
           x = rect.right + 10;
           y = rect.top + rect.height / 2;
         } else {
-          x = Math.max(16, Math.min(window.innerWidth - 16, rect.left + rect.width / 2));
+          // Clamp x so centered tooltip stays comfortably within viewport
+          x = Math.max(120, Math.min(window.innerWidth - 120, rect.left + rect.width / 2));
           y = preferredSide === "bottom" ? rect.bottom + 8 : rect.top - 8;
         }
 
         setTooltip({
-          text,
+          text: textToUse,
           x,
           y,
           side: preferredSide,
           visible: true,
         });
-      }, 1000);
+      }, delay);
+    };
+
+    const restoreOriginalTitle = (el: HTMLElement) => {
+      const orig = el.getAttribute("data-orig-title");
+      if (orig) {
+        el.setAttribute("title", orig);
+        el.removeAttribute("data-orig-title");
+      }
     };
 
     const handleMouseOut = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      const el = target.closest<HTMLElement>("[data-tooltip]");
-      if (el && activeElRef.current === el) {
+      if (activeElRef.current) {
         const related = e.relatedTarget as HTMLElement | null;
-        if (related && el.contains(related)) return;
+        if (related && activeElRef.current.contains(related)) return;
 
+        restoreOriginalTitle(activeElRef.current);
         activeElRef.current = null;
         if (timerRef.current) window.clearTimeout(timerRef.current);
         setTooltip((prev) => ({ ...prev, visible: false }));
       }
     };
 
-    const handleMouseDown = () => {
-      // Instantly dismiss tooltip on click
+    const dismissTooltip = () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (activeElRef.current) {
+        restoreOriginalTitle(activeElRef.current);
+        activeElRef.current = null;
+      }
       setTooltip((prev) => ({ ...prev, visible: false }));
-      activeElRef.current = null;
     };
 
     window.addEventListener("mouseover", handleMouseOver, { passive: true });
     window.addEventListener("mouseout", handleMouseOut, { passive: true });
-    window.addEventListener("mousedown", handleMouseDown, { passive: true });
+    window.addEventListener("mousedown", dismissTooltip, { passive: true });
+    window.addEventListener("wheel", dismissTooltip, { passive: true });
+    window.addEventListener("scroll", dismissTooltip, { passive: true });
 
     return () => {
       window.removeEventListener("mouseover", handleMouseOver);
       window.removeEventListener("mouseout", handleMouseOut);
-      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousedown", dismissTooltip);
+      window.removeEventListener("wheel", dismissTooltip);
+      window.removeEventListener("scroll", dismissTooltip);
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
   }, []);
@@ -118,10 +191,15 @@ export const CustomTooltip: FC = () => {
     <div
       style={{
         left: `${tooltip.x}px`,
-        top: tooltip.side === "right" ? `${tooltip.y}px` : tooltip.side === "bottom" ? `${tooltip.y}px` : undefined,
+        top:
+          tooltip.side === "right"
+            ? `${tooltip.y}px`
+            : tooltip.side === "bottom"
+            ? `${tooltip.y}px`
+            : undefined,
         bottom: tooltip.side === "top" ? `${window.innerHeight - tooltip.y}px` : undefined,
       }}
-      className={`fixed z-[999999] pointer-events-none px-3.5 py-1.5 rounded-xl shadow-xl text-xs font-semibold select-none animate-in fade-in zoom-in-95 duration-100 whitespace-nowrap transition-transform ${
+      className={`fixed z-[999999] pointer-events-none px-3.5 py-1.5 rounded-xl shadow-xl text-xs font-semibold select-none animate-in fade-in zoom-in-95 duration-100 max-w-[420px] break-words text-center transition-transform ${
         tooltip.side === "right" ? "-translate-y-1/2" : "-translate-x-1/2"
       } ${
         isLight

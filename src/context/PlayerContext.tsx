@@ -784,6 +784,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         await toggleYtLike(track.id, nextState);
       } catch (e) {
         console.error("YouTube like sync error:", e);
+        setLikedTrackIds((prev) => {
+          const rollback = new Set(prev);
+          if (isCurrentlyLiked) rollback.add(track.id);
+          else rollback.delete(track.id);
+          return rollback;
+        });
+        throw e;
       }
     }
   };

@@ -6,13 +6,12 @@ import { PlaylistView } from "./components/PlaylistView";
 import { ArtistView } from "./components/ArtistView";
 import { AlbumView } from "./components/AlbumView";
 import { SettingsView } from "./components/SettingsView";
+import { SearchView } from "./components/SearchView";
 import { PlayerBar } from "./components/PlayerBar";
 import { RightDrawer } from "./components/RightDrawer";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
 import { LoginModal } from "./components/LoginModal";
-import { MicroVisualizer } from "./components/MicroVisualizer";
 import { useTheme } from "./context/ThemeContext";
-import { useLanguage } from "./context/LanguageContext";
 import { usePlayer } from "./context/PlayerContext";
 import {
   searchMusic,
@@ -29,7 +28,7 @@ import {
 import { CustomTooltip } from "./components/CustomTooltip";
 import type { Track, UserProfile, Playlist } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
-import { Loader2, Music2, Heart, Play, AlertCircle, Check, MoreHorizontal } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
 
 const INITIAL_RECOMMENDED: Track[] = [
   {
@@ -104,7 +103,6 @@ const EPISODES_TRACKS: Track[] = [
 
 export const App: FC = () => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
   const player = usePlayer();
   const isLight = theme === "light";
 
@@ -219,6 +217,19 @@ export const App: FC = () => {
       window.removeEventListener("auxclick", handleAuxClick);
     };
   }, [canGoBack, canGoForward, history.length]);
+
+  // Global WebView2 / Tauri Context Menu Blocker (Suppress Chromium inspect/back/forward on blank areas)
+  useEffect(() => {
+    const handleGlobalContextMenu = (e: MouseEvent) => {
+      // Prevents Edge/Chromium WebView2 default context menu from popping up
+      e.preventDefault();
+    };
+
+    document.addEventListener("contextmenu", handleGlobalContextMenu);
+    return () => {
+      document.removeEventListener("contextmenu", handleGlobalContextMenu);
+    };
+  }, []);
 
   const handleNavigateArtist = (artistId: string, artistName: string, thumbnail?: string) => {
     navigateTo({ type: "artist", artistId, artistName, thumbnail });
@@ -476,18 +487,88 @@ export const App: FC = () => {
     }
   };
 
+  const handleToggleLike = async (track: Track) => {
+    const isCurrentlyLiked = player.likedTrackIds.has(track.id);
+    const nextLiked = !isCurrentlyLiked;
+
+    // Snapshot state for rollback if network/IPC fails
+    const prevLikedSongs = likedSongs;
+    const prevTotalCount = likedSongsTotalCount;
+    const prevLikedTrackIds = new Set(player.likedTrackIds);
+
+    // 1. Optimistic UI update: immediately remove/add row & update counters
+    if (!nextLiked) {
+      // Unliking: immediately filter out of liked songs
+      setLikedSongs((prev) => prev.filter((t) => t.id !== track.id));
+
+      setLikedSongsTotalCount((prev) => {
+        if (!prev) {
+          const newLen = Math.max(0, prevLikedSongs.length - 1);
+          return `${newLen} şarkı`;
+        }
+        const digits = prev.replace(/[^\d]/g, "");
+        if (!digits) return prev;
+        const currentNum = parseInt(digits, 10);
+        const newNum = Math.max(0, currentNum - 1);
+        const formatted = `${newNum.toLocaleString("tr-TR")} şarkı`;
+        try {
+          localStorage.setItem("tubify_liked_total_count", formatted);
+        } catch {}
+        return formatted;
+      });
+
+      player.showToast(`"${track.title}" Beğenilenler'den kaldırıldı`);
+    } else {
+      // Liking: immediately prepend to liked songs
+      setLikedSongs((prev) => {
+        if (prev.some((t) => t.id === track.id)) return prev;
+        return [track, ...prev];
+      });
+
+      setLikedSongsTotalCount((prev) => {
+        if (!prev) {
+          const newLen = prevLikedSongs.length + 1;
+          return `${newLen} şarkı`;
+        }
+        const digits = prev.replace(/[^\d]/g, "");
+        if (!digits) return prev;
+        const currentNum = parseInt(digits, 10);
+        const newNum = currentNum + 1;
+        const formatted = `${newNum.toLocaleString("tr-TR")} şarkı`;
+        try {
+          localStorage.setItem("tubify_liked_total_count", formatted);
+        } catch {}
+        return formatted;
+      });
+
+      player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+    }
+
+    // 2. Perform backend toggle
+    try {
+      await player.toggleLike(track, userProfile.is_authenticated);
+    } catch (err) {
+      console.error("Failed to toggle like on YouTube Music, rolling back:", err);
+      // 3. Rollback on failure!
+      setLikedSongs(prevLikedSongs);
+      setLikedSongsTotalCount(prevTotalCount);
+      try {
+        if (prevTotalCount) {
+          localStorage.setItem("tubify_liked_total_count", prevTotalCount);
+        }
+      } catch {}
+      player.syncLikedIds(Array.from(prevLikedTrackIds));
+      player.showToast("İşlem başarısız oldu, değişiklik geri alındı");
+    }
+  };
+
   const handleAddToPlaylist = async (pl: Playlist | "liked", track: Track) => {
     // 1. Liked Songs handling (Special case for LM / VLLM / liked)
     if (
       pl === "liked" ||
       (typeof pl !== "string" && (pl.id === "LM" || pl.id === "VLLM" || pl.id === "liked"))
     ) {
-      await player.toggleLike(track, true);
-      setLikedSongs((prev) => {
-        if (prev.some((t) => t.id === track.id)) return prev;
-        return [track, ...prev];
-      });
-      player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+      await handleToggleLike(track);
       return;
     }
 
@@ -599,13 +680,25 @@ export const App: FC = () => {
     }
   }, [currentQueue]);
 
-  // Search handler
-  const handleSearchSubmit = async () => {
-    const q = searchQuery.trim();
-    if (!q) return;
+  // Search handlers
+  const handleExecuteSearch = async (queryText: string) => {
+    const q = queryText.trim();
+    if (!q) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
     setIsSearching(true);
     setSearchError(null);
     navigateTo({ type: "search", query: q });
+
+    // Save to recent searches
+    try {
+      const saved = localStorage.getItem("tubify_recent_searches");
+      const list: string[] = saved ? JSON.parse(saved) : [];
+      const updated = [q, ...list.filter((s) => s.toLowerCase() !== q.toLowerCase())].slice(0, 10);
+      localStorage.setItem("tubify_recent_searches", JSON.stringify(updated));
+    } catch {}
 
     try {
       const results = await searchMusic(q);
@@ -616,6 +709,26 @@ export const App: FC = () => {
       setIsSearching(false);
     }
   };
+
+  const handleSearchSubmit = () => {
+    handleExecuteSearch(searchQuery);
+  };
+
+  // Debounced auto-search when user types
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      handleExecuteSearch(trimmed);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const loadPlaylistTracks = async (playlistId: string) => {
     setIsLoadingTracks(true);
@@ -872,8 +985,8 @@ export const App: FC = () => {
               searchQuery={searchQuery}
               onSearchChange={(q) => {
                 setSearchQuery(q);
-                if (!q && currentNav.type === "search") {
-                  navigateTo({ type: "home" });
+                if (q && currentNav.type !== "search") {
+                  navigateTo({ type: "search", query: q });
                 }
               }}
               onSearchSubmit={handleSearchSubmit}
@@ -961,7 +1074,7 @@ export const App: FC = () => {
                 }}
                 onToggleShuffle={player.toggleShuffle}
                 isShuffle={player.isShuffle}
-                onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
+                onToggleLike={handleToggleLike}
                 likedTrackIds={player.likedTrackIds}
                 isLoadingTracks={isLoadingTracks}
                 hasMore={!!continuationToken}
@@ -991,7 +1104,7 @@ export const App: FC = () => {
                 }}
                 onToggleShuffle={player.toggleShuffle}
                 isShuffle={player.isShuffle}
-                onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
+                onToggleLike={handleToggleLike}
                 likedTrackIds={player.likedTrackIds}
                 onNavigateAlbum={handleNavigateAlbum}
                 onContextMenuTrack={handleOpenContextMenu}
@@ -1015,7 +1128,7 @@ export const App: FC = () => {
                 }}
                 onToggleShuffle={player.toggleShuffle}
                 isShuffle={player.isShuffle}
-                onToggleLike={(t) => player.toggleLike(t, userProfile.is_authenticated)}
+                onToggleLike={handleToggleLike}
                 likedTrackIds={player.likedTrackIds}
                 onNavigateArtist={handleNavigateArtist}
                 onContextMenuTrack={handleOpenContextMenu}
@@ -1026,169 +1139,27 @@ export const App: FC = () => {
 
             {/* VIEW 5: Search View */}
             {currentNav.type === "search" && (
-              <div
+              <SearchView
+                query={searchQuery}
+                searchResults={searchResults}
+                isSearching={isSearching}
+                searchError={searchError}
+                userPlaylists={playlists}
+                activeTrack={player.activeTrack}
+                isPlaying={player.playbackStatus === "playing"}
+                likedTrackIds={player.likedTrackIds}
+                onPlayTrack={(t, q) => player.playTrack(t, q || searchResults)}
+                onToggleLike={handleToggleLike}
+                onContextMenuTrack={handleOpenContextMenu}
+                onNavigateArtist={handleNavigateArtist}
+                onNavigateAlbum={handleNavigateAlbum}
+                onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
+                onSelectQuery={(q) => {
+                  setSearchQuery(q);
+                  handleExecuteSearch(q);
+                }}
                 onScroll={handleViewScroll}
-                className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 md:p-8 pt-16 space-y-6 pb-28 relative z-10 bg-transparent ${
-                  isLight ? "text-[#111111]" : "text-white"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <h2
-                    className={`text-2xl font-black tracking-tight ${
-                      isLight ? "text-[#18181b]" : "text-white"
-                    }`}
-                  >
-                    {t.searchResultsFor} "{searchQuery}"
-                  </h2>
-                  <button
-                    onClick={() => navigateTo({ type: "home" })}
-                    className={`text-xs font-semibold transition-colors cursor-pointer ${
-                      isLight
-                        ? "text-[#71717a] hover:text-[#111111]"
-                        : "text-white/60 hover:text-white"
-                    }`}
-                  >
-                    {t.backToHome}
-                  </button>
-                </div>
-
-                {isSearching ? (
-                  <div
-                    className={`py-24 flex flex-col items-center justify-center gap-3 ${
-                      isLight ? "text-[#71717a]" : "text-white/60"
-                    }`}
-                  >
-                    <Loader2 className="w-8 h-8 animate-spin text-[#ff0000]" />
-                  </div>
-                ) : searchError ? (
-                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
-                    {searchError}
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <div
-                    className={`py-24 text-center space-y-2 ${
-                      isLight ? "text-[#71717a]" : "text-white/40"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold">{t.noResultsFound}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {searchResults.map((track, idx) => {
-                      const isActive = player.activeTrack?.id === track.id;
-                      const isLiked = player.likedTrackIds.has(track.id);
-
-                      return (
-                        <div
-                          key={`search-${track.id}-${idx}`}
-                          onClick={() => player.playTrack(track, searchResults)}
-                          onContextMenu={(e) => handleOpenContextMenu(track, e)}
-                          className={`flex items-center justify-between p-3 rounded-2xl transition-all group cursor-pointer active:scale-[0.99] ${
-                            isActive
-                              ? isLight
-                                ? "bg-[#ffffff] shadow-sm border border-[#e4e4e7] text-black"
-                                : "bg-white/[0.12] border border-white/[0.1] text-white"
-                              : isLight
-                              ? "hover:bg-[#ffffff]/80 text-[#18181b]"
-                              : "hover:bg-white/[0.04] text-white/80"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div
-                              className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm ${
-                                isLight ? "bg-[#e4e4e7]" : "bg-zinc-800"
-                              }`}
-                            >
-                              {track.thumbnail ? (
-                                <img
-                                  src={track.thumbnail}
-                                  alt={track.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Music2 className="w-5 h-5 text-[#ff0000]" />
-                                </div>
-                              )}
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                              </div>
-                              {isActive && player.playbackStatus === "playing" && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                  <MicroVisualizer isPlaying={true} />
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="min-w-0">
-                              <h4
-                                className={`text-xs font-bold truncate leading-tight ${
-                                  isActive
-                                    ? "text-[#ff0000]"
-                                    : isLight
-                                    ? "text-[#18181b]"
-                                    : "text-white"
-                                }`}
-                              >
-                                {track.title}
-                              </h4>
-                              <p
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleNavigateArtist(track.artist_id || track.artist, track.artist);
-                                }}
-                                className={`text-[11px] truncate mt-0.5 hover:underline cursor-pointer ${
-                                  isLight ? "text-[#71717a] hover:text-black" : "text-white/60 hover:text-white"
-                                }`}
-                              >
-                                {track.artist}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                player.toggleLike(track, userProfile.is_authenticated);
-                              }}
-                              className={`p-1.5 transition-colors cursor-pointer ${
-                                isLight
-                                  ? "text-[#a1a1aa] hover:text-[#ff0000]"
-                                  : "text-white/40 hover:text-[#ff0000]"
-                              }`}
-                            >
-                              <Heart
-                                className={`w-4 h-4 ${
-                                  isLiked ? "text-[#ff0000] fill-[#ff0000]" : ""
-                                }`}
-                              />
-                            </button>
-                            <button
-                              onClick={(e) => handleOpenContextMenu(track, e)}
-                              className={`p-1.5 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 ${
-                                isLight
-                                  ? "text-[#a1a1aa] hover:text-black"
-                                  : "text-white/40 hover:text-white"
-                              }`}
-                              title="Daha fazla seçenek"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                            <span
-                              className={`text-xs font-mono font-medium ${
-                                isLight ? "text-[#71717a]" : "text-white/50"
-                              }`}
-                            >
-                              {track.duration || "3:30"}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              />
             )}
 
             {/* VIEW 6: Home View */}
@@ -1225,6 +1196,7 @@ export const App: FC = () => {
         onNavigateArtist={handleNavigateArtist}
         onNavigateAlbum={handleNavigateAlbum}
         onContextMenuTrack={handleOpenContextMenu}
+        onToggleLike={() => player.activeTrack && handleToggleLike(player.activeTrack)}
       />
 
       {/* HUD mini-player overlay */}
@@ -1258,6 +1230,7 @@ export const App: FC = () => {
           onNavigateAlbum={handleNavigateAlbum}
           playlists={playlists}
           onAddToPlaylist={handleAddToPlaylist}
+          onToggleLike={handleToggleLike}
           onRemoveFromPlaylist={
             currentNav.type === "playlist" &&
             currentNav.playlist.id !== "liked" &&
