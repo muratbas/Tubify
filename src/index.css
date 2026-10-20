@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @font-face {
   font-family: "SpotifyMix";
   src: url("/fonts/SpotifyMix-Light.ttf") format("truetype");
@@ -44,6 +46,10 @@ svg.lucide :is(path, circle, line, rect, polyline, polygon) {
     --bg-main: #ffffff;
     --bg-surface: #ffffff;
     --accent: #ff0000;
+  }
+
+  :root.light body {
+    color: #111111;
   }
 
   body {

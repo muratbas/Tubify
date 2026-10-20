@@ -577,6 +577,9 @@ pub fn collect_playlists_recursive(
                 .map(|v| v.to_string());
             let thumb = card
                 .pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails")
+                .or_else(|| card.pointer("/thumbnailRenderer/croppedSquareThumbnailRenderer/thumbnail/thumbnails"))
+                .or_else(|| card.pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails"))
+                .or_else(|| card.pointer("/thumbnail/thumbnails"))
                 .and_then(|v| v.as_array())
                 .and_then(|arr| arr.last())
                 .and_then(|t| t.get("url"))

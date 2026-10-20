@@ -37,11 +37,11 @@ export const MoodFilterBar: FC = () => {
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-tight transition-all duration-200 cursor-pointer shrink-0 active:scale-95 ${
               isActive
                 ? isLight
-                  ? "bg-[#18181b] text-white shadow-sm"
+                  ? "bg-neutral-900 text-white shadow-sm"
                   : "bg-white text-black shadow-sm"
                 : isLight
-                ? "bg-white/70 text-[#52525b] hover:bg-white hover:text-[#18181b] border border-[#e4e4e7]"
-                : "bg-white/[0.06] text-white/70 hover:bg-white/[0.12] hover:text-white border border-white/[0.08]"
+                ? "bg-neutral-100 text-neutral-700 hover:bg-neutral-200/80 hover:text-neutral-900"
+                : "bg-white/[0.07] text-neutral-300 hover:bg-white/[0.12] hover:text-white"
             }`}
           >
             {label}

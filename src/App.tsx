@@ -82,40 +82,6 @@ const INITIAL_RECOMMENDED: Track[] = [
   },
 ];
 
-const INITIAL_LISTEN_AGAIN: Track[] = [
-  {
-    id: "kJQP7kiw5Fk",
-    title: "Despacito",
-    artist: "Luis Fonsi",
-    album: "VIDA",
-    thumbnail: "https://i.ytimg.com/vi/kJQP7kiw5Fk/mqdefault.jpg",
-    duration: "3:47",
-  },
-  {
-    id: "JGwWNGJdvx8",
-    title: "Shape of You",
-    artist: "Ed Sheeran",
-    album: "÷",
-    thumbnail: "https://i.ytimg.com/vi/JGwWNGJdvx8/mqdefault.jpg",
-    duration: "3:53",
-  },
-  {
-    id: "fJ9rUzIMcZQ",
-    title: "Bohemian Rhapsody",
-    artist: "Queen",
-    album: "A Night at the Opera",
-    thumbnail: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/mqdefault.jpg",
-    duration: "5:55",
-  },
-  {
-    id: "OPf0YbXqDm0",
-    title: "Uptown Funk",
-    artist: "Mark Ronson ft. Bruno Mars",
-    album: "Uptown Special",
-    thumbnail: "https://i.ytimg.com/vi/OPf0YbXqDm0/mqdefault.jpg",
-    duration: "4:30",
-  },
-];
 
 const EPISODES_TRACKS: Track[] = [
   {
@@ -1230,10 +1196,12 @@ export const App: FC = () => {
               <HomeView
                 recentlyPlayed={player.recentTracks}
                 recommendations={INITIAL_RECOMMENDED}
-                listenAgain={INITIAL_LISTEN_AGAIN}
+                playlists={playlists}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
                 onPlayTrack={(t) => player.playTrack(t, [...player.recentTracks, ...INITIAL_RECOMMENDED])}
+                onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
+                onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
                 onNavigateArtist={handleNavigateArtist}
                 onContextMenuTrack={handleOpenContextMenu}
                 onScroll={handleViewScroll}

@@ -290,8 +290,54 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - **3. Kademe (Tekrar Kapalı - `off`):** Üçüncü basışta tekrar devre dışı kalır, ikon gri standart `Repeat` ikonuna geri döner.
     - **4. Tooltip Gecikmesi & Sakin Hover Davranışı (1 Saniye):**
       - `CustomTooltip.tsx` tetiklenme gecikmesi 160ms'den 1000ms'ye (tam 1 saniye) çıkarıldı. Kullanıcı fareyi butonun üzerinde bilinçli olarak 1 saniye bekletmediği sürece arayüzde baloncuklar parlamaz.
+  - [x] **Aşama 33:** Ana Sayfa (`HomeView`) UI/UX Modern Arayüz Revizyonu (Spotify/Spotifast Düzeni):
+    - **1. "Recently Played" (Son Çalınanlar) Grid Alanının Yenilenmesi:**
+      - 4 sütunlu kalın çerçeveli ve sabit play butonlu eski yapı kaldırıldı; yerine modern kompakt 2x3 / 2x4 ızgara mimarisi kuruldu (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`).
+      - Kenarlıklar tamamen kaldırıldı; yumuşak yarı saydam zemin (`bg-neutral-100 hover:bg-neutral-200/80` / `dark:bg-white/[0.07] dark:hover:bg-white/[0.12]`) uygulandı.
+      - Şarkı kapağı sol kenara sıfır oturtuldu (`w-14 h-14 md:w-16 md:h-16 shrink-0`); kartın `rounded-xl overflow-hidden` yapısıyla bütünleştirildi.
+      - Şarkı başlığı `font-semibold text-sm text-neutral-900 dark:text-white truncate`, sanatçı `text-xs text-neutral-500 dark:text-neutral-400 truncate` yapıldı.
+      - Kaba sabit play butonları kaldırıldı; varsayılanda tamamen gizli (`opacity-0 scale-90`), kartın üzerine fareyle gelindiğinde yumuşak geçişle beliren (`group-hover:opacity-100 group-hover:scale-100 transition-all duration-200`) zarif dairesel kırmızı play/pause butonu (`shadow-md`) yerleştirildi.
+    - **2. Kırık / Eksik Kapak Görselleri Fallback ve Yüksek Çözünürlük Optimizasyonu:**
+      - `getOptimizedThumbnail` fonksiyonu geliştirildi; YouTube Music / Google CDN URL'leri yüksek çözünürlüklü `w544-h544` formatına, YouTube video küçük resimleri ise `maxresdefault.jpg` formatına önceliklendirildi.
+      - `TrackCover` bileşeni eklendi: 1080p olmayan videolarda `maxresdefault` 404 verdiğinde `onError` yakalanarak anında `hqdefault.jpg`'ye geçilir.
+      - Kırık, geçersiz veya boş kapaklarda YouTube'un donuk gri kutusu yerine nötr yumuşak gri zemin (`bg-neutral-200 dark:bg-neutral-800`) ve ortasında zarif `Music2` notası ikonu (`text-neutral-400 dark:text-neutral-500`) gösterilir.
+    - **3. Yatay Raf Kartları ("More recommendations" / "Listen again"):**
+      - Dikey kartların kalın border çizgileri kaldırıldı; `p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-white/[0.08] transition-colors group cursor-pointer` stiline geçirildi.
+      - Görsel alanı tam kare (`aspect-square w-full rounded-xl overflow-hidden shadow-sm`), üzerine gelindiğinde hafifçe yukarı kayarak beliren (`translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all`) gölgeli play butonu yerleştirildi.
+      - Başlık `font-medium text-sm text-neutral-900 dark:text-white mt-2.5 truncate`, alt başlık/sanatçı `text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2` yapıldı.
+    - **4. Dinamik Karşılama Başlığı ve Sayfa Düzeni:**
+      - Günün saatine göre otomatik değişen başlık entegre edildi: 05:00-12:00 arası "Günaydın", 12:00-18:00 arası "Tünaydın", 18:00 sonrası "İyi akşamlar" (`text-2xl md:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white mb-6 mt-2`).
+      - Arka plan tamamen temiz nötr zemin (`bg-transparent`, ana kapsayıcı `bg-white dark:bg-[#0c0c0c]`) tutuldu; gereksiz renk çıkarıcı veya degrade eklenmedi.
+      - `MoodFilterBar` filtre hapları da çerçevelerden arındırılarak Spotify pill standardına kavuşturuldu.
+    - **5. Light/Dark Mode Renk Uyumu, 6 Dikey Büyük Kart ve "Kitaplığınızdan" Rafı:**
+      - Light mode metin görünürlüğü onarıldı: `index.css` içine `@custom-variant dark (&:where(.dark, .dark *));` ve `:root.light body { color: #111111; }` eklendi; `HomeView.tsx` içindeki tüm başlık ve metinler `isLight ? "text-neutral-900" : "text-white"` conditional sınıflarına taşınarak beyaz zemin üzerinde metinlerin kaybolma sorunu kesin olarak giderildi.
+      - Üstteki filtre çubuğu (`MoodFilterBar`) Ana Sayfa'dan tamamen kaldırıldı.
+      - Karşılama başlığının ("İyi akşamlar" vb.) altındaki parça adedi tam 6'ya sabitlendi; kullanıcı ekran görüntüsüne birebir sadık 3 sütunlu (`grid-cols-2 md:grid-cols-3 gap-5 md:gap-7`), tam kare büyük kapaklı dikey kart mimarisi kuruldu.
+      - Kart hover durumunda görselin tam ortasında beliren kırmızı daire içinde beyaz play butonu (`w-12 h-12 md:w-14 md:h-14 rounded-full bg-[#ff0000] shadow-2xl shadow-red-600/40`) ve başlık/sanatçı hiyerarşisi uygulandı.
+      - "More recommendations" ve "Listen again" bölümleri tamamen silindi.
+      - Yerine **"Kitaplığınızdan"** başlığı altında kullanıcının kitaplığındaki çalma listelerini yatay kaydırılabilir (`overflow-x-auto no-scrollbar scroll-smooth`) olarak listeleyen raf bölümü eklendi; `App.tsx` üzerinden `playlists`, `onSelectPlaylist` ve `onPlayPlaylist` köprüleri bağlandı.
+    - **6. Dikey Kartların Dengeli Boyuta Çekilmesi & Playlist Kapaklarının Onarımı:**
+      - Karşılama başlığı altındaki 6 parça kartı aşırı devasa boyutlardan kurtarılarak Spotify standartlarına (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 md:gap-4`) çekildi. Geniş ekranlarda 6 parça tek bir akıcı satırda dengeli, kompakt ve şık duracak şekilde küçültüldü.
+      - "Kitaplığınızdan" bölümünde çalma listesi kapaklarının yüklenmeme sorunu çözüldü:
+        - `auth.rs` içerisinde `fetch_user_playlists` çözümleyicisine YouTube Music'in kullanıcı listeleri için kullandığı `croppedSquareThumbnailRenderer` ve `thumbnailRenderer` alternatif yolları eklendi.
+        - `HomeView.tsx` içerisinde `TrackCover` bileşenine `isPlaylist` ayrımı eklendi; kullanıcı çalma listesi kolajları CDN üzerinde `=w544-h544-l90-rj` yüzünden 404 vermesin diye URL manipülasyonu engellendi ve ham URL önceliklendirildi.
+        - Kapak resmi boş gelen çalma listeleri için yerel önbellekteki (`tubify_playlist_tracks_${pl.id}`) ilk şarkının kapak görseli fallback olarak bağlandı.
+  - [x] **Aşama 34:** Ana Sayfa Üst Hızlı Erişim Kartları (Quick Access Hub):
+    - **1. Grid Yerleşimi & Kart Mimarisi:**
+      - Karşılama başlığının ("Günaydın" vb.) hemen altına 3 sütunlu dengeli ve modern bir Hızlı Erişim ızgarası (`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 mb-8 mt-2`) yerleştirildi.
+      - Kenarlıksız, yumuşak nötr zemin (`bg-neutral-100/70 hover:bg-neutral-200/60` / `dark:bg-neutral-800/50 dark:hover:bg-neutral-800/80`), `rounded-2xl p-4`, `hover:-translate-y-0.5 hover:shadow-sm` ve `transition-all duration-200 ease-out` etkileşimleri uygulandı.
+    - **2. İkon ve Tipografi Hiyerarşisi:**
+      - Sol ikon alanı: `w-11 h-11 rounded-xl` yumuşak kare taşıyıcı (`bg-white dark:bg-neutral-700/60 shadow-xs group-hover:scale-105 transition-transform duration-200`) ve 20px ikonlar (`w-5 h-5 text-neutral-700 dark:text-neutral-200`).
+      - Sağ metin alanı: Kalın başlık (`font-semibold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-black dark:group-hover:text-white transition-colors`) ve alt ipucu metni (`text-xs text-neutral-500 dark:text-neutral-400 mt-0.5`).
+    - **3. Hızlı Erişim Kartları:**
+      - **Kitaplık:** `Library` ikonu — *"Koleksiyonun & listelerin"*
+      - **Göz At:** `Compass` ikonu — *"Türler, ruh halleri & listeler"*
+      - **İndirilenler:** `ArrowDownToLine` ikonu — *"Çevrimdışı müzikler"*
   - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+
+
+
 
