@@ -433,6 +433,71 @@ function tubifyDevApiPlugin(): Plugin {
           }
         }
 
+        // 8. Add Track to Playlist API
+        if (url.pathname === "/api/playlist/add-track" && req.method === "POST") {
+          let body = "";
+          req.on("data", (chunk) => (body += chunk));
+          req.on("end", async () => {
+            try {
+              const { playlistId, videoId } = JSON.parse(body);
+              const session = getStoredSession();
+              if (!session?.cookie) {
+                res.statusCode = 401;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ error: "Giriş yapılmamış" }));
+                return;
+              }
+
+              const cleanId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
+              const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+                Origin: "https://music.youtube.com",
+                Referer: "https://music.youtube.com/",
+                Cookie: session.cookie,
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              };
+              if (session.sapisid) {
+                headers["Authorization"] = getSapisidHash(session.sapisid);
+              }
+
+              const ytRes = await fetch("https://music.youtube.com/youtubei/v1/browse/edit_playlist", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  context: { client: { clientName: "WEB_REMIX", clientVersion: "1.20240401.01.00", hl: "tr", gl: "TR" } },
+                  playlistId: cleanId,
+                  actions: [
+                    {
+                      action: "ACTION_ADD_VIDEO",
+                      addedVideoId: videoId,
+                      dedupeOption: "DEDUPE_OPTION_CHECK",
+                    },
+                  ],
+                }),
+              });
+
+              if (!ytRes.ok) {
+                const errText = await ytRes.text();
+                throw new Error(errText || "Çalma listesine eklenemedi");
+              }
+
+              const data = await ytRes.json();
+              if (data.status && data.status !== "STATUS_SUCCEEDED") {
+                throw new Error(`İşlem başarısız: ${data.status}`);
+              }
+
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ success: true }));
+            } catch (err: any) {
+              res.statusCode = 400;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+
         next();
       });
     },

@@ -9,17 +9,17 @@ import {
   Volume1,
   Shuffle,
   Repeat,
+  Repeat1,
   Loader2,
   Music2,
   Heart,
   Mic2,
   ListMusic,
-  Tv,
   MoreHorizontal,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
-import type { Track, PlaybackStatus } from "../types/music";
+import type { Track, PlaybackStatus, RepeatMode } from "../types/music";
 
 interface PlayerBarProps {
   track?: Track | null;
@@ -31,6 +31,7 @@ interface PlayerBarProps {
   isLiked?: boolean;
   isShuffle?: boolean;
   isRepeat?: boolean;
+  repeatMode?: RepeatMode;
   onPlayPause?: () => void;
   onNext?: () => void;
   onPrev?: () => void;
@@ -70,7 +71,14 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
   const volume = props.volume !== undefined ? props.volume : player.volume;
   const isMuted = props.isMuted !== undefined ? props.isMuted : player.isMuted;
   const isShuffle = props.isShuffle !== undefined ? props.isShuffle : player.isShuffle;
-  const isRepeat = props.isRepeat !== undefined ? props.isRepeat : player.isRepeat;
+  const repeatMode: RepeatMode =
+    props.repeatMode !== undefined
+      ? props.repeatMode
+      : player.repeatMode !== undefined
+      ? player.repeatMode
+      : (props.isRepeat !== undefined ? props.isRepeat : player.isRepeat)
+      ? "all"
+      : "off";
 
   const isLiked =
     props.isLiked !== undefined
@@ -276,17 +284,27 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
 
           <button
             onClick={onToggleRepeat}
-            data-tooltip={isRepeat ? "Tekrar Açık" : "Tekrar Kapalı"}
+            data-tooltip={
+              repeatMode === "all"
+                ? "Tümünü Tekrarla"
+                : repeatMode === "one"
+                ? "Tek Parçayı Tekrarla"
+                : "Tekrar Kapalı"
+            }
             data-tooltip-side="top"
             className={`transition-colors cursor-pointer ${
-              isRepeat
+              repeatMode !== "off"
                 ? "text-[#ff0000]"
                 : isLight
                 ? "text-neutral-500 hover:text-neutral-900"
                 : "text-neutral-400 hover:text-white"
             }`}
           >
-            <Repeat className="w-4 h-4" />
+            {repeatMode === "one" ? (
+              <Repeat1 className="w-4 h-4" />
+            ) : (
+              <Repeat className="w-4 h-4" />
+            )}
           </button>
         </div>
 
@@ -301,9 +319,9 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           </span>
 
           <div className="flex-1 relative flex items-center group cursor-pointer py-2">
-            {/* Background Track */}
+            {/* Background Track: fixed h-1 without hover expansion */}
             <div
-              className={`w-full h-1 group-hover:h-1.5 rounded-full overflow-hidden transition-all ${
+              className={`w-full h-1 rounded-full overflow-hidden ${
                 isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
               }`}
             >
@@ -368,7 +386,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         </div>
       </div>
 
-      {/* 3. Right: Lyrics, Queue, Device, Volume */}
+      {/* 3. Right: Lyrics, Queue, Volume */}
       <div className="flex items-center gap-3 w-[30%] justify-end">
         {/* Lyrics */}
         <button
@@ -402,17 +420,6 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <ListMusic className="w-4 h-4" />
         </button>
 
-        {/* Devices */}
-        <button
-          data-tooltip="Bir cihaza bağlan"
-          data-tooltip-side="top"
-          className={`p-1.5 transition-colors cursor-pointer ${
-            isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-          }`}
-        >
-          <Tv className="w-4 h-4" />
-        </button>
-
         {/* Volume */}
         <div
           className="flex items-center gap-2 group relative py-2"
@@ -443,9 +450,9 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
             </div>
 
             <div className="w-24 relative flex items-center cursor-pointer">
-              {/* Background Track */}
+              {/* Background Track: fixed h-1 without hover expansion */}
               <div
-                className={`w-full h-1 group-hover:h-1.5 rounded-full overflow-hidden transition-all ${
+                className={`w-full h-1 rounded-full overflow-hidden ${
                   isLight ? "bg-neutral-200" : "bg-[#4d4d4d]"
                 }`}
               >

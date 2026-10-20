@@ -73,6 +73,20 @@ async fn delete_yt_playlist(playlist_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn add_track_to_playlist(playlist_id: String, video_id: String) -> Result<(), String> {
+    auth::add_track_to_playlist(&playlist_id, &video_id).await
+}
+
+#[tauri::command]
+async fn remove_track_from_playlist(
+    playlist_id: String,
+    video_id: String,
+    set_video_id: Option<String>,
+) -> Result<(), String> {
+    auth::remove_track_from_playlist(&playlist_id, &video_id, set_video_id.as_deref()).await
+}
+
+#[tauri::command]
 async fn open_google_login(app: AppHandle) -> Result<(), String> {
     auth::open_login_webview(app).await
 }
@@ -173,6 +187,8 @@ pub fn run() {
             toggle_yt_like,
             create_yt_playlist,
             delete_yt_playlist,
+            add_track_to_playlist,
+            remove_track_from_playlist,
             open_google_login,
             check_login_status,
             open_external_url,

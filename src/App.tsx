@@ -23,6 +23,8 @@ import {
   getPlaylistTracksPage,
   createYtPlaylist,
   deleteYtPlaylist,
+  addTrackToPlaylist,
+  removeTrackFromPlaylist,
 } from "./services/api";
 import { CustomTooltip } from "./components/CustomTooltip";
 import type { Track, UserProfile, Playlist } from "./types/music";
@@ -287,6 +289,8 @@ export const App: FC = () => {
   });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
+  const [playlistSuggestions, setPlaylistSuggestions] = useState<Track[]>([]);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -506,6 +510,83 @@ export const App: FC = () => {
     }
   };
 
+  const handleAddToPlaylist = async (pl: Playlist | "liked", track: Track) => {
+    // 1. Liked Songs handling (Special case for LM / VLLM / liked)
+    if (
+      pl === "liked" ||
+      (typeof pl !== "string" && (pl.id === "LM" || pl.id === "VLLM" || pl.id === "liked"))
+    ) {
+      await player.toggleLike(track, true);
+      setLikedSongs((prev) => {
+        if (prev.some((t) => t.id === track.id)) return prev;
+        return [track, ...prev];
+      });
+      player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+      return;
+    }
+
+    // 2. Custom playlist handling: Clean "VL" prefix from playlist ID
+    const rawId = pl.id;
+    const cleanPlaylistId = rawId.startsWith("VL") ? rawId.slice(2) : rawId;
+
+    try {
+      // 3. InnerTube browse/edit_playlist API call
+      await addTrackToPlaylist(cleanPlaylistId, track.id);
+
+      // 4. Update local storage cache
+      try {
+        const key = `tubify_playlist_tracks_${rawId}`;
+        const existingRaw = localStorage.getItem(key);
+        const existing: Track[] = existingRaw ? JSON.parse(existingRaw) : [];
+        if (!existing.some((t) => t.id === track.id)) {
+          existing.push({
+            ...track,
+            added_at: new Date().toLocaleDateString("tr-TR", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            }),
+          });
+          localStorage.setItem(key, JSON.stringify(existing));
+        }
+      } catch {}
+
+      // 5. Instantly update playlists state so sidebar track_count increments
+      setPlaylists((prev) =>
+        prev.map((item) => {
+          const itemClean = item.id.startsWith("VL") ? item.id.slice(2) : item.id;
+          if (itemClean === cleanPlaylistId) {
+            const raw = item.track_count || "";
+            const match = raw.match(/\d+/);
+            const currentCount = match ? parseInt(match[0], 10) : 0;
+            const newCount = currentCount + 1;
+            return { ...item, track_count: `${newCount} şarkı` };
+          }
+          return item;
+        })
+      );
+
+      // 6. If user is currently viewing this playlist, append to current playlist view immediately
+      if (
+        currentNav.type === "playlist" &&
+        (currentNav.playlist.id === rawId ||
+          (currentNav.playlist.id.startsWith("VL")
+            ? currentNav.playlist.id.slice(2)
+            : currentNav.playlist.id) === cleanPlaylistId)
+      ) {
+        setPlaylistTracks((prev) => {
+          if (prev.some((t) => t.id === track.id)) return prev;
+          return [...prev, track];
+        });
+      }
+
+      player.showToast(`"${track.title}", "${pl.title}" listesine eklendi`);
+    } catch (e: any) {
+      console.error("Failed to add track to playlist:", e);
+      player.showToast(`Listeye eklenemedi: ${e?.message || e}`);
+    }
+  };
+
   const handleLoginSuccess = (profile: UserProfile) => {
     setUserProfile(profile);
     loadUserData();
@@ -573,10 +654,28 @@ export const App: FC = () => {
   const loadPlaylistTracks = async (playlistId: string) => {
     setIsLoadingTracks(true);
     setPlaylistTracks([]);
+    setPlaylistSuggestions([]);
     setContinuationToken(null);
     try {
       const page = await getPlaylistTracksPage(playlistId, null);
-      setPlaylistTracks(page.tracks);
+      let tracks = page.tracks;
+      if (tracks.length === 0 && playlistId !== "liked" && playlistId !== "LM") {
+        try {
+          const local =
+            localStorage.getItem(`tubify_playlist_tracks_${playlistId}`) ||
+            (playlistId.startsWith("VL")
+              ? localStorage.getItem(`tubify_playlist_tracks_${playlistId.slice(2)}`)
+              : localStorage.getItem(`tubify_playlist_tracks_VL${playlistId}`));
+          if (local) {
+            const parsed = JSON.parse(local);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              tracks = parsed;
+            }
+          }
+        } catch {}
+      }
+      setPlaylistTracks(tracks);
+      setPlaylistSuggestions(page.suggestions || []);
       setContinuationToken(page.continuation || null);
       if (playlistId === "liked" || playlistId === "LM") {
         setLikedSongs(page.tracks);
@@ -594,8 +693,125 @@ export const App: FC = () => {
     } catch (e) {
       console.error("Failed to load playlist tracks:", e);
       setPlaylistTracks([]);
+      setPlaylistSuggestions([]);
     } finally {
       setIsLoadingTracks(false);
+    }
+  };
+
+  const handleRefreshSuggestions = async () => {
+    if (currentNav.type !== "playlist" || isRefreshingSuggestions) return;
+    setIsRefreshingSuggestions(true);
+    try {
+      const page = await getPlaylistTracksPage(currentNav.playlist.id, null);
+      if (page.suggestions && page.suggestions.length > 0) {
+        setPlaylistSuggestions(page.suggestions);
+      }
+    } catch (e) {
+      console.error("Failed to refresh suggestions:", e);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  };
+
+  const handleAddSuggestionToPlaylist = async (track: Track) => {
+    if (currentNav.type !== "playlist") return;
+    const pl = currentNav.playlist;
+    const rawId = pl.id;
+    const cleanPlaylistId = rawId.startsWith("VL") ? rawId.slice(2) : rawId;
+
+    // 1. Optimistic UI: remove from suggestions and append to tracks
+    const prevSuggestions = playlistSuggestions;
+    const prevTracks = playlistTracks;
+
+    setPlaylistSuggestions((prev) => prev.filter((t) => t.id !== track.id));
+    setPlaylistTracks((prev) => {
+      if (prev.some((t) => t.id === track.id)) return prev;
+      return [...prev, track];
+    });
+
+    // 2. Increment track_count in currentNav and playlists
+    setPlaylists((prev) =>
+      prev.map((item) => {
+        const itemClean = item.id.startsWith("VL") ? item.id.slice(2) : item.id;
+        if (itemClean === cleanPlaylistId || item.id === rawId) {
+          const raw = item.track_count || "";
+          const match = raw.match(/\d+/);
+          const currentCount = match ? parseInt(match[0], 10) : 0;
+          return { ...item, track_count: `${currentCount + 1} şarkı` };
+        }
+        return item;
+      })
+    );
+
+    // 3. InnerTube edit_playlist API call
+    try {
+      await addTrackToPlaylist(cleanPlaylistId, track.id);
+
+      // 4. Update local storage cache
+      try {
+        const key = `tubify_playlist_tracks_${rawId}`;
+        const existingRaw = localStorage.getItem(key);
+        const existing: Track[] = existingRaw ? JSON.parse(existingRaw) : [];
+        if (!existing.some((t) => t.id === track.id)) {
+          existing.push(track);
+          localStorage.setItem(key, JSON.stringify(existing));
+        }
+      } catch {}
+
+      player.showToast(`"${track.title}" çalma listesine eklendi`);
+    } catch (err: unknown) {
+      console.error("Failed to add suggestion to playlist:", err);
+      // Rollback on failure
+      setPlaylistSuggestions(prevSuggestions);
+      setPlaylistTracks(prevTracks);
+      player.showToast("Şarkı çalma listesine eklenemedi");
+    }
+  };
+
+  const handleRemoveTrackFromCurrentPlaylist = async (track: Track) => {
+    if (currentNav.type !== "playlist") return;
+    const pl = currentNav.playlist;
+    const rawId = pl.id;
+    const cleanPlaylistId = rawId.startsWith("VL") ? rawId.slice(2) : rawId;
+
+    // 1. Optimistic UI: remove from playlistTracks
+    const prevTracks = playlistTracks;
+    setPlaylistTracks((prev) => prev.filter((t) => t.id !== track.id));
+
+    // 2. Decrement track count in playlists state
+    setPlaylists((prev) =>
+      prev.map((item) => {
+        const itemClean = item.id.startsWith("VL") ? item.id.slice(2) : item.id;
+        if (itemClean === cleanPlaylistId || item.id === rawId) {
+          const raw = item.track_count || "";
+          const match = raw.match(/\d+/);
+          const currentCount = match ? parseInt(match[0], 10) : 0;
+          return { ...item, track_count: `${Math.max(0, currentCount - 1)} şarkı` };
+        }
+        return item;
+      })
+    );
+
+    // 3. InnerTube edit_playlist API call
+    try {
+      await removeTrackFromPlaylist(cleanPlaylistId, track.id, track.set_video_id);
+
+      // 4. Update local storage cache
+      try {
+        const key = `tubify_playlist_tracks_${rawId}`;
+        const existingRaw = localStorage.getItem(key);
+        const existing: Track[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const updated = existing.filter((t) => t.id !== track.id);
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch {}
+
+      player.showToast(`"${track.title}" çalma listesinden kaldırıldı`);
+    } catch (err: unknown) {
+      console.error("Failed to remove track from playlist:", err);
+      // Rollback on failure
+      setPlaylistTracks(prevTracks);
+      player.showToast("Şarkı çalma listesinden kaldırılamadı");
     }
   };
 
@@ -755,6 +971,7 @@ export const App: FC = () => {
               <PlaylistView
                 playlist={currentNav.playlist}
                 tracks={activePlaylistTracks}
+                suggestions={playlistSuggestions}
                 likedSongsTotalCount={likedSongsTotalCount}
                 userProfileName={userProfile.name}
                 activeTrack={player.activeTrack}
@@ -764,6 +981,9 @@ export const App: FC = () => {
                     recordPlaylistPlayed(currentNav.playlist.id);
                   }
                   player.playTrack(t, activePlaylistTracks);
+                }}
+                onPlaySuggestion={(t) => {
+                  player.playTrack(t);
                 }}
                 onPlayAll={() => {
                   if (activePlaylistTracks.length > 0) {
@@ -786,6 +1006,9 @@ export const App: FC = () => {
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
                 onScroll={handleViewScroll}
+                onAddSuggestion={handleAddSuggestionToPlaylist}
+                onRefreshSuggestions={handleRefreshSuggestions}
+                isRefreshingSuggestions={isRefreshingSuggestions}
               />
             )}
 
@@ -1065,6 +1288,15 @@ export const App: FC = () => {
           onNavigateArtist={handleNavigateArtist}
           onNavigateAlbum={handleNavigateAlbum}
           playlists={playlists}
+          onAddToPlaylist={handleAddToPlaylist}
+          onRemoveFromPlaylist={
+            currentNav.type === "playlist" &&
+            currentNav.playlist.id !== "liked" &&
+            currentNav.playlist.id !== "LM" &&
+            currentNav.playlist.id !== "episodes"
+              ? handleRemoveTrackFromCurrentPlaylist
+              : undefined
+          }
         />
       )}
 

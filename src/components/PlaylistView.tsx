@@ -8,6 +8,8 @@ import {
   Clock3,
   Music2,
   Search,
+  Plus,
+  RotateCw,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -17,11 +19,13 @@ import type { Track, Playlist } from "../types/music";
 interface PlaylistViewProps {
   playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null; track_count?: string | null };
   tracks: Track[];
+  suggestions?: Track[];
   likedSongsTotalCount?: string | null;
   userProfileName?: string | null;
   activeTrack: Track | null;
   isPlaying: boolean;
   onPlayTrack: (track: Track) => void;
+  onPlaySuggestion?: (track: Track) => void;
   onPlayAll: () => void;
   onToggleShuffle?: () => void;
   isShuffle?: boolean;
@@ -41,16 +45,21 @@ interface PlaylistViewProps {
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
+  onAddSuggestion?: (track: Track) => Promise<void> | void;
+  onRefreshSuggestions?: () => void;
+  isRefreshingSuggestions?: boolean;
 }
 
 export const PlaylistView: FC<PlaylistViewProps> = ({
   playlist,
   tracks,
+  suggestions = [],
   likedSongsTotalCount,
   userProfileName,
   activeTrack,
   isPlaying,
   onPlayTrack,
+  onPlaySuggestion,
   onPlayAll,
   onToggleShuffle,
   isShuffle = false,
@@ -64,6 +73,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   onNavigateAlbum,
   onContextMenuTrack,
   onScroll,
+  onAddSuggestion,
+  onRefreshSuggestions,
+  isRefreshingSuggestions = false,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -102,6 +114,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   const gridTemplate = isQueueExpanded
     ? "grid-cols-[40px_minmax(200px,1fr)_70px_50px] xl:grid-cols-[40px_minmax(200px,1fr)_140px_70px_50px]"
     : "grid-cols-[40px_minmax(200px,1.5fr)_minmax(120px,1fr)_70px_50px]";
+  const suggestionGridTemplate = isQueueExpanded
+    ? "grid-cols-[minmax(200px,1fr)_70px_48px] xl:grid-cols-[minmax(200px,1fr)_140px_70px_48px]"
+    : "grid-cols-[minmax(200px,1.5fr)_minmax(120px,1fr)_70px_48px]";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -507,6 +522,219 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   <div className="w-5 h-5 border-2 border-[#ff0000] border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Suggestions Section */}
+        {!isLoadingTracks && suggestions && suggestions.length > 0 && (
+          <div className="mt-10 mb-8 border-t border-black/10 dark:border-white/10 pt-6">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2
+                  className={`text-xl font-bold tracking-tight ${
+                    isLight ? "text-neutral-900" : "text-white"
+                  }`}
+                >
+                  Öneriler
+                </h2>
+                <p
+                  className={`text-xs mt-0.5 ${
+                    isLight ? "text-neutral-500" : "text-neutral-400"
+                  }`}
+                >
+                  Bu çalma listesindeki parçalara göre
+                </p>
+              </div>
+              {onRefreshSuggestions && (
+                <button
+                  onClick={onRefreshSuggestions}
+                  disabled={isRefreshingSuggestions}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    isLight
+                      ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700 active:scale-95"
+                      : "bg-white/10 hover:bg-white/15 text-neutral-200 active:scale-95"
+                  }`}
+                  title="Önerileri Yenile"
+                >
+                  <RotateCw
+                    className={`w-3.5 h-3.5 ${
+                      isRefreshingSuggestions ? "animate-spin text-[#ff0000]" : ""
+                    }`}
+                  />
+                  <span>Yenile</span>
+                </button>
+              )}
+            </div>
+
+            {/* Suggestions Rows */}
+            <div className="space-y-0.5">
+              {suggestions.map((track, idx) => {
+                const isActive = activeTrack?.id === track.id;
+                const isSingle = !track.album || track.album.toLowerCase() === "single";
+
+                return (
+                  <div
+                    key={`suggestion-${track.id}-${idx}`}
+                    onDoubleClick={() =>
+                      onPlaySuggestion ? onPlaySuggestion(track) : onPlayTrack(track)
+                    }
+                    onContextMenu={(e) => {
+                      if (onContextMenuTrack) {
+                        onContextMenuTrack(track, e);
+                      }
+                    }}
+                    className={`grid ${suggestionGridTemplate} gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
+                      isActive
+                        ? isLight
+                          ? "bg-black/[0.07] text-neutral-950 font-medium"
+                          : "bg-white/[0.12] text-white font-medium"
+                        : isLight
+                        ? "hover:bg-black/[0.05] text-neutral-700"
+                        : "hover:bg-white/[0.08] text-neutral-300"
+                    }`}
+                  >
+                    {/* Artwork + Title + Artist */}
+                    <div className="flex items-center gap-3.5 min-w-[200px] overflow-hidden">
+                      <div className="relative w-10 h-10 shrink-0 group/cover rounded overflow-hidden">
+                        {track.thumbnail ? (
+                          <img
+                            src={track.thumbnail}
+                            alt={track.title}
+                            className="w-full h-full object-cover bg-neutral-200"
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full flex items-center justify-center ${
+                              isLight ? "bg-neutral-200" : "bg-[#282828]"
+                            }`}
+                          >
+                            <Music2 className="w-4 h-4 text-[#ff0000]" />
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPlaySuggestion) {
+                              onPlaySuggestion(track);
+                            } else {
+                              onPlayTrack(track);
+                            }
+                          }}
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer text-white"
+                          title="Oynat"
+                        >
+                          {isActive && isPlaying ? (
+                            <Pause className="w-4 h-4 fill-white stroke-white" />
+                          ) : (
+                            <Play className="w-4 h-4 fill-white stroke-white ml-0.5" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`text-sm font-semibold truncate leading-normal py-0.5 ${
+                            isActive
+                              ? "text-[#ff0000]"
+                              : isLight
+                              ? "text-neutral-900"
+                              : "text-white"
+                          }`}
+                        >
+                          {track.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                          {track.is_explicit && (
+                            <span
+                              title="Explicit"
+                              className="w-3.5 h-3.5 rounded-[2px] bg-neutral-500 text-white text-[9px] font-black shrink-0 inline-flex items-center justify-center leading-none"
+                            >
+                              E
+                            </span>
+                          )}
+                          <p
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigateArtist) {
+                                onNavigateArtist(
+                                  track.artist_id || track.artist,
+                                  track.artist
+                                );
+                              }
+                            }}
+                            className={`text-xs truncate leading-normal py-0.5 hover:underline cursor-pointer ${
+                              isLight
+                                ? "text-neutral-500 hover:text-neutral-900"
+                                : "text-neutral-400 hover:text-white"
+                            }`}
+                          >
+                            {track.artist}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ALBÜM */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isSingle && track.album_id && onNavigateAlbum) {
+                          onNavigateAlbum(
+                            track.album_id,
+                            track.album || undefined,
+                            track.artist,
+                            track.thumbnail || undefined
+                          );
+                        }
+                      }}
+                      className={`text-xs truncate ${
+                        isQueueExpanded ? "hidden xl:block w-[140px]" : "w-full"
+                      } ${
+                        !isSingle && track.album_id
+                          ? "hover:underline cursor-pointer"
+                          : ""
+                      } ${
+                        isLight
+                          ? "text-neutral-600 hover:text-neutral-900"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      {!isSingle ? track.album : ""}
+                    </div>
+
+                    {/* DURATION */}
+                    <div
+                      className={`text-xs text-right font-mono ${
+                        isLight ? "text-neutral-500" : "text-neutral-400"
+                      }`}
+                    >
+                      {track.duration || "3:30"}
+                    </div>
+
+                    {/* LISTEYE EKLE (+) BUTTON */}
+                    <div className="flex items-center justify-end">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAddSuggestion) {
+                            onAddSuggestion(track);
+                          }
+                        }}
+                        className={`w-8 h-8 rounded-full transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
+                          isLight
+                            ? "bg-neutral-100 hover:bg-[#ff0000] text-neutral-600 hover:text-white shadow-sm"
+                            : "bg-white/10 hover:bg-[#ff0000] text-neutral-300 hover:text-white shadow-sm"
+                        }`}
+                        title="Listeye Ekle"
+                      >
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

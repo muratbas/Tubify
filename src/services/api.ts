@@ -204,6 +204,55 @@ export async function deleteYtPlaylist(playlistId: string): Promise<void> {
   }
 }
 
+export async function addTrackToPlaylist(playlistId: string, videoId: string): Promise<void> {
+  const cleanPlaylistId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
+
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("add_track_to_playlist", {
+      playlistId: cleanPlaylistId,
+      videoId,
+    });
+    return;
+  }
+
+  const res = await fetch("/api/playlist/add-track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playlistId: cleanPlaylistId, videoId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Şarkı çalma listesine eklenemedi");
+  }
+}
+
+export async function removeTrackFromPlaylist(
+  playlistId: string,
+  videoId: string,
+  setVideoId?: string | null
+): Promise<void> {
+  const cleanPlaylistId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("remove_track_from_playlist", {
+      playlistId: cleanPlaylistId,
+      videoId,
+      setVideoId: setVideoId || null,
+    });
+    return;
+  }
+  const res = await fetch("/api/playlist/remove-track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playlistId: cleanPlaylistId, videoId, setVideoId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Şarkı çalma listesinden kaldırılamadı");
+  }
+}
+
 export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
@@ -223,7 +272,7 @@ export async function getPlaylistTracksPage(
       continuation: continuation || null,
     });
   }
-  return { tracks: [], continuation: null };
+  return { tracks: [], suggestions: [], continuation: null };
 }
 
 export async function getArtistDetails(browseId: string): Promise<ArtistDetails> {

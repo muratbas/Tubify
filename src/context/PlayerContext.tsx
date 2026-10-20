@@ -7,7 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory } from "../types/music";
+import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory, RepeatMode } from "../types/music";
 import {
   getStreamUrl,
   toggleYtLike,
@@ -60,6 +60,7 @@ interface PlayerContextType {
   isMuted: boolean;
   isShuffle: boolean;
   isRepeat: boolean;
+  repeatMode: RepeatMode;
   queue: Track[];
   is16x9Aspect: boolean;
   isRightDrawerOpen: boolean;
@@ -128,7 +129,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   });
   const [isShuffle, setIsShuffle] = useState(false);
-  const [isRepeat, setIsRepeat] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(() => {
+    try {
+      const saved = localStorage.getItem("tubify_repeat_mode");
+      if (saved === "all" || saved === "one") return saved;
+    } catch {}
+    return "off";
+  });
+  const isRepeat = repeatMode !== "off";
   const [queue, setQueueState] = useState<Track[]>([]);
 
   // Desktop Panels & Layout State
@@ -170,6 +178,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const isShuffleRef = useRef(isShuffle);
   isShuffleRef.current = isShuffle;
 
+  const repeatModeRef = useRef<RepeatMode>(repeatMode);
+  repeatModeRef.current = repeatMode;
+
   const isRepeatRef = useRef(isRepeat);
   isRepeatRef.current = isRepeat;
 
@@ -202,10 +213,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const curTrack = currentTrackRef.current;
     if (!curTrack || curQueue.length === 0) return null;
 
+    if (repeatModeRef.current === "one") {
+      return curTrack;
+    }
+
     if (isShuffleRef.current) {
-      if (curQueue.length <= 1) return isRepeatRef.current ? curTrack : null;
+      if (curQueue.length <= 1) return repeatModeRef.current === "all" ? curTrack : null;
       const candidates = curQueue.filter((t) => t.id !== curTrack.id);
-      if (candidates.length === 0) return isRepeatRef.current ? curTrack : null;
+      if (candidates.length === 0) return repeatModeRef.current === "all" ? curTrack : null;
       const randIdx = Math.floor(Math.random() * candidates.length);
       return candidates[randIdx];
     }
@@ -213,7 +228,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const idx = curQueue.findIndex((t) => t.id === curTrack.id);
     if (idx !== -1 && idx + 1 < curQueue.length) {
       return curQueue[idx + 1];
-    } else if (isRepeatRef.current && curQueue.length > 0) {
+    } else if (repeatModeRef.current === "all" && curQueue.length > 0) {
       return curQueue[0];
     }
     return null;
@@ -299,8 +314,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const idx = curQueue.findIndex((t) => t.id === curTrack.id);
     if (idx !== -1 && idx + 1 < curQueue.length) {
       playTrackInternal(curQueue[idx + 1]);
-    } else if (isRepeatRef.current && curQueue.length > 0) {
+    } else if (repeatModeRef.current === "all" && curQueue.length > 0) {
       playTrackInternal(curQueue[0]);
+    } else if (repeatModeRef.current === "one" && curTrack) {
+      playTrackInternal(curTrack);
     } else {
       setPlaybackStatus("paused");
     }
@@ -353,6 +370,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onPlay = () => setPlaybackStatus("playing");
     const onPause = () => setPlaybackStatus("paused");
     const onEnded = () => {
+      if (repeatModeRef.current === "one") {
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(console.error);
+        }
+        return;
+      }
       setPlaybackStatus("paused");
       nextTrackRef.current();
     };
@@ -686,7 +710,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleShuffle = () => setIsShuffle((prev) => !prev);
-  const toggleRepeat = () => setIsRepeat((prev) => !prev);
   const toggle16x9Aspect = () => setIs16x9Aspect((prev) => !prev);
 
   const toggleQueue = useCallback(() => {
@@ -714,6 +737,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     toastTimeoutRef.current = window.setTimeout(() => {
       setToastMessage(null);
     }, 2800);
+  }, []);
+
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode((prev) => {
+      let next: RepeatMode;
+      if (prev === "off") next = "all";
+      else if (prev === "all") next = "one";
+      else next = "off";
+
+      try {
+        localStorage.setItem("tubify_repeat_mode", next);
+      } catch {}
+
+      return next;
+    });
   }, []);
 
   const clearQueue = useCallback(() => {
@@ -856,6 +894,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isMuted,
         isShuffle,
         isRepeat,
+        repeatMode,
         queue,
         is16x9Aspect,
         isRightDrawerOpen,

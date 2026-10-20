@@ -77,7 +77,9 @@ function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): str
   if (pl.track_count && pl.track_count.trim()) {
     const rawCount = pl.track_count.trim();
     const countText =
-      rawCount.toLowerCase().includes("şarkı") || rawCount.toLowerCase().includes("song")
+      rawCount.toLowerCase().includes("şarkı") ||
+      rawCount.toLowerCase().includes("parça") ||
+      rawCount.toLowerCase().includes("song")
         ? rawCount
         : `${rawCount} şarkı`;
     return `Çalma listesi • ${countText}`;
@@ -113,9 +115,13 @@ function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): str
 function getGridSubtitle(pl: Playlist, userProfileName?: string | null): string {
   if (pl.track_count && pl.track_count.trim()) {
     const rawCount = pl.track_count.trim();
-    return rawCount.toLowerCase().includes("şarkı") || rawCount.toLowerCase().includes("song")
-      ? rawCount
-      : `${rawCount} şarkı`;
+    const countText =
+      rawCount.toLowerCase().includes("şarkı") ||
+      rawCount.toLowerCase().includes("parça") ||
+      rawCount.toLowerCase().includes("song")
+        ? rawCount
+        : `${rawCount} şarkı`;
+    return countText;
   }
 
   try {

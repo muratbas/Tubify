@@ -241,7 +241,57 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Mini modda: Üst sekmeler (`Ana Sayfa`, `Ara`) yazısız, ortalanmış simgelere küçülür; Kitaplık başlığı yerini genişletme butonuna bırakır.
       - Çalma listeleri dikey tek sütun halinde `48x48px` (`w-12 h-12 rounded-xl`) kare kapaklar olarak listelenir; aktif çalma listesi kırmızı halka (`ring-2 ring-[#ff0000]`) ile vurgulanır.
       - `CustomTooltip.tsx` modülüne sağ yön (`data-tooltip-side="right"`) desteği eklenerek mini modda kapakların ve ikonların üzerine gelindiğinde sağ tarafta akıcı ve şık kayan tooltip gösterilmesi sağlandı.
-  - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 30:** Context Menu "Çalma Listesine Ekle" İşlevinin InnerTube API ile Gerçekten Çalıştırılması (Bug Fix):
+    - **1. InnerTube `browse/edit_playlist` Endpoint Entegrasyonu:**
+      - Rust backend `src-tauri/src/auth.rs` ve `src-tauri/src/lib.rs` içerisine `add_track_to_playlist(playlist_id, video_id)` fonksiyonu ve IPC komutu eklendi.
+      - YouTube Music InnerTube `https://music.youtube.com/youtubei/v1/browse/edit_playlist` endpoint'ine `Cookie`, `Authorization: SAPISIDHASH`, `X-Origin`, `X-YouTube-Client-Name: 67` yetkilendirme başlıklarıyla POST isteği (`ACTION_ADD_VIDEO`, `addedVideoId`, `DEDUPE_OPTION_CHECK`) atılması sağlandı.
+      - Web dev modu için `vite.config.ts` içerisine `/api/playlist/add-track` fallback proxy middleware'i eklendi.
+    - **2. `playlistId` İçindeki `"VL"` Ön Ekinin Temizlenmesi:**
+      - Hem Rust backend (`strip_prefix("VL")`) hem de frontend IPC köprüsünde (`src/services/api.ts` ve `App.tsx`) `playlistId`'nin başında bulunan `"VL"` ön eki temizlenerek (`cleanPlaylistId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId`) InnerTube'a saf liste kimliği (`PL...`) gönderilmesi güvenceye alındı.
+    - **3. "Beğenilen Şarkılar" Özel Durumu:**
+      - Alt menünün en üstündeki `Beğenilen Şarkılar` (`liked`, `LM`, `VLLM`) seçildiğinde `browse/edit_playlist` yerine `toggle_yt_like` (`/youtubei/v1/like/like`) çağrılarak YouTube Music beğeni sistemiyle tam senkronizasyon sağlandı.
+    - **4. State, UI & Sidebar Anında Senkronizasyon:**
+      - Şarkı listeye eklendiğinde `playlists` state'i anında güncellenerek sol menüdeki ilgili listenin şarkı sayısı anında arttırıldı (`0 parça` / `0 şarkı` hemen `1 şarkı` olarak güncellenir).
+      - Kullanıcı o anda o listenin içindeyse şarkı anında aktif listeye (`playlistTracks`) eklendi.
+      - `localStorage` önbellek kaydı (`tubify_playlist_tracks_${pl.id}`) fallback olarak güncellendi ve `loadPlaylistTracks` içerisine entegre edildi.
+      - `Sidebar.tsx` içerisinde `parça` ibaresinin `getPlaylistSubtitle` ve `getGridSubtitle` tarafından doğru tanınması sağlandı.
+      - Hata durumunda toast ile kullanıcıya net geri bildirim gösterilmesi sağlandı.
+  - [x] **Aşama 31:** Çalma Listesi İçindeki "Öneriler (Suggestions)" Şarkılarını Ana Listeden Ayırma:
+    - **1. Backend & Parser Ayrımı (`src-tauri/src/auth.rs`):**
+      - `PlaylistTracksResult` struct'ına `#[serde(default)] pub suggestions: Vec<Track>` alanı eklendi.
+      - `fetch_playlist_tracks_page` fonksiyonunda `musicPlaylistShelfRenderer` (gerçek playlist şarkıları) ile ikincil `musicShelfRenderer` (öneriler / tavsiyeler) blokları tamamen ayrıştırıldı.
+      - Sayfalama (continuation) token'ı yalnızca `musicPlaylistShelfRenderer` içinden çekilerek önerilerin continuation token'ıyla çakışması önlendi.
+      - Başlıkta belirtilen şarkı adedi (örn: "1 şarkı") kontrolü ve recursive arama koruması eklenerek gerçek şarkı adedini aşan öğelerin otomatik olarak `suggestions` dizisine aktarılması sağlandı.
+    - **2. Çalma Listesi UI "Öneriler" Bölümü (`PlaylistView.tsx`):**
+      - Ana tablo bittikten hemen sonra `mt-10 mb-8` boşlukla Spotify/YT Music standartlarında "Öneriler" başlığı ve *"Bu çalma listesindeki parçalara göre"* alt metni render edildi.
+      - Başlığın sağında `RotateCw` spinner animasyonlu şık bir "Yenile" (`onRefreshSuggestions`) butonu konumlandırıldı.
+      - Önerilen şarkılarda sıra numarası (`1, 2, 3...`) kaldırıldı; kapak görseli (hover'da oynat/önizle overlay'i ile), şarkı adı, tıklanabilir sanatçı, albüm ve süre bilgisi yerleştirildi.
+      - Satırın en sağına kırmızı hover efektli dairesel "Listeye Ekle" (`+` / `Plus`) butonu eklendi.
+    - **3. Tek Tıkla Listeye Ekleme & Kuyruk (Queue) Kuralı (`App.tsx`):**
+      - Öneriler satırındaki `+` butonuna basıldığında Optimistic UI ile şarkı anında `suggestions` listesinden çıkartılıp ana `tracks` tablosuna eklendi, toplam şarkı sayısı `+1` güncellendi ve `addTrackToPlaylist` (`ACTION_ADD_VIDEO`) API isteği arka planda çalıştırıldı.
+      - Oynat (`Play`) veya Karışık Çal (`Shuffle`) butonları yalnızca gerçek `activePlaylistTracks` dizisini kuyruğa ekleyecek şekilde korundu; öneriler listeye eklenmedikçe çalma listesi kuyruğuna dahil edilmez.
+    - **4. SectionListRenderer Continuation ile Önerilerin Çekilmesi (Bug Fix):**
+      - YouTube Music'in öneriler rafını (`musicShelfRenderer`) ilk browse yanıtına doğrudan gömmek yerine `sectionListRenderer.continuations` token'ı altında sunduğu tespit edildi.
+      - `fetch_playlist_tracks_page` içine ikincil `sectionListRenderer` continuation çözümleyicisi eklenerek `Öneriler` rafı otomatik olarak çekildi ve `suggestions` dizisine aktarıldı.
+    - **5. Context Menu: "Bu Çalma Listesinden Kaldır" Eylemi (`TrackContextMenu.tsx` & Backend):**
+      - `search.rs` ve `music.ts` `Track` modeline `set_video_id` (`playlistItemData.playlistSetVideoId`) alanı entegre edildi.
+      - Rust backend `remove_track_from_playlist` (`ACTION_REMOVE_VIDEO`, `setVideoId`, `removedVideoId`) fonksiyonu ve IPC komutu yazıldı.
+      - Kullanıcı bir çalma listesini görüntülerken sağ tık menüsüne kırmızı çöp kutusu ikonlu (`Trash2`) **"Bu Çalma Listesinden Kaldır"** seçeneği eklendi.
+      - Tıklandığında Optimistic UI ile şarkı anında tablodan silinir, şarkı sayısı `-1` düşürülür ve `localStorage` önbelleği güncellenir.
+  - [x] **Aşama 32:** Alt Player Bar İyileştirmeleri (Hover Genişleme Düzeltmesi, Cihaz Butonu Temizliği ve 2-Kademeli Loop Döngüsü):
+    - **1. Playerbar & Volume Bar Hover Büyümesinin Kaldırılması:**
+      - Timeline ilerleme çubuğu ve ses seviyesi çubuğunun üzerine fareyle gelindiğinde tetiklenen `group-hover:h-1.5` ve `transition-all` kaldırıldı; her iki çubuk da zarif, sabit `h-1` yüksekliğinde tutuldu.
+    - **2. "Bir Cihaza Bağlan" Butonunun Kaldırılması:**
+      - Alt oynatıcı barının sağ tarafındaki kullanılmayan TV ekranı ikonlu (`Tv`) "Bir cihaza bağlan" butonu ve gereksiz importlar DOM'dan tamamen temizlendi.
+    - **3. 2-Kademeli Gelişmiş Tekrar (Repeat / Loop) Döngüsü (`off` $\to$ `all` $\to$ `one` $\to$ `off`):**
+      - `RepeatMode` (`"off" | "all" | "one"`) türü tanımlandı; tercih `localStorage` (`tubify_repeat_mode`) içine bağlandı.
+      - **1. Kademe (Tümünü Tekrarla - `all`):** İlk basışta buton kırmızı (`#ff0000`) ve `Repeat` ikonu olur; çalan çalma listesi/albüm sırası (queue) bittiğinde otomatik olarak listenin başına dönüp oynatmaya devam eder (ekranda gereksiz toast bildirimi çıkmaz).
+      - **2. Kademe (Tek Parçayı Tekrarla - `one`):** İkinci basışta ikon ortasında "1" bulunan `Repeat1` ikonuna dönüşür ve kırmızı renkte kalır; çalan şarkı bittiğinde (`onEnded`) şarkı anında başa sarıp (`currentTime = 0; audio.play()`) aynı parçayı kesintisiz tekrarlar.
+      - **3. Kademe (Tekrar Kapalı - `off`):** Üçüncü basışta tekrar devre dışı kalır, ikon gri standart `Repeat` ikonuna geri döner.
+    - **4. Tooltip Gecikmesi & Sakin Hover Davranışı (1 Saniye):**
+      - `CustomTooltip.tsx` tetiklenme gecikmesi 160ms'den 1000ms'ye (tam 1 saniye) çıkarıldı. Kullanıcı fareyi butonun üzerinde bilinçli olarak 1 saniye bekletmediği sürece arayüzde baloncuklar parlamaz.
+  - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+

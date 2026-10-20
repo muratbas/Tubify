@@ -34,6 +34,8 @@ pub struct HomeSection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistTracksResult {
     pub tracks: Vec<Track>,
+    #[serde(default)]
+    pub suggestions: Vec<Track>,
     pub continuation: Option<String>,
     pub track_count: Option<String>,
 }
@@ -389,6 +391,11 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
             })
         });
 
+    let set_video_id = mrlir
+        .pointer("/playlistItemData/playlistSetVideoId")
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string());
+
     Some(Track {
         id: video_id,
         title,
@@ -399,6 +406,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         duration,
         thumbnail,
         is_explicit,
+        set_video_id,
     })
 }
 
@@ -516,6 +524,7 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
         duration,
         thumbnail,
         is_explicit,
+        set_video_id: None,
     })
 }
 
@@ -704,6 +713,43 @@ pub async fn fetch_user_playlists() -> Result<Vec<Playlist>, String> {
     Ok(playlists)
 }
 
+fn parse_number_from_track_count(text: &str) -> Option<usize> {
+    let digits: String = text
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == ',' || *c == ' ')
+        .filter(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse::<usize>().ok()
+}
+
+fn collect_suggestions_recursive(
+    value: &serde_json::Value,
+    suggestions: &mut Vec<Track>,
+    seen_suggestions: &mut std::collections::HashSet<String>,
+    seen_tracks: &std::collections::HashSet<String>,
+) {
+    if let Some(obj) = value.as_object() {
+        if let Some(msr) = obj.get("musicShelfRenderer") {
+            let mut shelf_tracks = Vec::new();
+            let mut shelf_seen = std::collections::HashSet::new();
+            collect_tracks_recursive(msr, &mut shelf_tracks, &mut shelf_seen);
+            for t in shelf_tracks {
+                if !seen_tracks.contains(&t.id) && seen_suggestions.insert(t.id.clone()) {
+                    suggestions.push(t);
+                }
+            }
+            return;
+        }
+        for (_, child) in obj {
+            collect_suggestions_recursive(child, suggestions, seen_suggestions, seen_tracks);
+        }
+    } else if let Some(arr) = value.as_array() {
+        for child in arr {
+            collect_suggestions_recursive(child, suggestions, seen_suggestions, seen_tracks);
+        }
+    }
+}
+
 pub async fn fetch_playlist_tracks_page(
     playlist_id: &str,
     continuation_token: Option<&str>,
@@ -756,6 +802,7 @@ pub async fn fetch_playlist_tracks_page(
 
         return Ok(PlaylistTracksResult {
             tracks,
+            suggestions: Vec::new(),
             continuation: next_continuation,
             track_count: None,
         });
@@ -800,10 +847,59 @@ pub async fn fetch_playlist_tracks_page(
         .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
 
     let mut tracks = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    collect_tracks_recursive(&json, &mut tracks, &mut seen);
+    let mut seen_tracks = std::collections::HashSet::new();
+    let mut seen_suggestions = std::collections::HashSet::new();
 
-    let next_continuation = extract_continuation_token(&json);
+    let (next_continuation, mut suggestions) = if let Some(playlist_shelf) = find_renderer(&json, &["musicPlaylistShelfRenderer"]) {
+        collect_tracks_recursive(playlist_shelf, &mut tracks, &mut seen_tracks);
+        let cont = extract_continuation_token(playlist_shelf);
+        let mut sugg = Vec::new();
+        collect_suggestions_recursive(&json, &mut sugg, &mut seen_suggestions, &seen_tracks);
+        (cont, sugg)
+    } else {
+        collect_tracks_recursive(&json, &mut tracks, &mut seen_tracks);
+        (extract_continuation_token(&json), Vec::new())
+    };
+
+    // If suggestions are not directly embedded, YouTube Music delivers them via sectionListRenderer continuation
+    if suggestions.is_empty() {
+        let sec_token_opt = json
+            .pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/continuations/0/nextContinuationData/continuation")
+            .or_else(|| json.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/continuations/0/nextContinuationData/continuation"))
+            .or_else(|| json.pointer("/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/continuations/0/nextContinuationData/continuation"))
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                if let Some(slr) = find_renderer(&json, &["sectionListRenderer"]) {
+                    slr.pointer("/continuations/0/nextContinuationData/continuation").and_then(|v| v.as_str())
+                } else {
+                    None
+                }
+            });
+
+        if let Some(sec_token) = sec_token_opt {
+            if let Ok(cont_url) = reqwest::Url::parse_with_params(
+                "https://music.youtube.com/youtubei/v1/browse",
+                &[("continuation", sec_token), ("ctoken", sec_token)],
+            ) {
+                let cont_payload = serde_json::json!({
+                    "context": {
+                        "client": {
+                            "clientName": "WEB_REMIX",
+                            "clientVersion": "1.20240401.01.00",
+                            "hl": "tr",
+                            "gl": "TR"
+                        }
+                    }
+                });
+
+                if let Ok(res) = client.post(cont_url).json(&cont_payload).send().await {
+                    if let Ok(sugg_json) = res.json::<serde_json::Value>().await {
+                        collect_suggestions_recursive(&sugg_json, &mut suggestions, &mut seen_suggestions, &seen_tracks);
+                    }
+                }
+            }
+        }
+    }
 
     // Extract total track count from playlist header
     let mut track_count = None;
@@ -835,8 +931,22 @@ pub async fn fetch_playlist_tracks_page(
         }
     }
 
+    // Safety check: If playlist header explicitly declares N tracks (e.g. "1 şarkı")
+    // and tracks.len() > N while suggestions is empty, split the excess into suggestions.
+    if let Some(expected_count) = track_count.as_deref().and_then(parse_number_from_track_count) {
+        if tracks.len() > expected_count && suggestions.is_empty() {
+            let remaining = tracks.split_off(expected_count);
+            for t in remaining {
+                if seen_suggestions.insert(t.id.clone()) {
+                    suggestions.push(t);
+                }
+            }
+        }
+    }
+
     Ok(PlaylistTracksResult {
         tracks,
+        suggestions,
         continuation: next_continuation,
         track_count,
     })
@@ -1443,6 +1553,135 @@ pub async fn delete_playlist(playlist_id: &str) -> Result<(), String> {
     if !res.status().is_success() {
         let err_text = res.text().await.unwrap_or_default();
         return Err(format!("Silme işlemi başarısız: {}", err_text));
+    }
+
+    Ok(())
+}
+
+pub async fn add_track_to_playlist(playlist_id: &str, video_id: &str) -> Result<(), String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış".to_string())?;
+        (session.cookie.clone(), session.sapisid.clone())
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let clean_id = playlist_id.strip_prefix("VL").unwrap_or(playlist_id);
+    let url = "https://music.youtube.com/youtubei/v1/browse/edit_playlist";
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "playlistId": clean_id,
+        "actions": [
+            {
+                "action": "ACTION_ADD_VIDEO",
+                "addedVideoId": video_id,
+                "dedupeOption": "DEDUPE_OPTION_CHECK"
+            }
+        ]
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Çalma listesine ekleme isteği gönderilemedi: {}", e))?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("Çalma listesine eklenemedi: {}", err_text));
+    }
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("JSON ayrıştırılamadı: {}", e))?;
+
+    if let Some(err) = json.get("error") {
+        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Bilinmeyen hata");
+        return Err(format!("YouTube Music hatası: {}", msg));
+    }
+
+    if let Some(status) = json.get("status").and_then(|v| v.as_str()) {
+        if status != "STATUS_SUCCEEDED" {
+            return Err(format!("İşlem başarısız: {}", status));
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn remove_track_from_playlist(
+    playlist_id: &str,
+    video_id: &str,
+    set_video_id: Option<&str>,
+) -> Result<(), String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış".to_string())?;
+        (session.cookie.clone(), session.sapisid.clone())
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let clean_id = playlist_id.strip_prefix("VL").unwrap_or(playlist_id);
+    let url = "https://music.youtube.com/youtubei/v1/browse/edit_playlist";
+
+    let mut action_obj = serde_json::json!({
+        "action": "ACTION_REMOVE_VIDEO",
+        "removedVideoId": video_id
+    });
+    if let Some(svid) = set_video_id {
+        action_obj["setVideoId"] = serde_json::Value::String(svid.to_string());
+    }
+
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "playlistId": clean_id,
+        "actions": [action_obj]
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Çalma listesinden kaldırma isteği gönderilemedi: {}", e))?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("Çalma listesinden kaldırılamadı: {}", err_text));
+    }
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("JSON ayrıştırılamadı: {}", e))?;
+
+    if let Some(err) = json.get("error") {
+        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Bilinmeyen hata");
+        return Err(format!("YouTube Music hatası: {}", msg));
+    }
+
+    if let Some(status) = json.get("status").and_then(|v| v.as_str()) {
+        if status != "STATUS_SUCCEEDED" {
+            return Err(format!("İşlem başarısız: {}", status));
+        }
     }
 
     Ok(())

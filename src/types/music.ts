@@ -9,10 +9,12 @@ export interface Track {
   thumbnail?: string | null;
   is_explicit?: boolean | null;
   added_at?: string | null;
+  set_video_id?: string | null;
 }
 
 export interface PlaylistTracksResult {
   tracks: Track[];
+  suggestions?: Track[];
   continuation?: string | null;
   track_count?: string | null;
 }
@@ -78,3 +80,5 @@ export type RightDrawerTab = "nowPlaying" | "queue" | "lyrics";
 export type QueueViewMode = "closed" | "mini" | "expanded";
 
 export type MoodCategory = "all" | "relax" | "energize" | "focus" | "workout" | "commute";
+
+export type RepeatMode = "off" | "all" | "one";

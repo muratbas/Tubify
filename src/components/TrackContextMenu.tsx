@@ -9,9 +9,11 @@ import {
   User,
   Disc,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
+import { addTrackToPlaylist } from "../services/api";
 import type { Track, Playlist } from "../types/music";
 
 export interface ContextMenuPosition {
@@ -31,6 +33,8 @@ export interface TrackContextMenuProps {
     thumbnail?: string
   ) => void;
   playlists?: Playlist[];
+  onAddToPlaylist?: (pl: Playlist | "liked", track: Track) => Promise<void> | void;
+  onRemoveFromPlaylist?: (track: Track) => Promise<void> | void;
 }
 
 function getClampedPosition(pos: ContextMenuPosition | null) {
@@ -61,6 +65,8 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
   onNavigateArtist,
   onNavigateAlbum,
   playlists = [],
+  onAddToPlaylist,
+  onRemoveFromPlaylist,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -147,13 +153,25 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
     onClose();
   };
 
-  const handleAddToPlaylist = (pl: Playlist | "liked") => {
-    if (pl === "liked") {
+  const handleAddToPlaylist = async (pl: Playlist | "liked") => {
+    onClose();
+    if (onAddToPlaylist) {
+      await onAddToPlaylist(pl, track);
+      return;
+    }
+
+    if (pl === "liked" || pl.id === "LM" || pl.id === "VLLM") {
       player.toggleLike(track, true);
       player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
-    } else {
+      return;
+    }
+
+    try {
+      const cleanPlaylistId = pl.id.startsWith("VL") ? pl.id.slice(2) : pl.id;
+      await addTrackToPlaylist(cleanPlaylistId, track.id);
+
+      const key = `tubify_playlist_tracks_${pl.id}`;
       try {
-        const key = `tubify_playlist_tracks_${pl.id}`;
         const existingRaw = localStorage.getItem(key);
         const existing: Track[] = existingRaw ? JSON.parse(existingRaw) : [];
         if (!existing.some((t) => t.id === track.id)) {
@@ -167,13 +185,13 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           });
           localStorage.setItem(key, JSON.stringify(existing));
         }
-        player.showToast(`"${track.title}", "${pl.title}" listesine eklendi`);
-      } catch (e) {
-        console.error("Failed to add track to playlist storage:", e);
-        player.showToast(`"${pl.title}" listesine eklendi`);
-      }
+      } catch {}
+
+      player.showToast(`"${track.title}", "${pl.title}" listesine eklendi`);
+    } catch (e: any) {
+      console.error("Failed to add track to playlist:", e);
+      player.showToast(`Listeye eklenemedi: ${e?.message || e}`);
     }
-    onClose();
   };
 
   const handleGoArtist = () => {
@@ -199,6 +217,12 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
     navigator.clipboard?.writeText(`https://music.youtube.com/watch?v=${track.id}`);
     player.showToast("Şarkı bağlantısı panoya kopyalandı");
     onClose();
+  };
+
+  const handleRemoveFromPlaylist = async () => {
+    if (!track || !onRemoveFromPlaylist) return;
+    onClose();
+    await onRemoveFromPlaylist(track);
   };
 
   return (
@@ -331,6 +355,21 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           </div>
         )}
       </div>
+
+      {/* Remove from this Playlist */}
+      {onRemoveFromPlaylist && (
+        <button
+          onClick={handleRemoveFromPlaylist}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left cursor-pointer ${
+            isLight
+              ? "hover:bg-red-50 text-red-600"
+              : "hover:bg-red-500/10 text-red-400"
+          }`}
+        >
+          <Trash2 className="w-4 h-4 shrink-0 text-[#ff0000]" />
+          <span>Bu Çalma Listesinden Kaldır</span>
+        </button>
+      )}
 
       <div className={`h-[1px] my-1 ${isLight ? "bg-neutral-200" : "bg-white/[0.08]"}`} />
 

@@ -50,7 +50,7 @@ export const CustomTooltip: FC = () => {
 
       if (timerRef.current) window.clearTimeout(timerRef.current);
 
-      // Fast, snappy delay (160ms) to feel responsive without flashing during fast mouse movement
+      // 1-second delay so tooltips only show when intentionally hovering for 1s
       timerRef.current = window.setTimeout(() => {
         if (!activeElRef.current) return;
 
@@ -75,7 +75,7 @@ export const CustomTooltip: FC = () => {
           side: preferredSide,
           visible: true,
         });
-      }, 160);
+      }, 1000);
     };
 
     const handleMouseOut = (e: MouseEvent) => {
