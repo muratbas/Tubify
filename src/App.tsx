@@ -1199,10 +1199,11 @@ export const App: FC = () => {
                 playlists={playlists}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
-                onPlayTrack={(t) => player.playTrack(t, [...player.recentTracks, ...INITIAL_RECOMMENDED])}
+                onPlayTrack={(t, list) => player.playTrack(t, list || [...player.recentTracks, ...INITIAL_RECOMMENDED])}
                 onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
                 onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
                 onNavigateArtist={handleNavigateArtist}
+                onNavigateAlbum={handleNavigateAlbum}
                 onContextMenuTrack={handleOpenContextMenu}
                 onScroll={handleViewScroll}
               />

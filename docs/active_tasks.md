@@ -333,11 +333,19 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - **Kitaplık:** `Library` ikonu — *"Koleksiyonun & listelerin"*
       - **Göz At:** `Compass` ikonu — *"Türler, ruh halleri & listeler"*
       - **İndirilenler:** `ArrowDownToLine` ikonu — *"Çevrimdışı müzikler"*
-  - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 35:** "Son dinledikleriniz" Başlığı ve YouTube Music 5 Rafının Birebir Eklenmesi:
+    - **1. "Son dinledikleriniz" Başlığı:**
+      - Hızlı Erişim Kartları (Quick Access Hub) altındaki 6 dikey parça kartının üstüne `"Son dinledikleriniz"` başlığı eklendi (`text-xl font-bold tracking-tight mb-4`).
+    - **2. "Kitaplığınızdan" Altına YouTube Music Ekran Görüntülerindeki 5 Bölümün Eklenmesi:**
+      - **Sizin için önerilen albümler:** Dream is Destiny, Les, Graduation, Mets, Rebel, good kid m.A.A.d. city albümleri; `< >` kaydırma butonları, kapaklar, albüm/EP rozetleri, sanatçı isimleri ve albüm sayfasına yönlendirme (`onNavigateAlbum`) desteği.
+      - **Unutulan favoriler:** Highest in the room, Goosebumps slowed, Sertab Erener Olsun, BodyPartz parçaları; 16:9 yatay video kartları, ortalanmış play butonu ve YouTube Music görüntülenme/oynatıldı sayaçları.
+      - **Yeni keşifler ve eski favoriler:** Beğendiğim müzikler (mor/pembe başparmak degrade kartı), Karışık Keşif Listeniz, Tekrar Mix'i, Arşivden Şarkılar özel miks kartları ve sanatçı listeleri.
+      - **Sizin için seçilen trend şarkılar:** 4 satırlı yatay kayan sütun ızgarası (`grid grid-rows-4 grid-flow-col`), `"Tümünü oynat"` butonu, `< >` kontrolleri, parça dinlenme sayıları ve albüm bilgileri (03' Bonnie & Clyde, Beni öldüren atışlar, The Forgiveness Chant, Kal Be Gönlüm, François Besse, Akila, Romenzo Criminale, Housewife, Dayanamıyorum, MADARA vb.).
+      - **Günlük keşif:** Tyler Ring Ring Ring, Strawberry Guy Without You, Nurettin Rençber Söyle Sunam, Ati242 25, No.1 Uslandım, Sakin Bu Defa parçaları; `"Tümünü oynat"`, kare kapaklar, sansür/Explicit rozetleri ve dinlenme sayıları.
+    - **3. Oynatma ve Etkileşim:**
+      - Eklenen tüm şarkı ve videolar için gerçek YouTube ID'leri bağlandı; tıklandığında alt oynatıcıda kuyruk oluşturarak doğrudan çalma sağlandı.
+    - **4. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
-
-
-
-
