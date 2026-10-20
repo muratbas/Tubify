@@ -26,9 +26,30 @@ pub struct Playlist {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HomeItem {
+    pub id: String,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub thumbnail: Option<String>,
+    pub item_type: String, // "album" | "playlist" | "track" | "radio"
+    pub aspect_ratio: Option<String>, // "1:1" | "16:9"
+    pub explicit: bool,
+    pub video_id: Option<String>,
+    pub playlist_id: Option<String>,
+    pub browse_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HomeSection {
     pub title: String,
-    pub tracks: Vec<Track>,
+    pub strapline: Option<String>,
+    pub items: Vec<HomeItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HomeFeedResult {
+    pub sections: Vec<HomeSection>,
+    pub continuation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1748,4 +1769,438 @@ pub async fn open_login_webview(app: AppHandle) -> Result<(), String> {
     });
 
     Ok(())
+}
+
+pub fn parse_home_two_row_item(card: &serde_json::Value) -> Option<HomeItem> {
+    let mut title = card
+        .pointer("/title/runs/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if title.is_empty() {
+        if let Some(runs) = card.pointer("/title/runs").and_then(|v| v.as_array()) {
+            title = runs.iter().filter_map(|r| r.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join("");
+        }
+    }
+    if title.is_empty() {
+        return None;
+    }
+
+    let mut subtitle = None;
+    if let Some(runs) = card.pointer("/subtitle/runs").and_then(|v| v.as_array()) {
+        let parts: Vec<&str> = runs.iter().filter_map(|r| r.get("text").and_then(|t| t.as_str())).collect();
+        if !parts.is_empty() {
+            subtitle = Some(parts.join(""));
+        }
+    }
+
+    let browse_id = card
+        .pointer("/navigationEndpoint/browseEndpoint/browseId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let video_id = card
+        .pointer("/navigationEndpoint/watchEndpoint/videoId")
+        .or_else(|| card.pointer("/onTap/watchEndpoint/videoId"))
+        .or_else(|| card.pointer("/thumbnailOverlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint/videoId"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let playlist_id = card
+        .pointer("/navigationEndpoint/watchEndpoint/playlistId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let mut thumbnail = card
+        .pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails")
+        .or_else(|| card.pointer("/thumbnailRenderer/croppedSquareThumbnailRenderer/thumbnail/thumbnails"))
+        .or_else(|| card.pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails"))
+        .or_else(|| card.pointer("/thumbnail/thumbnails"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.last())
+        .and_then(|t| t.get("url"))
+        .and_then(|u| u.as_str())
+        .map(|s| s.to_string());
+
+    if let Some(ref mut thumb) = thumbnail {
+        if thumb.starts_with("//") {
+            *thumb = format!("https:{}", thumb);
+        }
+    }
+
+    let aspect_str = card.get("aspectRatio").and_then(|v| v.as_str()).unwrap_or("");
+    let sub_str = subtitle.as_deref().unwrap_or("").to_lowercase();
+    let is_16_9 = aspect_str.contains("16_9") || aspect_str.contains("RECTANGLE") || sub_str.contains("görüntüleme") || sub_str.contains("oynatıldı");
+    let aspect_ratio = if is_16_9 { Some("16:9".to_string()) } else { Some("1:1".to_string()) };
+
+    let explicit = card.pointer("/subtitleBadges").is_some() || card.pointer("/badges").is_some();
+
+    let item_type = if let Some(ref bid) = browse_id {
+        if bid.starts_with("MPREb_") || bid.starts_with("OLAK5uy_") || sub_str.contains("albüm") || sub_str.contains("ep") || sub_str.contains("album") {
+            "album".to_string()
+        } else if bid.starts_with("VL") || bid.starts_with("PL") || bid.starts_with("RD") || sub_str.contains("liste") || sub_str.contains("playlist") {
+            "playlist".to_string()
+        } else if bid.starts_with("UC") || bid.starts_with("FEmusic_artist") {
+            "artist".to_string()
+        } else if video_id.is_some() {
+            "track".to_string()
+        } else {
+            "playlist".to_string()
+        }
+    } else if video_id.is_some() {
+        "track".to_string()
+    } else {
+        "playlist".to_string()
+    };
+
+    let id = video_id.clone().or_else(|| browse_id.clone()).unwrap_or_else(|| title.clone());
+
+    Some(HomeItem {
+        id,
+        title,
+        subtitle,
+        thumbnail,
+        item_type,
+        aspect_ratio,
+        explicit,
+        video_id,
+        playlist_id,
+        browse_id,
+    })
+}
+
+pub fn parse_home_responsive_item(mrlir: &serde_json::Value) -> Option<HomeItem> {
+    let video_id = mrlir
+        .pointer("/playlistItemData/videoId")
+        .or_else(|| {
+            mrlir.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
+        })
+        .or_else(|| {
+            mrlir.pointer("/doubleTapEndpoint/watchEndpoint/videoId")
+        })
+        .or_else(|| {
+            mrlir.pointer("/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint/videoId")
+        })
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string());
+
+    let mut title = mrlir
+        .pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if title.is_empty() {
+        if let Some(runs) = mrlir.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs").and_then(|v| v.as_array()) {
+            title = runs.iter().filter_map(|r| r.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join("");
+        }
+    }
+
+    if title.is_empty() {
+        return None;
+    }
+
+    let mut subtitle = None;
+    if let Some(runs) = mrlir
+        .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
+        .and_then(|v| v.as_array())
+    {
+        let parts: Vec<&str> = runs.iter().filter_map(|r| r.get("text").and_then(|t| t.as_str())).collect();
+        if !parts.is_empty() {
+            subtitle = Some(parts.join(""));
+        }
+    }
+
+    let mut thumbnail = mrlir
+        .pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails")
+        .or_else(|| mrlir.pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails"))
+        .or_else(|| mrlir.pointer("/thumbnail/thumbnails"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.last())
+        .and_then(|t| t.get("url"))
+        .and_then(|u| u.as_str())
+        .map(|v| v.to_string());
+
+    if let Some(ref mut thumb) = thumbnail {
+        if thumb.starts_with("//") {
+            *thumb = format!("https:{}", thumb);
+        }
+    }
+
+    let explicit = mrlir.pointer("/badges").is_some() || mrlir.pointer("/subtitleBadges").is_some();
+    let id = video_id.clone().unwrap_or_else(|| title.clone());
+
+    Some(HomeItem {
+        id,
+        title,
+        subtitle,
+        thumbnail,
+        item_type: "track".to_string(),
+        aspect_ratio: Some("1:1".to_string()),
+        explicit,
+        video_id,
+        playlist_id: None,
+        browse_id: None,
+    })
+}
+
+pub fn parse_home_sections(contents: &[serde_json::Value]) -> Vec<HomeSection> {
+    let mut sections = Vec::new();
+    for sec in contents {
+        let shelf = sec.get("musicCarouselShelfRenderer").or_else(|| sec.get("musicShelfRenderer"));
+        if let Some(c) = shelf {
+            let mut title = c
+                .pointer("/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0/text")
+                .or_else(|| c.pointer("/title/runs/0/text"))
+                .or_else(|| c.pointer("/header/musicShelfBasicHeaderRenderer/title/runs/0/text"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            if title.is_empty() {
+                if let Some(runs) = c.pointer("/header/musicCarouselShelfBasicHeaderRenderer/title/runs").and_then(|v| v.as_array()) {
+                    title = runs.iter().filter_map(|r| r.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join("");
+                }
+            }
+
+            if title.is_empty() {
+                continue;
+            }
+
+            let strapline = c
+                .pointer("/header/musicCarouselShelfBasicHeaderRenderer/strapline/runs/0/text")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let title_lower = title.to_lowercase();
+            let strapline_lower = strapline.as_deref().unwrap_or("").to_lowercase();
+
+            // 1. Filter "Birlikte dinleyin" / "Listen together" / Stations
+            let is_listen_together = title_lower.contains("birlikte dinle")
+                || title_lower.contains("listen together")
+                || strapline_lower.contains("istasyon")
+                || strapline_lower.contains("station");
+            if is_listen_together {
+                continue;
+            }
+
+            // 2. Filter "Sizin için önerilen müzik videoları" / "Recommended music videos"
+            let is_music_videos = title_lower.contains("müzik video")
+                || title_lower.contains("music video")
+                || (title_lower.contains("video") && title_lower.contains("öner"))
+                || (title_lower.contains("video") && title_lower.contains("recommend"));
+            if is_music_videos {
+                continue;
+            }
+
+            // 3. Filter "Yeni keşifler ve eski favoriler" / "Mixed for you"
+            let is_mixed_for_you = title_lower.contains("yeni keşifler")
+                || title_lower.contains("mixed for you")
+                || (title_lower.contains("keşif") && title_lower.contains("favori"))
+                || (title_lower.contains("discover") && title_lower.contains("favorite"));
+            if is_mixed_for_you {
+                continue;
+            }
+
+            let mut items = Vec::new();
+            if let Some(raw_items) = c.get("contents").and_then(|v| v.as_array()) {
+                for it in raw_items {
+                    if let Some(card) = it.get("musicTwoRowItemRenderer") {
+                        if let Some(home_item) = parse_home_two_row_item(card) {
+                            items.push(home_item);
+                        }
+                    } else if let Some(mrlir) = it.get("musicResponsiveListItemRenderer") {
+                        if let Some(home_item) = parse_home_responsive_item(mrlir) {
+                            items.push(home_item);
+                        }
+                    }
+                }
+            }
+
+            // Structural check 1: Personalized mixes (VLRDTMAK5uy_)
+            if items.iter().any(|it| it.browse_id.as_deref().map(|id| id.starts_with("VLRDTMAK5uy_")).unwrap_or(false)) {
+                continue;
+            }
+
+            // Structural check 2: Music video shelves (16:9 videos)
+            if !items.is_empty() && items.iter().all(|it| it.aspect_ratio.as_deref() == Some("16:9")) && (title_lower.contains("video") || title_lower.contains("klip")) {
+                continue;
+            }
+
+            // Structural check 3: Stations
+            if items.iter().any(|it| it.title.to_lowercase().contains("station") || it.title.to_lowercase().contains("istasyon")) {
+                continue;
+            }
+
+            // Filter out "Beğendiğim müzikler" (Liked songs) from "Yeniden dinleyin" (Listen again) shelf
+            let is_listen_again_shelf = title_lower.contains("yeniden dinle")
+                || title_lower.contains("listen again")
+                || c.pointer("/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0/navigationEndpoint/browseEndpoint/browseId")
+                    .and_then(|v| v.as_str())
+                    .map(|id| id == "FEmusic_listen_again")
+                    .unwrap_or(false);
+
+            if is_listen_again_shelf {
+                items.retain(|it| {
+                    let is_liked_id = it.id == "VLLM"
+                        || it.id == "LM"
+                        || it.browse_id.as_deref() == Some("VLLM")
+                        || it.browse_id.as_deref() == Some("LM")
+                        || it.browse_id.as_deref() == Some("FEmusic_liked");
+                    let it_title_lower = it.title.to_lowercase();
+                    let is_liked_title = it_title_lower.contains("beğendiğim müzik")
+                        || it_title_lower.contains("liked songs")
+                        || it_title_lower.contains("beğenilenler");
+                    !is_liked_id && !is_liked_title
+                });
+            }
+
+            if !items.is_empty() {
+                sections.push(HomeSection {
+                    title,
+                    strapline,
+                    items,
+                });
+            }
+        }
+    }
+    sections
+}
+
+pub async fn fetch_home_feed(continuation: Option<&str>) -> Result<HomeFeedResult, String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        if let Some(s) = lock.as_ref() {
+            (s.cookie.clone(), s.sapisid.clone())
+        } else {
+            ("".to_string(), None)
+        }
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let (sections, next_continuation) = if let Some(token) = continuation {
+        let cont_url = reqwest::Url::parse_with_params(
+            "https://music.youtube.com/youtubei/v1/browse",
+            &[("continuation", token), ("ctoken", token)],
+        ).map_err(|e| e.to_string())?;
+
+        let cont_payload = serde_json::json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": "1.20240401.01.00",
+                    "hl": "tr",
+                    "gl": "TR"
+                }
+            }
+        });
+
+        let res = client
+            .post(cont_url)
+            .json(&cont_payload)
+            .send()
+            .await
+            .map_err(|e| format!("Ağ hatası: {}", e))?;
+
+        let next_json: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
+
+        let raw_sections = next_json
+            .pointer("/continuationContents/sectionListContinuation/contents")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let parsed = parse_home_sections(&raw_sections);
+        let next_cont = next_json
+            .pointer("/continuationContents/sectionListContinuation/continuations/0/nextContinuationData/continuation")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        (parsed, next_cont)
+    } else {
+        let url = "https://music.youtube.com/youtubei/v1/browse";
+        let payload = serde_json::json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": "1.20240401.01.00",
+                    "hl": "tr",
+                    "gl": "TR"
+                }
+            },
+            "browseId": "FEmusic_home"
+        });
+
+        let res = client
+            .post(url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("Ağ hatası: {}", e))?;
+
+        let json: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| format!("Ayrıştırma hatası: {}", e))?;
+
+        let raw_sections = json
+            .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let mut parsed = parse_home_sections(&raw_sections);
+        let mut next_cont = json
+            .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/continuations/0/nextContinuationData/continuation")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        // Proactive continuation fetch: On initial load, fetch the second batch immediately
+        // so user receives 5-7 shelves right away without waiting!
+        if let Some(ref token) = next_cont.clone() {
+            if let Ok(cont_url) = reqwest::Url::parse_with_params(
+                "https://music.youtube.com/youtubei/v1/browse",
+                &[("continuation", token), ("ctoken", token)],
+            ) {
+                let cont_payload = serde_json::json!({
+                    "context": {
+                        "client": {
+                            "clientName": "WEB_REMIX",
+                            "clientVersion": "1.20240401.01.00",
+                            "hl": "tr",
+                            "gl": "TR"
+                        }
+                    }
+                });
+
+                if let Ok(res2) = client.post(cont_url).json(&cont_payload).send().await {
+                    if let Ok(next_json) = res2.json::<serde_json::Value>().await {
+                        if let Some(raw_cont_sections) = next_json
+                            .pointer("/continuationContents/sectionListContinuation/contents")
+                            .and_then(|v| v.as_array())
+                        {
+                            let more_parsed = parse_home_sections(raw_cont_sections);
+                            parsed.extend(more_parsed);
+                        }
+                        next_cont = next_json
+                            .pointer("/continuationContents/sectionListContinuation/continuations/0/nextContinuationData/continuation")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                    }
+                }
+            }
+        }
+
+        (parsed, next_cont)
+    };
+
+    Ok(HomeFeedResult {
+        sections,
+        continuation: next_continuation,
+    })
 }

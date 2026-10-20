@@ -6,6 +6,7 @@ import type {
   PlaylistTracksResult,
   ArtistDetails,
   AlbumDetails,
+  HomeFeedResult,
 } from "../types/music";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -361,5 +362,13 @@ export async function updatePlaybackStatus(isPlaying: boolean): Promise<void> {
       console.warn("Failed to update playback status:", e);
     }
   }
+}
+
+export async function getHomeFeed(continuation?: string | null): Promise<HomeFeedResult> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<HomeFeedResult>("get_home_feed", { continuation: continuation || null });
+  }
+  return { sections: [], continuation: null };
 }
 

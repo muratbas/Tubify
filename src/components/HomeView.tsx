@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect, useMemo } from "react";
+import { type FC, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -10,11 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ThumbsUp,
+  Loader2,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
-import { usePlayer } from "../context/PlayerContext";
-import type { Track, Playlist } from "../types/music";
+import { getHomeFeed } from "../services/api";
+import type { Track, Playlist, HomeSection, HomeItem } from "../types/music";
 
 interface HomeViewProps {
   recentlyPlayed: Track[];
@@ -103,28 +104,24 @@ const TrackCover: FC<{
   }, [src, isPlaylist]);
 
   const handleError = () => {
-    if (currentSrc.includes("/maxresdefault.jpg")) {
-      setCurrentSrc(currentSrc.replace("/maxresdefault.jpg", "/hqdefault.jpg"));
-      return;
-    }
-    if (!hasTriedRaw && src && currentSrc !== src) {
+    if (!hasTriedRaw && src && src !== currentSrc) {
       setHasTriedRaw(true);
       setCurrentSrc(src);
+      return;
+    }
+    if (currentSrc.includes("maxresdefault.jpg")) {
+      setCurrentSrc(currentSrc.replace("maxresdefault.jpg", "hqdefault.jpg"));
       return;
     }
     setHasError(true);
   };
 
   if (!currentSrc || hasError) {
+    const iconDim =
+      iconSize === "sm" ? "w-4 h-4" : iconSize === "lg" ? "w-8 h-8" : "w-6 h-6";
     return (
-      <div
-        className={`w-full h-full flex items-center justify-center bg-neutral-200 dark:bg-neutral-800 ${className}`}
-      >
-        <Music2
-          className={`text-neutral-400 dark:text-neutral-500 ${
-            iconSize === "sm" ? "w-5 h-5" : iconSize === "lg" ? "w-8 h-8" : "w-6 h-6"
-          }`}
-        />
+      <div className={`w-full h-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center ${className}`}>
+        <Music2 className={`${iconDim} text-neutral-400 dark:text-neutral-500`} />
       </div>
     );
   }
@@ -140,295 +137,325 @@ const TrackCover: FC<{
   );
 };
 
-// --- DATA FROM USER SCREENSHOTS (YOUTUBE MUSIC EXACT REPRODUCTION) ---
-
-// Image 1: Sizin için önerilen albümler
-const RECOMMENDED_ALBUMS = [
+// Initial fallback tracks if recentlyPlayed is empty
+const INITIAL_FALLBACK_TRACKS: Track[] = [
   {
-    id: "Jj1sa0jay4c",
-    albumId: "MPREb_dreamisdestiny",
-    title: "Dream is Destiny",
-    artist: "No Clear Mind",
-    type: "Albüm",
-    thumbnail: "https://i.ytimg.com/vi/Jj1sa0jay4c/hqdefault.jpg",
+    id: "gQlMMD8auMs",
+    title: "Starboy",
+    artist: "The Weeknd, Daft Punk",
+    thumbnail: "https://i.ytimg.com/vi/gQlMMD8auMs/hqdefault.jpg",
   },
   {
-    id: "vNVyqttAnmA",
-    albumId: "MPREb_les",
-    title: "Les",
-    artist: "Fironn",
-    type: "EP",
-    thumbnail: "https://i.ytimg.com/vi/vNVyqttAnmA/hqdefault.jpg",
+    id: "kJQP7kiw5Fk",
+    title: "Despacito",
+    artist: "Luis Fonsi, Daddy Yankee",
+    thumbnail: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg",
   },
   {
-    id: "unypqeWmyNI",
-    albumId: "MPREb_graduation",
-    title: "Graduation",
-    artist: "Kanye West",
-    type: "Albüm",
-    isExplicit: true,
-    thumbnail: "https://i.ytimg.com/vi/unypqeWmyNI/hqdefault.jpg",
+    id: "fJ9rUzIMcZQ",
+    title: "Bohemian Rhapsody",
+    artist: "Queen",
+    thumbnail: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg",
   },
   {
-    id: "G4aZlo4mVTM",
-    albumId: "MPREb_mets",
-    title: "Mets",
-    artist: "No Clear Mind",
-    type: "Albüm",
-    thumbnail: "https://i.ytimg.com/vi/G4aZlo4mVTM/hqdefault.jpg",
+    id: "JGwWNGJdvx8",
+    title: "Shape of You",
+    artist: "Ed Sheeran",
+    thumbnail: "https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg",
   },
   {
-    id: "5K0V7sPWdVw",
-    albumId: "MPREb_rebel",
-    title: "Rebel",
-    artist: "EsDeeKid",
-    type: "Albüm",
-    isExplicit: true,
-    thumbnail: "https://i.ytimg.com/vi/5K0V7sPWdVw/hqdefault.jpg",
+    id: "3JZ_D3ELwOQ",
+    title: "Radioactive",
+    artist: "Imagine Dragons",
+    thumbnail: "https://i.ytimg.com/vi/3JZ_D3ELwOQ/hqdefault.jpg",
   },
   {
-    id: "SwvzXM-EVrQ",
-    albumId: "MPREb_gkmc",
-    title: "good kid, m.A.A.d. city",
-    artist: "Kendrick Lamar",
-    type: "Albüm",
-    isExplicit: true,
-    thumbnail: "https://i.ytimg.com/vi/SwvzXM-EVrQ/hqdefault.jpg",
+    id: "hT_nvWreIhg",
+    title: "Counting Stars",
+    artist: "OneRepublic",
+    thumbnail: "https://i.ytimg.com/vi/hT_nvWreIhg/hqdefault.jpg",
   },
 ];
 
-// Image 2: Unutulan favoriler (Landscape Video Cards)
-const FORGOTTEN_FAVORITES: Track[] = [
-  {
-    id: "ZC8z5HYtF1k",
-    title: "highest in the room 「travis scott」 | edit audio",
-    artist: "All of my Edit Audios",
-    album: "Oynatıldı",
-    thumbnail: "https://i.ytimg.com/vi/ZC8z5HYtF1k/hqdefault.jpg",
-    duration: "2:56",
-  },
-  {
-    id: "WY0bw-__HL8",
-    title: "travis scott & kendrick lamar ~ goosebumps / slowed + reverb /",
-    artist: "rum world",
-    album: "33 Mn görüntüleme",
-    thumbnail: "https://i.ytimg.com/vi/WY0bw-__HL8/hqdefault.jpg",
-    duration: "4:32",
-  },
-  {
-    id: "_v98All94pc",
-    title: "Sertab Erener & İzmir Big Band - Olsun",
-    artist: "Sertab Erener",
-    album: "33 Mn görüntüleme",
-    thumbnail: "https://i.ytimg.com/vi/_v98All94pc/hqdefault.jpg",
-    duration: "4:48",
-  },
-  {
-    id: "qisoHWRZg0E",
-    title: "BodyPartz (Slowed)",
-    artist: "Luci4",
-    album: "Şarkı",
-    is_explicit: true,
-    thumbnail: "https://i.ytimg.com/vi/qisoHWRZg0E/hqdefault.jpg",
-    duration: "2:14",
-  },
-];
+/**
+ * Dynamic Horizontal Carousel Shelf Component
+ */
+const DynamicShelf: FC<{
+  section: HomeSection;
+  isLight: boolean;
+  activeTrackId?: string;
+  isPlaying?: boolean;
+  onPlayItem: (item: HomeItem, shelf: HomeSection) => void;
+  onClickItem: (item: HomeItem, shelf: HomeSection) => void;
+  onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
+}> = ({
+  section,
+  isLight,
+  activeTrackId,
+  isPlaying,
+  onPlayItem,
+  onClickItem,
+  onContextMenuTrack,
+}) => {
+  const shelfSlug = useMemo(
+    () => `shelf-${section.title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
+    [section.title]
+  );
 
-// Image 3: Yeni keşifler ve eski favoriler (Curated Mixes)
-const CURATED_MIXES = [
-  {
-    id: "liked-mix",
-    title: "Beğendiğim müzikler",
-    subtitle: "Otomatik oynatma listesi",
-    type: "liked",
-    gradient: "from-[#ec4899] via-[#8b5cf6] to-[#6366f1]",
-  },
-  {
-    id: "discovery-mix",
-    title: "Karışık Keşif Listeniz",
-    subtitle: "James Blake, Dead By Sunrise, Sakiler, Ozan Çolakoğlu",
-    thumbnail: "https://i.ytimg.com/vi/1kUAAsqAz30/hqdefault.jpg",
-    type: "mix",
-  },
-  {
-    id: "repeat-mix",
-    title: "Tekrar Mix'i",
-    subtitle: "Radiohead, Eminem, Fironn, Talking Heads",
-    thumbnail: "https://i.ytimg.com/vi/Xp5AT4V5WIc/hqdefault.jpg",
-    type: "mix",
-  },
-  {
-    id: "archive-mix",
-    title: "Arşivden Şarkılar",
-    subtitle: "MGMT, Tame Impala, glwzbll, K.Flay",
-    thumbnail: "https://i.ytimg.com/vi/5K0V7sPWdVw/hqdefault.jpg",
-    type: "mix",
-  },
-];
+  const scroll = (dir: -1 | 1) => {
+    const el = document.getElementById(shelfSlug);
+    if (el) {
+      el.scrollBy({ left: dir * 460, behavior: "smooth" });
+    }
+  };
 
-// Image 4: Sizin için seçilen trend şarkılar (4-row compact horizontal columns)
-const TRENDING_PICKS: Track[] = [
-  {
-    id: "hl5t3TyP8aY",
-    title: "03' Bonnie & Clyde (Radio Edit) (feat. Beyoncé...)",
-    artist: "JAY-Z",
-    album: "4,6 Mn kez dinlendi • 03' Bonnie & Clyde",
-    thumbnail: "https://i.ytimg.com/vi/hl5t3TyP8aY/hqdefault.jpg",
-    duration: "3:25",
-  },
-  {
-    id: "TOlOpSkyHa0",
-    title: "beni öldüren atışlar değil o bakışlardı",
-    artist: "deth, rash ve yasins",
-    album: "20 B kez dinlendi • beni öldüren atışlar de...",
-    thumbnail: "https://i.ytimg.com/vi/TOlOpSkyHa0/hqdefault.jpg",
-    duration: "2:40",
-  },
-  {
-    id: "MBi8C6dJm6E",
-    title: "The Forgiveness Chant",
-    artist: "4LFA",
-    album: "25 B kez dinlendi • DIWAN",
-    thumbnail: "https://i.ytimg.com/vi/MBi8C6dJm6E/hqdefault.jpg",
-    duration: "3:10",
-  },
-  {
-    id: "t4t4iJVvAHo",
-    title: "Kal Be Gönlüm",
-    artist: "Serdar Ortaç",
-    album: "489 B kez dinlendi • Kal Be Gönlüm",
-    thumbnail: "https://i.ytimg.com/vi/t4t4iJVvAHo/hqdefault.jpg",
-    duration: "4:02",
-  },
-  {
-    id: "gET0VfwA-Jw",
-    title: "François Besse",
-    artist: "Lacrim",
-    album: "151 B kez dinlendi • De ma fenêtre",
-    is_explicit: true,
-    thumbnail: "https://i.ytimg.com/vi/gET0VfwA-Jw/hqdefault.jpg",
-    duration: "3:15",
-  },
-  {
-    id: "F5Q8lWLaumo",
-    title: "Akila",
-    artist: "Motive",
-    album: "1,6 Mn kez dinlendi • Akila",
-    thumbnail: "https://i.ytimg.com/vi/F5Q8lWLaumo/hqdefault.jpg",
-    duration: "2:50",
-  },
-  {
-    id: "YS6HQ8IqWfk",
-    title: "Romenzo Criminale",
-    artist: "Lacrim",
-    album: "106 B kez dinlendi • De ma fenêtre",
-    is_explicit: true,
-    thumbnail: "https://i.ytimg.com/vi/YS6HQ8IqWfk/hqdefault.jpg",
-    duration: "3:30",
-  },
-  {
-    id: "DPEodkHzH-s",
-    title: "Housewife",
-    artist: "Tate McRae",
-    album: "10 Mn kez dinlendi • Housewife",
-    thumbnail: "https://i.ytimg.com/vi/DPEodkHzH-s/hqdefault.jpg",
-    duration: "2:45",
-  },
-  {
-    id: "LfEK1pDDJew",
-    title: "Dayanamıyorum",
-    artist: "Kerim Araz ve Sevgim Yılmaz",
-    album: "2 Mn kez dinlendi • Dayanamıyorum",
-    thumbnail: "https://i.ytimg.com/vi/LfEK1pDDJew/hqdefault.jpg",
-    duration: "3:18",
-  },
-  {
-    id: "9KVsSUFW5Bk",
-    title: "MADARA (feat. Neil Kaplan ve Hideyoshi)",
-    artist: "EZ MIL ve Eminem",
-    album: "4,2 Mn kez dinlendi • MADARA",
-    is_explicit: true,
-    thumbnail: "https://i.ytimg.com/vi/9KVsSUFW5Bk/hqdefault.jpg",
-    duration: "3:40",
-  },
-  {
-    id: "0Wc2J3Y9s8w",
-    title: "الغرام المستحيل",
-    artist: "Sari Alsalibe",
-    album: "1 Mn kez dinlendi • الغرام المستحيل",
-    thumbnail: "https://i.ytimg.com/vi/0Wc2J3Y9s8w/hqdefault.jpg",
-    duration: "4:10",
-  },
-  {
-    id: "bU_kF9_H7g4",
-    title: "لو تعرف",
-    artist: "Ramy Sabry",
-    album: "214 B kez dinlendi • حفلة المسرح الروماني 2026",
-    thumbnail: "https://i.ytimg.com/vi/bU_kF9_H7g4/hqdefault.jpg",
-    duration: "3:55",
-  },
-];
+  const isListenAgain = useMemo(() => {
+    const t = section.title.toLowerCase();
+    return t.includes("yeniden dinle") || t.includes("listen again");
+  }, [section.title]);
 
-// Image 5: Günlük keşif
-const DAILY_DISCOVER: Track[] = [
-  {
-    id: "U85bOgG7DWM",
-    title: "Ring Ring Ring",
-    artist: "Tyler, The Creator",
-    album: "26 Mn kez dinlendi",
-    is_explicit: true,
-    thumbnail: "https://i.ytimg.com/vi/U85bOgG7DWM/hqdefault.jpg",
-    duration: "3:52",
-  },
-  {
-    id: "1kUAAsqAz30",
-    title: "Without You",
-    artist: "Strawberry Guy",
-    album: "18 Mn kez dinlendi",
-    thumbnail: "https://i.ytimg.com/vi/1kUAAsqAz30/hqdefault.jpg",
-    duration: "3:17",
-  },
-  {
-    id: "mogx5OcUcR4",
-    title: "Söyle Sunam",
-    artist: "Nurettin Rençber",
-    album: "63 Mn kez dinlendi",
-    thumbnail: "https://i.ytimg.com/vi/mogx5OcUcR4/hqdefault.jpg",
-    duration: "4:28",
-  },
-  {
-    id: "H5NA_UTSYeE",
-    title: "25",
-    artist: "Ati242",
-    album: "168 Mn kez dinlendi",
-    thumbnail: "https://i.ytimg.com/vi/H5NA_UTSYeE/hqdefault.jpg",
-    duration: "2:44",
-  },
-  {
-    id: "dSEE_LAMilE",
-    title: "Uslandım",
-    artist: "No.1",
-    album: "900 B kez dinlendi",
-    thumbnail: "https://i.ytimg.com/vi/dSEE_LAMilE/hqdefault.jpg",
-    duration: "3:05",
-  },
-  {
-    id: "Xp5AT4V5WIc",
-    title: "Bu Defa",
-    artist: "Sakin",
-    album: "501 B kez dinlendi",
-    thumbnail: "https://i.ytimg.com/vi/Xp5AT4V5WIc/hqdefault.jpg",
-    duration: "4:01",
-  },
-];
+  const displayItems = useMemo(() => {
+    if (!isListenAgain) return section.items;
+    return section.items.filter((item) => {
+      const isLikedId =
+        item.id === "VLLM" ||
+        item.id === "LM" ||
+        item.id === "liked" ||
+        item.browse_id === "VLLM" ||
+        item.browse_id === "LM" ||
+        item.browse_id === "FEmusic_liked";
+      const t = item.title.toLowerCase();
+      const isLikedTitle =
+        t.includes("beğendiğim müzik") ||
+        t.includes("liked songs") ||
+        t.includes("beğenilenler");
+      return !isLikedId && !isLikedTitle;
+    });
+  }, [section.items, isListenAgain]);
+
+  return (
+    <section className="space-y-3">
+      {/* Shelf Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h2
+            className={`text-xl font-bold tracking-tight mb-3 mt-8 ${
+              isLight ? "text-neutral-900" : "text-neutral-100"
+            }`}
+          >
+            {section.title}
+          </h2>
+          {section.strapline && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 -mt-2 mb-3 font-medium">
+              {section.strapline}
+            </p>
+          )}
+        </div>
+
+        {/* Scroll Controls (< >) */}
+        <div className="flex items-center gap-1.5 pb-3">
+          <button
+            onClick={() => scroll(-1)}
+            aria-label="Önceki"
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+              isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/20 text-neutral-300"
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => scroll(1)}
+            aria-label="Sonraki"
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+              isLight
+                ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                : "bg-white/10 hover:bg-white/20 text-neutral-300"
+            }`}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Horizontal Carousel Scroller */}
+      <div
+        id={shelfSlug}
+        className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth -mx-2 px-2"
+      >
+        {displayItems.map((item, idx) => {
+          const isVideo = item.aspect_ratio === "16:9";
+          const isItemActive = activeTrackId === (item.video_id || item.id);
+          const isItemPlaying = isItemActive && isPlaying;
+          const isLikedSongs =
+            item.id === "VLLM" ||
+            item.id === "LM" ||
+            item.title.toLowerCase().includes("beğendiğim müzikler");
+
+          return (
+            <div
+              key={`${item.id}-${idx}`}
+              onClick={() => onClickItem(item, section)}
+              onContextMenu={(e) => {
+                if (onContextMenuTrack && (item.video_id || item.item_type === "track")) {
+                  onContextMenuTrack(
+                    {
+                      id: item.video_id || item.id,
+                      title: item.title,
+                      artist: item.subtitle || "Sanatçı",
+                      thumbnail: item.thumbnail,
+                      is_explicit: item.explicit,
+                    },
+                    e
+                  );
+                }
+              }}
+              className={`group cursor-pointer flex flex-col p-2.5 rounded-2xl transition-all duration-200 select-none shrink-0 ${
+                isVideo ? "w-[240px] md:w-[260px]" : "w-[170px] min-w-[170px]"
+              } ${isLight ? "hover:bg-neutral-100/90" : "hover:bg-white/[0.07]"}`}
+            >
+              {/* Cover Image Container */}
+              <div
+                className={`relative w-full rounded-2xl overflow-hidden shadow-sm bg-neutral-100 dark:bg-neutral-800 ${
+                  isVideo ? "aspect-video" : "aspect-square"
+                }`}
+              >
+                {isLikedSongs && (!item.thumbnail || item.thumbnail.includes("pbg/liked-songs")) ? (
+                  <div className="w-full h-full bg-gradient-to-br from-[#7928CA] via-[#B800FF] to-[#FF0080] flex items-center justify-center">
+                    <ThumbsUp className="w-11 h-11 text-white fill-white drop-shadow-md" />
+                  </div>
+                ) : (
+                  <TrackCover
+                    src={item.thumbnail}
+                    alt={item.title}
+                    className="group-hover:scale-105 transition-transform duration-300"
+                    iconSize="md"
+                    isPlaylist={item.item_type === "playlist"}
+                  />
+                )}
+
+                {/* Hover Play Button (Right Bottom Corner) */}
+                <div className="absolute right-2.5 bottom-2.5 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPlayItem(item, section);
+                    }}
+                    className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-xl shadow-black/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                    data-tooltip={isItemPlaying ? "Duraklat" : "Oynat"}
+                  >
+                    {isItemPlaying ? (
+                      <Pause className="w-4 h-4 fill-white" />
+                    ) : (
+                      <Play className="w-4 h-4 fill-white ml-0.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Text Info */}
+              <div className="min-w-0 mt-2.5">
+                <h3
+                  className={`font-semibold text-sm truncate ${
+                    isItemActive
+                      ? "text-[#ff0000]"
+                      : isLight
+                      ? "text-neutral-900"
+                      : "text-neutral-100"
+                  }`}
+                  title={item.title}
+                >
+                  {item.title}
+                </h3>
+
+                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                  {item.explicit && (
+                    <span
+                      title="Explicit"
+                      className="w-3.5 h-3.5 rounded-[3px] bg-neutral-400 text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
+                    >
+                      E
+                    </span>
+                  )}
+                  <p
+                    className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5 leading-snug"
+                    title={item.subtitle || ""}
+                  >
+                    {item.subtitle || (item.item_type === "album" ? "Albüm" : "Çalma Listesi")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+// Universal language-agnostic filter for unwanted shelves:
+// 1. "Birlikte dinleyin" / "Listen together" / Stations
+// 2. "Sizin için önerilen müzik videoları" / "Recommended music videos"
+// 3. "Yeni keşifler ve eski favoriler" / "Mixed for you"
+function shouldHideShelf(title: string, items?: HomeItem[]): boolean {
+  const t = (title || "").toLowerCase();
+
+  // 1. Listen together / Stations
+  if (
+    t.includes("birlikte dinle") ||
+    t.includes("listen together") ||
+    t.includes("istasyon") ||
+    t.includes("station")
+  ) {
+    return true;
+  }
+
+  // 2. Music videos
+  if (
+    t.includes("müzik video") ||
+    t.includes("music video") ||
+    (t.includes("video") && t.includes("öner")) ||
+    (t.includes("video") && t.includes("recommend"))
+  ) {
+    return true;
+  }
+
+  // 3. Mixed for you / Discover & favorites
+  if (
+    t.includes("yeni keşifler") ||
+    t.includes("mixed for you") ||
+    (t.includes("keşif") && t.includes("favori")) ||
+    (t.includes("discover") && t.includes("favorite"))
+  ) {
+    return true;
+  }
+
+  // Structural checks:
+  if (items && items.length > 0) {
+    // Personalized mix playlists (VLRDTMAK5uy_)
+    if (items.some((it) => it.browse_id?.startsWith("VLRDTMAK5uy_"))) {
+      return true;
+    }
+    // All items are 16:9 video cards in a video shelf
+    if (items.every((it) => it.aspect_ratio === "16:9") && (t.includes("video") || t.includes("klip"))) {
+      return true;
+    }
+    // Radio station items
+    if (items.some((it) => it.title.toLowerCase().includes("station") || it.title.toLowerCase().includes("istasyon"))) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export const HomeView: FC<HomeViewProps> = ({
   recentlyPlayed,
-  recommendations = [],
-  playlists = [],
-  activeTrack: propActiveTrack,
-  isPlaying: propIsPlaying,
-  onPlayTrack: propOnPlayTrack,
+  playlists,
+  activeTrack,
+  isPlaying = false,
+  onPlayTrack = () => {},
   onSelectPlaylist,
   onPlayPlaylist,
   onNavigateArtist,
@@ -438,15 +465,101 @@ export const HomeView: FC<HomeViewProps> = ({
 }) => {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const player = usePlayer();
   const isLight = theme === "light";
 
-  const activeTrack = propActiveTrack !== undefined ? propActiveTrack : player.activeTrack;
-  const isPlaying =
-    propIsPlaying !== undefined ? propIsPlaying : player.playbackStatus === "playing";
-  const onPlayTrack = propOnPlayTrack || player.playTrack;
+  // Dynamic Home Feed State (shelves from InnerTube FEmusic_home)
+  const [sections, setSections] = useState<HomeSection[]>(() => {
+    try {
+      const cached = localStorage.getItem("tubify_home_feed_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((s: HomeSection) => !shouldHideShelf(s.title, s.items));
+        }
+      }
+    } catch {}
+    return [];
+  });
+  const [continuation, setContinuation] = useState<string | null>(null);
+  const [isLoadingHome, setIsLoadingHome] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Dynamic greeting based on current local time
+  // Fetch initial home feed on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFeed = async () => {
+      try {
+        setIsLoadingHome(true);
+        const res = await getHomeFeed();
+        if (isMounted && res && Array.isArray(res.sections) && res.sections.length > 0) {
+          const filtered = res.sections.filter((s) => !shouldHideShelf(s.title, s.items));
+          setSections(filtered);
+          setContinuation(res.continuation || null);
+          try {
+            localStorage.setItem("tubify_home_feed_cache", JSON.stringify(filtered));
+          } catch {}
+        }
+      } catch (err) {
+        console.error("Home feed fetch error:", err);
+      } finally {
+        if (isMounted) setIsLoadingHome(false);
+      }
+    };
+    fetchFeed();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch next continuation batch
+  const handleLoadMore = useCallback(async () => {
+    if (!continuation || isLoadingMore) return;
+    try {
+      setIsLoadingMore(true);
+      const res = await getHomeFeed(continuation);
+      if (res && Array.isArray(res.sections) && res.sections.length > 0) {
+        setSections((prev) => {
+          // Avoid duplicate section titles & filter unwanted shelves
+          const existingTitles = new Set(prev.map((s) => s.title));
+          const newOnes = res.sections.filter(
+            (s) => !existingTitles.has(s.title) && !shouldHideShelf(s.title, s.items)
+          );
+          const updated = [...prev, ...newOnes];
+          try {
+            localStorage.setItem("tubify_home_feed_cache", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+      setContinuation(res.continuation || null);
+    } catch (err) {
+      console.error("Continuation fetch error:", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [continuation, isLoadingMore]);
+
+  // Infinite scroll observer at bottom of page
+  useEffect(() => {
+    if (!continuation || isLoadingMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: "400px" }
+    );
+
+    const target = sentinelRef.current;
+    if (target) observer.observe(target);
+    return () => {
+      if (target) observer.unobserve(target);
+    };
+  }, [continuation, isLoadingMore, handleLoadMore]);
+
+  // Time-of-day greeting (Günaydın / Tünaydın / İyi akşamlar)
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (language === "tr") {
@@ -459,13 +572,16 @@ export const HomeView: FC<HomeViewProps> = ({
     return "Good evening";
   };
 
-  // Strictly 6 tracks for top section
-  const displayTracks = (recentlyPlayed && recentlyPlayed.length > 0
-    ? recentlyPlayed
-    : recommendations
-  ).slice(0, 6);
+  // Top 6 tracks for Recently Played section
+  const displayTracks = useMemo(() => {
+    const pool =
+      recentlyPlayed && recentlyPlayed.length > 0
+        ? recentlyPlayed
+        : INITIAL_FALLBACK_TRACKS;
+    return pool.slice(0, 6);
+  }, [recentlyPlayed]);
 
-  // Quick Access Hub items
+  // Quick Access Hub Navigation Items (Kitaplık, Göz At, İndirilenler)
   const quickAccessItems = useMemo(
     () => [
       {
@@ -474,7 +590,7 @@ export const HomeView: FC<HomeViewProps> = ({
         subtitle:
           language === "tr"
             ? "Koleksiyonun & listelerin"
-            : "Your collection & playlists",
+            : "Your collection & lists",
         icon: Library,
       },
       {
@@ -497,19 +613,109 @@ export const HomeView: FC<HomeViewProps> = ({
     [language]
   );
 
-  // Random / shuffled playlists from user's library for "Kitaplığınızdan"
+  // Random / shuffled playlists from user's library for "Kitaplığınızdan" fallback
   const libraryPlaylists = useMemo(() => {
     if (!playlists || playlists.length === 0) return [];
     const filtered = playlists.filter((p) => p.id !== "LM" && p.id !== "VLLM");
     return [...filtered].sort(() => 0.5 - Math.random());
   }, [playlists]);
 
-  // Smooth shelf scrolling helper for < and > arrow controls
-  const scrollShelf = (id: string, dir: -1 | 1) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollBy({ left: dir * 420, behavior: "smooth" });
+  // Item Click Handler (Album, Playlist, Artist, or Track)
+  const handleItemClick = (item: HomeItem, shelf: HomeSection) => {
+    if (
+      item.item_type === "album" ||
+      item.browse_id?.startsWith("MPREb_") ||
+      item.browse_id?.startsWith("OLAK5uy_")
+    ) {
+      if (onNavigateAlbum) {
+        onNavigateAlbum(
+          item.browse_id || item.id,
+          item.title,
+          item.subtitle || undefined,
+          item.thumbnail || undefined
+        );
+        return;
+      }
     }
+
+    if (
+      item.item_type === "playlist" ||
+      item.browse_id?.startsWith("VL") ||
+      item.browse_id?.startsWith("PL")
+    ) {
+      if (onSelectPlaylist) {
+        onSelectPlaylist({
+          id: item.browse_id || item.id,
+          title: item.title,
+          description: item.subtitle || undefined,
+          thumbnail: item.thumbnail || null,
+        });
+        return;
+      }
+    }
+
+    if (item.item_type === "artist" || item.browse_id?.startsWith("UC")) {
+      if (onNavigateArtist) {
+        onNavigateArtist(item.browse_id || item.id, item.title);
+        return;
+      }
+    }
+
+    // Default: play track / video / radio
+    handlePlayItem(item, shelf);
+  };
+
+  // Item Play Handler
+  const handlePlayItem = (item: HomeItem, shelf: HomeSection) => {
+    if (
+      (item.item_type === "album" || item.browse_id?.startsWith("MPREb_")) &&
+      onNavigateAlbum
+    ) {
+      onNavigateAlbum(
+        item.browse_id || item.id,
+        item.title,
+        item.subtitle || undefined,
+        item.thumbnail || undefined
+      );
+      return;
+    }
+
+    if (
+      (item.item_type === "playlist" || item.browse_id?.startsWith("VL")) &&
+      onPlayPlaylist
+    ) {
+      onPlayPlaylist({
+        id: item.browse_id || item.id,
+        title: item.title,
+        description: item.subtitle || undefined,
+        thumbnail: item.thumbnail || null,
+      });
+      return;
+    }
+
+    // Collect all playable tracks in this shelf for an immersive playback queue
+    const playableShelfTracks: Track[] = shelf.items
+      .filter((it) => it.video_id || it.item_type === "track" || it.item_type === "radio")
+      .map((it) => ({
+        id: it.video_id || it.id,
+        title: it.title,
+        artist: it.subtitle || "Sanatçı",
+        thumbnail: it.thumbnail,
+        is_explicit: it.explicit,
+      }));
+
+    const currentTrack: Track = {
+      id: item.video_id || item.id,
+      title: item.title,
+      artist: item.subtitle || "Sanatçı",
+      thumbnail: item.thumbnail,
+      is_explicit: item.explicit,
+    };
+
+    onPlayTrack(
+      currentTrack,
+      playableShelfTracks.length > 0 ? playableShelfTracks : undefined
+    );
   };
 
   return (
@@ -579,7 +785,7 @@ export const HomeView: FC<HomeViewProps> = ({
           })}
         </div>
 
-        {/* SECTION: Son dinledikleriniz */}
+        {/* SECTION: Son dinledikleriniz (6 Compact Cards) */}
         <h2
           className={`text-xl md:text-2xl font-bold tracking-tight mb-4 ${
             isLight ? "text-neutral-900" : "text-white"
@@ -588,7 +794,7 @@ export const HomeView: FC<HomeViewProps> = ({
           {language === "tr" ? "Son dinledikleriniz" : "Recently played"}
         </h2>
 
-        {/* 6-column responsive grid: compact and balanced */}
+        {/* 6-column responsive grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 md:gap-4">
           {displayTracks.map((track, i) => {
             const isActive = activeTrack?.id === track.id;
@@ -647,7 +853,7 @@ export const HomeView: FC<HomeViewProps> = ({
                   </div>
                 </div>
 
-                {/* Track Info (Title & Artist) below the cover */}
+                {/* Track Info */}
                 <div className="min-w-0">
                   <h4
                     className={`font-semibold text-sm leading-snug mt-2.5 truncate ${
@@ -694,21 +900,34 @@ export const HomeView: FC<HomeViewProps> = ({
         </div>
       </section>
 
-      {/* 2. SECTION: Kitaplığınızdan (From your library) */}
-      <section className="space-y-4">
-        <h2
-          className={`text-xl md:text-2xl font-bold tracking-tight ${
-            isLight ? "text-neutral-900" : "text-white"
-          }`}
-        >
-          {language === "tr" ? "Kitaplığınızdan" : "From your library"}
-        </h2>
+      {/* 2. DYNAMIC INNER-TUBE CAROUSEL SHELVES ("Yeni keşifler...", "Sizin için önerilen albümler", "Unutulan favoriler", vb.) */}
+      {sections.map((section) => (
+        <DynamicShelf
+          key={section.title}
+          section={section}
+          isLight={isLight}
+          activeTrackId={activeTrack?.id}
+          isPlaying={isPlaying}
+          onPlayItem={handlePlayItem}
+          onClickItem={handleItemClick}
+          onContextMenuTrack={onContextMenuTrack}
+        />
+      ))}
 
-        {libraryPlaylists.length > 0 ? (
+      {/* Fallback "Kitaplığınızdan" if no sections are available yet */}
+      {sections.length === 0 && libraryPlaylists.length > 0 && (
+        <section className="space-y-4">
+          <h2
+            className={`text-xl md:text-2xl font-bold tracking-tight ${
+              isLight ? "text-neutral-900" : "text-white"
+            }`}
+          >
+            {language === "tr" ? "Kitaplığınızdan" : "From your library"}
+          </h2>
+
           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-2 px-2 scroll-smooth">
             {libraryPlaylists.map((pl, idx) => {
               const coverUrl = getPlaylistCover(pl);
-
               return (
                 <div
                   key={`lib-pl-${pl.id}-${idx}`}
@@ -760,608 +979,46 @@ export const HomeView: FC<HomeViewProps> = ({
                         isLight ? "text-neutral-500" : "text-neutral-400"
                       }`}
                     >
-                      {pl.track_count
-                        ? pl.track_count
-                        : pl.description
-                        ? pl.description
-                        : language === "tr"
-                        ? "Çalma listesi"
-                        : "Playlist"}
+                      {pl.track_count || (language === "tr" ? "Çalma listesi" : "Playlist")}
                     </p>
                   </div>
                 </div>
               );
             })}
           </div>
-        ) : (
-          <div
-            className={`p-6 rounded-2xl text-sm ${
-              isLight ? "bg-neutral-100/70 text-neutral-500" : "bg-white/[0.04] text-neutral-400"
-            }`}
-          >
-            {language === "tr"
-              ? "Kitaplığınızda henüz çalma listesi bulunmuyor."
-              : "No playlists found in your library."}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* 3. SECTION (Image 1): Sizin için önerilen albümler */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2
-            className={`text-xl md:text-2xl font-bold tracking-tight ${
-              isLight ? "text-neutral-900" : "text-white"
-            }`}
-          >
-            {language === "tr" ? "Sizin için önerilen albümler" : "Recommended albums for you"}
-          </h2>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => scrollShelf("shelf-rec-albums", -1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollShelf("shelf-rec-albums", 1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+      {/* Initial loading state indicator (if cache is empty) */}
+      {isLoadingHome && sections.length === 0 && (
+        <div className="py-12 flex flex-col items-center justify-center gap-3 text-neutral-400">
+          <Loader2 className="w-7 h-7 animate-spin text-[#ff0000]" />
+          <span className="text-sm font-medium">YouTube Music içerikleri yükleniyor...</span>
         </div>
+      )}
 
-        <div
-          id="shelf-rec-albums"
-          className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-2 px-2 scroll-smooth"
-        >
-          {RECOMMENDED_ALBUMS.map((alb) => (
-            <div
-              key={`alb-${alb.id}`}
-              onClick={() => {
-                if (onNavigateAlbum) {
-                  onNavigateAlbum(alb.albumId || alb.id, alb.title, alb.artist, alb.thumbnail);
-                } else {
-                  onPlayTrack({
-                    id: alb.id,
-                    title: alb.title,
-                    artist: alb.artist,
-                    album: alb.title,
-                    thumbnail: alb.thumbnail,
-                  });
-                }
-              }}
-              className={`w-40 md:w-48 shrink-0 group flex flex-col p-2.5 rounded-xl transition-colors duration-200 cursor-pointer relative select-none ${
-                isLight ? "hover:bg-neutral-100/90" : "hover:bg-white/[0.07]"
-              }`}
-            >
-              <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 mb-2.5">
-                <TrackCover
-                  src={alb.thumbnail}
-                  alt={alb.title}
-                  className="group-hover:scale-105 transition-transform duration-300"
-                  iconSize="md"
-                />
-
-                <div className="absolute right-2 bottom-2 transition-all duration-200 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlayTrack({
-                        id: alb.id,
-                        title: alb.title,
-                        artist: alb.artist,
-                        album: alb.title,
-                        thumbnail: alb.thumbnail,
-                      });
-                    }}
-                    className="w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-black/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                    data-tooltip="Oynat"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="min-w-0">
-                <h4
-                  className={`font-semibold text-sm truncate ${
-                    isLight ? "text-neutral-900" : "text-white"
-                  }`}
-                  title={alb.title}
-                >
-                  {alb.title}
-                </h4>
-                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                  {alb.isExplicit && (
-                    <span
-                      title="Explicit"
-                      className="w-3.5 h-3.5 rounded-[3px] bg-neutral-400 text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
-                    >
-                      E
-                    </span>
-                  )}
-                  <p
-                    className={`text-xs truncate ${
-                      isLight ? "text-neutral-500" : "text-neutral-400"
-                    }`}
-                  >
-                    {alb.type} • {alb.artist}
-                  </p>
-                </div>
-              </div>
+      {/* Continuation Scroll Sentinel & Loader */}
+      {continuation && (
+        <div ref={sentinelRef} className="py-6 flex items-center justify-center">
+          {isLoadingMore ? (
+            <div className="flex items-center gap-2 text-sm text-neutral-400">
+              <Loader2 className="w-5 h-5 animate-spin text-[#ff0000]" />
+              <span>Daha fazla içerik yükleniyor...</span>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 4. SECTION (Image 2): Unutulan favoriler (Landscape 16:9 Cards) */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2
-            className={`text-xl md:text-2xl font-bold tracking-tight ${
-              isLight ? "text-neutral-900" : "text-white"
-            }`}
-          >
-            {language === "tr" ? "Unutulan favoriler" : "Forgotten favorites"}
-          </h2>
-          <div className="flex items-center gap-1.5">
+          ) : (
             <button
-              onClick={() => scrollShelf("shelf-forgotten-favs", -1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollShelf("shelf-forgotten-favs", 1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div
-          id="shelf-forgotten-favs"
-          className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-2 px-2 scroll-smooth"
-        >
-          {FORGOTTEN_FAVORITES.map((t) => {
-            const isActive = activeTrack?.id === t.id;
-            const isThisPlaying = isActive && isPlaying;
-
-            return (
-              <div
-                key={`forgotten-${t.id}`}
-                onClick={() => onPlayTrack(t, FORGOTTEN_FAVORITES)}
-                className={`w-64 md:w-72 shrink-0 group flex flex-col p-2.5 rounded-xl transition-colors duration-200 cursor-pointer relative select-none ${
-                  isLight ? "hover:bg-neutral-100/90" : "hover:bg-white/[0.07]"
-                }`}
-              >
-                {/* 16:9 Landscape Video Aspect */}
-                <div className="relative aspect-video w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 mb-2.5">
-                  <TrackCover
-                    src={t.thumbnail}
-                    alt={t.title}
-                    className="group-hover:scale-105 transition-transform duration-300"
-                    iconSize="md"
-                  />
-
-                  {/* Centered Video Play Button on Hover */}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-all duration-200 pointer-events-none ${
-                      isThisPlaying
-                        ? "opacity-100 scale-100 bg-black/25"
-                        : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 group-hover:bg-black/25"
-                    }`}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPlayTrack(t, FORGOTTEN_FAVORITES);
-                      }}
-                      className="pointer-events-auto w-11 h-11 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-2xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                      data-tooltip={isThisPlaying ? "Duraklat" : "Oynat"}
-                    >
-                      {isThisPlaying ? (
-                        <Pause className="w-5 h-5 fill-white" />
-                      ) : (
-                        <Play className="w-5 h-5 fill-white ml-0.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <h4
-                    className={`font-semibold text-sm line-clamp-1 ${
-                      isActive
-                        ? "text-[#ff0000]"
-                        : isLight
-                        ? "text-neutral-900"
-                        : "text-white"
-                    }`}
-                    title={t.title}
-                  >
-                    {t.title}
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                    {t.is_explicit && (
-                      <span
-                        title="Explicit"
-                        className="w-3.5 h-3.5 rounded-[3px] bg-neutral-400 text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
-                      >
-                        E
-                      </span>
-                    )}
-                    <p
-                      className={`text-xs truncate ${
-                        isLight ? "text-neutral-500" : "text-neutral-400"
-                      }`}
-                      title={`${t.artist} • ${t.album}`}
-                    >
-                      {t.artist} • {t.album}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 5. SECTION (Image 3): Yeni keşifler ve eski favoriler */}
-      <section className="space-y-4">
-        <h2
-          className={`text-xl md:text-2xl font-bold tracking-tight ${
-            isLight ? "text-neutral-900" : "text-white"
-          }`}
-        >
-          {language === "tr" ? "Yeni keşifler ve eski favoriler" : "New discoveries and old favorites"}
-        </h2>
-
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-2 px-2 scroll-smooth">
-          {CURATED_MIXES.map((mix) => (
-            <div
-              key={`mix-${mix.id}`}
-              onClick={() => {
-                if (mix.type === "liked") {
-                  const likedPl = playlists.find((p) => p.id === "LM" || p.id === "liked");
-                  if (likedPl) onSelectPlaylist?.(likedPl);
-                } else if (mix.thumbnail) {
-                  onPlayTrack({
-                    id: mix.id,
-                    title: mix.title,
-                    artist: mix.subtitle,
-                    album: "YouTube Music Mix",
-                    thumbnail: mix.thumbnail,
-                  });
-                }
-              }}
-              className={`w-44 md:w-52 shrink-0 group flex flex-col p-2.5 rounded-xl transition-colors duration-200 cursor-pointer relative select-none ${
-                isLight ? "hover:bg-neutral-100/90" : "hover:bg-white/[0.07]"
-              }`}
-            >
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 mb-2.5">
-                {mix.type === "liked" ? (
-                  <div className={`w-full h-full bg-gradient-to-br ${mix.gradient} flex items-center justify-center`}>
-                    <ThumbsUp className="w-12 h-12 text-white fill-white" />
-                  </div>
-                ) : (
-                  <TrackCover
-                    src={mix.thumbnail}
-                    alt={mix.title}
-                    className="group-hover:scale-105 transition-transform duration-300"
-                    iconSize="lg"
-                  />
-                )}
-
-                <div className="absolute right-2.5 bottom-2.5 transition-all duration-200 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (mix.type === "liked") {
-                        const likedPl = playlists.find((p) => p.id === "LM" || p.id === "liked");
-                        if (likedPl) onPlayPlaylist?.(likedPl);
-                      } else if (mix.thumbnail) {
-                        onPlayTrack({
-                          id: mix.id,
-                          title: mix.title,
-                          artist: mix.subtitle,
-                          album: "Mix",
-                          thumbnail: mix.thumbnail,
-                        });
-                      }
-                    }}
-                    className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-black/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                    data-tooltip="Oynat"
-                  >
-                    <Play className="w-4 h-4 fill-white ml-0.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="min-w-0">
-                <h4
-                  className={`font-semibold text-sm truncate ${
-                    isLight ? "text-neutral-900" : "text-white"
-                  }`}
-                  title={mix.title}
-                >
-                  {mix.title}
-                </h4>
-                <p
-                  className={`text-xs mt-0.5 line-clamp-2 ${
-                    isLight ? "text-neutral-500" : "text-neutral-400"
-                  }`}
-                  title={mix.subtitle}
-                >
-                  {mix.subtitle}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 6. SECTION (Image 4): Sizin için seçilen trend şarkılar (4-Row Compact Columns) */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2
-            className={`text-xl md:text-2xl font-bold tracking-tight ${
-              isLight ? "text-neutral-900" : "text-white"
-            }`}
-          >
-            {language === "tr" ? "Sizin için seçilen trend şarkılar" : "Trending songs picked for you"}
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onPlayTrack(TRENDING_PICKS[0], TRENDING_PICKS)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              onClick={handleLoadMore}
+              className={`text-xs font-semibold px-5 py-2.5 rounded-full transition-colors cursor-pointer ${
                 isLight
-                  ? "border-neutral-300 hover:bg-neutral-100 text-neutral-800"
-                  : "border-neutral-700 hover:bg-neutral-800 text-white"
+                  ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                  : "bg-white/10 hover:bg-white/20 text-neutral-200"
               }`}
             >
-              <Play className="w-3 h-3 fill-current" />
-              <span>{language === "tr" ? "Tümünü oynat" : "Play all"}</span>
+              Daha fazla göster
             </button>
-            <button
-              onClick={() => scrollShelf("shelf-trending-grid", -1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollShelf("shelf-trending-grid", 1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          )}
         </div>
-
-        {/* 4-Row Horizontal Column Flow */}
-        <div
-          id="shelf-trending-grid"
-          className="grid grid-rows-4 grid-flow-col auto-cols-[290px] sm:auto-cols-[330px] md:auto-cols-[370px] gap-x-4 gap-y-2 overflow-x-auto no-scrollbar scroll-smooth pb-2 -mx-2 px-2"
-        >
-          {TRENDING_PICKS.map((track) => {
-            const isActive = activeTrack?.id === track.id;
-            const isThisPlaying = isActive && isPlaying;
-
-            return (
-              <div
-                key={`trending-${track.id}`}
-                onClick={() => onPlayTrack(track, TRENDING_PICKS)}
-                onContextMenu={(e) => onContextMenuTrack?.(track, e)}
-                className={`group flex items-center gap-3 p-1.5 rounded-xl transition-colors cursor-pointer select-none ${
-                  isLight
-                    ? isActive
-                      ? "bg-neutral-200/80"
-                      : "hover:bg-neutral-100"
-                    : isActive
-                    ? "bg-white/[0.12]"
-                    : "hover:bg-white/[0.06]"
-                }`}
-              >
-                <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 relative bg-neutral-200 dark:bg-neutral-800 shadow-xs">
-                  <TrackCover
-                    src={track.thumbnail}
-                    alt={track.title}
-                    className="w-full h-full object-cover"
-                    iconSize="sm"
-                  />
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${
-                      isThisPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    }`}
-                  >
-                    {isThisPlaying ? (
-                      <Pause className="w-4 h-4 fill-white text-white" />
-                    ) : (
-                      <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h4
-                    className={`text-sm font-semibold truncate ${
-                      isActive
-                        ? "text-[#ff0000]"
-                        : isLight
-                        ? "text-neutral-900"
-                        : "text-white"
-                    }`}
-                    title={track.title}
-                  >
-                    {track.title}
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                    {track.is_explicit && (
-                      <span
-                        title="Explicit"
-                        className="w-3.5 h-3.5 rounded-[3px] bg-neutral-400 text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
-                      >
-                        E
-                      </span>
-                    )}
-                    <p
-                      className={`text-xs truncate ${
-                        isLight ? "text-neutral-500" : "text-neutral-400"
-                      }`}
-                      title={`${track.artist} • ${track.album}`}
-                    >
-                      {track.artist} • {track.album}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 7. SECTION (Image 5): Günlük keşif */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2
-            className={`text-xl md:text-2xl font-bold tracking-tight ${
-              isLight ? "text-neutral-900" : "text-white"
-            }`}
-          >
-            {language === "tr" ? "Günlük keşif" : "Daily discover"}
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onPlayTrack(DAILY_DISCOVER[0], DAILY_DISCOVER)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border ${
-                isLight
-                  ? "border-neutral-300 hover:bg-neutral-100 text-neutral-800"
-                  : "border-neutral-700 hover:bg-neutral-800 text-white"
-              }`}
-            >
-              <Play className="w-3 h-3 fill-current" />
-              <span>{language === "tr" ? "Tümünü oynat" : "Play all"}</span>
-            </button>
-            <button
-              onClick={() => scrollShelf("shelf-daily-discover", -1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollShelf("shelf-daily-discover", 1)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                isLight ? "hover:bg-neutral-200 text-neutral-700" : "hover:bg-white/10 text-white"
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div
-          id="shelf-daily-discover"
-          className="flex gap-4 overflow-x-auto no-scrollbar pb-3 pt-1 -mx-2 px-2 scroll-smooth"
-        >
-          {DAILY_DISCOVER.map((track) => {
-            const isActive = activeTrack?.id === track.id;
-            const isThisPlaying = isActive && isPlaying;
-
-            return (
-              <div
-                key={`daily-${track.id}`}
-                onClick={() => onPlayTrack(track, DAILY_DISCOVER)}
-                onContextMenu={(e) => onContextMenuTrack?.(track, e)}
-                className={`w-36 md:w-44 shrink-0 group flex flex-col p-2.5 rounded-xl transition-colors duration-200 cursor-pointer relative select-none ${
-                  isLight ? "hover:bg-neutral-100/90" : "hover:bg-white/[0.07]"
-                }`}
-              >
-                <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 mb-2.5">
-                  <TrackCover
-                    src={track.thumbnail}
-                    alt={track.title}
-                    className="group-hover:scale-105 transition-transform duration-300"
-                    iconSize="md"
-                  />
-
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-all duration-200 pointer-events-none ${
-                      isThisPlaying
-                        ? "opacity-100 scale-100 bg-black/25"
-                        : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 group-hover:bg-black/25"
-                    }`}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPlayTrack(track, DAILY_DISCOVER);
-                      }}
-                      className="pointer-events-auto w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                      data-tooltip={isThisPlaying ? "Duraklat" : "Oynat"}
-                    >
-                      {isThisPlaying ? (
-                        <Pause className="w-4 h-4 fill-white" />
-                      ) : (
-                        <Play className="w-4 h-4 fill-white ml-0.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <h4
-                    className={`font-semibold text-sm truncate ${
-                      isActive
-                        ? "text-[#ff0000]"
-                        : isLight
-                        ? "text-neutral-900"
-                        : "text-white"
-                    }`}
-                    title={track.title}
-                  >
-                    {track.title}
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                    {track.is_explicit && (
-                      <span
-                        title="Explicit"
-                        className="w-3.5 h-3.5 rounded-[3px] bg-neutral-400 text-white text-[8px] font-black shrink-0 inline-flex items-center justify-center leading-none select-none"
-                      >
-                        E
-                      </span>
-                    )}
-                    <p
-                      className={`text-xs truncate ${
-                        isLight ? "text-neutral-500" : "text-neutral-400"
-                      }`}
-                      title={`${track.artist} • ${track.album}`}
-                    >
-                      {track.artist} • {track.album}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      )}
     </div>
   );
 };

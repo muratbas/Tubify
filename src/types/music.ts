@@ -82,3 +82,27 @@ export type QueueViewMode = "closed" | "mini" | "expanded";
 export type MoodCategory = "all" | "relax" | "energize" | "focus" | "workout" | "commute";
 
 export type RepeatMode = "off" | "all" | "one";
+
+export interface HomeItem {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  thumbnail?: string | null;
+  item_type: "album" | "playlist" | "track" | "radio" | string;
+  aspect_ratio?: "1:1" | "16:9" | string | null;
+  explicit: boolean;
+  video_id?: string | null;
+  playlist_id?: string | null;
+  browse_id?: string | null;
+}
+
+export interface HomeSection {
+  title: string;
+  strapline?: string | null;
+  items: HomeItem[];
+}
+
+export interface HomeFeedResult {
+  sections: HomeSection[];
+  continuation?: string | null;
+}

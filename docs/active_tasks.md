@@ -346,6 +346,43 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Eklenen tüm şarkı ve videolar için gerçek YouTube ID'leri bağlandı; tıklandığında alt oynatıcıda kuyruk oluşturarak doğrudan çalma sağlandı.
     - **4. Doğrulama:**
       - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 36:** YouTube Music Dinamik Rafların (Shelves/Carousels) Çekilmesi ve Render Edilmesi:
+    - **1. Rust InnerTube FEmusic_home Parser (`auth.rs`):**
+      - `HomeItem`, `HomeSection`, `HomeFeedResult` veri modelleri tanımlandı.
+      - `parse_home_two_row_item`: `musicTwoRowItemRenderer` bloklarından `id`, `title`, `subtitle`, `thumbnail`, `item_type` (album, playlist, track, artist), `aspect_ratio` (1:1 / 16:9), `explicit`, `video_id`, `playlist_id`, `browse_id` ayrıştırıldı.
+      - `parse_home_responsive_item`: `musicResponsiveListItemRenderer` bloklarını (trend şarkılar, hızlı seçimler) `HomeItem` nesnelerine dönüştüren çözümleyici eklendi.
+      - `parse_home_sections`: `musicCarouselShelfRenderer` ve `musicShelfRenderer` başlık (`title`), alt başlık (`strapline`) ve içeriklerini dinamik olarak topladı.
+      - `fetch_home_feed`: İlk yüklemede tek istekte hem başlangıç hem de continuation raf paketini çekerek ("Yeniden dinleyin", "Kitaplığınızdan", "Yeni keşifler...", "Sizin için önerilen albümler", "Unutulan favoriler" vb.) 6-7 rafı anında döner.
+    - **2. Tauri IPC & API Köprüsü (`lib.rs`, `services/api.ts`, `types/music.ts`):**
+      - `get_home_feed(continuation?: string)` komutu tanımlanıp `invoke_handler!` makrosuna kaydedildi.
+      - TypeScript arayüzleri ve `getHomeFeed` servisi hazırlandı.
+    - **3. Frontend Dinamik Carousel & Sayfalama (`HomeView.tsx`):**
+      - `DynamicShelf` bileşeni oluşturuldu: `text-xl font-bold tracking-tight`, sol/sağ pürüzsüz kaydırma okları (`ChevronLeft`, `ChevronRight`), kare veya 16:9 yatay video en-boy oranına göre dinamik kart genişlikleri (`w-[170px]` veya `w-[260px]`).
+      - Hover durumunda sağ alttan hafifçe beliren kırmızı dairesel oynat butonu (`opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0`).
+      - Tıklama davranışı: Albümlerde `onNavigateAlbum`, çalma listelerinde `onSelectPlaylist`, şarkı/videolarda ise ilgili raftaki tüm parçaları sırayla kuyruğa ekleyerek `onPlayTrack`.
+      - Sonsuz kaydırma (`IntersectionObserver`) ve "Daha fazla göster" butonu ile continuation desteği eklendi.
+      - `tubify_home_feed_cache` ile anında yüklenme ve stale-while-revalidate performansı sağlandı.
+    - **4. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 37:** Dilden Bağımsız Evrensel Raf Filtresi (Birlikte Dinleyin, Müzik Videoları, Yeni Keşifler ve Eski Favoriler):
+    - **1. Filtre Kapsamı:**
+      - "Birlikte dinleyin" / "Listen together" / Radyo istasyonları
+      - "Sizin için önerilen müzik videoları" / "Recommended music videos"
+      - "Yeni keşifler ve eski favoriler" / "Mixed for you"
+    - **2. Çok Katmanlı & Dilden Bağımsız Çözüm:**
+      - **Yapısal İmza (Structural Fingerprint):** YouTube'un kişisel miks listelerine özel değişmez `VLRDTMAK5uy_` browse ID'si, müzik videolarına özel `MUSIC_VIDEO_TYPE_OMV` video konfigürasyonu ve 16:9 en-boy oranı, radyo istasyonlarına özel Station yapıları üzerinden filtreleme yapıldı.
+      - **Çok Dilli Güvenlik Ağı:** Başlık ve açıklamalarda Türkçe, İngilizce ve uluslararası anahtar kelimeler (`station`, `listen together`, `music video`, `mixed for you`) kontrol edildi.
+      - Hem Rust backend (`auth.rs` / `parse_home_sections`) hem de frontend (`HomeView.tsx` / `shouldHideShelf`) katmanlarında çift aşamalı filtreleme uygulandı.
+    - **3. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 38:** "Yeniden dinleyin" Rafından "Beğendiğim müzikler" Kartının Gizlenmesi:
+    - **1. Geliştirme Nedeni:**
+      - Tubify'da sol kenar çubuğunda ve kitaplıkta zaten özel "Beğenilen Şarkılar" kartı bulunduğu için, "Yeniden dinleyin" rafında yer alan otomatik "Beğendiğim müzikler" (Liked songs) kartı gereksiz tekrarı önlemek amacıyla gizlendi.
+    - **2. Çok Katmanlı & Dilden Bağımsız Çözüm:**
+      - Hem Rust backend (`auth.rs` / `is_listen_again_shelf`) hem de frontend (`HomeView.tsx` / `DynamicShelf`) içinde; `VLLM`, `LM`, `FEmusic_liked` browse ID'leri ve çok dilli başlık eşleşmeleri (`beğendiğim müzik`, `liked songs`, `beğenilenler`) filtrelendi.
+      - "Yeniden dinleyin" rafında sadece kullanıcının dinlediği gerçek parçalar sıralandı.
+    - **3. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.

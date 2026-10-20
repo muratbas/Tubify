@@ -142,6 +142,11 @@ async fn get_radio_tracks(video_id: String) -> Result<Vec<Track>, String> {
 }
 
 #[tauri::command]
+async fn get_home_feed(continuation: Option<String>) -> Result<auth::HomeFeedResult, String> {
+    auth::fetch_home_feed(continuation.as_deref()).await
+}
+
+#[tauri::command]
 fn minimize_window(window: tauri::Window) {
     let _ = window.minimize();
 }
@@ -184,6 +189,7 @@ pub fn run() {
             get_artist_details,
             get_album_details,
             get_radio_tracks,
+            get_home_feed,
             toggle_yt_like,
             create_yt_playlist,
             delete_yt_playlist,
