@@ -180,6 +180,30 @@ export async function toggleYtLike(videoId: string, like: boolean): Promise<void
   });
 }
 
+export async function createYtPlaylist(
+  title: string,
+  description?: string,
+  privacyStatus?: "PUBLIC" | "UNLISTED" | "PRIVATE"
+): Promise<string> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<string>("create_yt_playlist", {
+      title,
+      description: description || null,
+      privacyStatus: privacyStatus || "PUBLIC",
+    });
+  }
+  throw new Error("Tauri ortamı gereklidir.");
+}
+
+export async function deleteYtPlaylist(playlistId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("delete_yt_playlist", { playlistId });
+    return;
+  }
+}
+
 export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");

@@ -15,8 +15,10 @@ import { usePlayer } from "../context/PlayerContext";
 import type { Track, Playlist } from "../types/music";
 
 interface PlaylistViewProps {
-  playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null };
+  playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null; track_count?: string | null };
   tracks: Track[];
+  likedSongsTotalCount?: string | null;
+  userProfileName?: string | null;
   activeTrack: Track | null;
   isPlaying: boolean;
   onPlayTrack: (track: Track) => void;
@@ -44,6 +46,8 @@ interface PlaylistViewProps {
 export const PlaylistView: FC<PlaylistViewProps> = ({
   playlist,
   tracks,
+  likedSongsTotalCount,
+  userProfileName,
   activeTrack,
   isPlaying,
   onPlayTrack,
@@ -124,7 +128,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   return (
     <div
       onScroll={onScroll}
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 scroll-smooth ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 ${
         isLight ? "text-neutral-900" : "text-white"
       }`}
     >
@@ -182,10 +186,24 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               }`}
             >
               <span className={`font-semibold ${isLight ? "text-neutral-800" : "text-white"}`}>
-                murat
+                {userProfileName && !userProfileName.toLowerCase().includes("google")
+                  ? userProfileName
+                  : "murat"}
               </span>
               <span>•</span>
-              <span>{tracks.length.toLocaleString()} şarkı</span>
+              <span>
+                {isLikedPlaylist
+                  ? likedSongsTotalCount
+                    ? likedSongsTotalCount.toLowerCase().includes("şarkı")
+                      ? likedSongsTotalCount
+                      : `${likedSongsTotalCount} şarkı`
+                    : `${tracks.length.toLocaleString()} şarkı`
+                  : "track_count" in playlist && playlist.track_count && playlist.track_count.trim()
+                  ? playlist.track_count.toLowerCase().includes("şarkı")
+                    ? playlist.track_count
+                    : `${playlist.track_count} şarkı`
+                  : `${tracks.length.toLocaleString()} şarkı`}
+              </span>
             </p>
           </div>
         </div>

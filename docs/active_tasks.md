@@ -213,7 +213,35 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - `TitleBar.tsx` temiz, standart şeffaf / kaydırıldığında sade buzlu cam (`bg-white/90` / `bg-[#121212]/90`) tasarımına geri getirildi; `isAmbientActive` ve inline ambient arka plan mantığı silindi.
       - `AlbumView.tsx` ve `ArtistView.tsx` içerisinden `onCoverResolved` kaldırıldı; kapak ve thumbnail görselleri DOM'da temiz ve stabil bir şekilde render edilmeye devam ediyor.
       - `src/index.css` içerisinden `--ambient-color-raw` temizlendi.
-  - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+  - [x] **Aşama 27:** Sol Menü (Kitaplık / Sidebar) UI/UX Revizyonu, Sıralama Dropdown'ı, Özel Context Menu & Gizlenenler Klasörü:
+    - **1. Filtre Butonlarının (Pills) Kaldırılması:** "Çalma Listeleri", "Albümler", "Sanatçılar", "Podcast'ler" filtre butonları ve state'i DOM'dan tamamen temizlendi. Kitaplık başlığı altında doğrudan sıralama seçicisi ve çalma listeleri konumlandırıldı.
+    - **2. "Beğendiğim Müzikler" Tekrarının Kaldırılması & "Beğenilenler" Dokunulmazlığı:** YouTube Music API'sinden gelen `LM`, `VLLM`, `FEmusic_liked` ve "Beğendiğim müzikler" çalma listesi filtrelendi. Sistemdeki tek ve çekirdek liste mor kalp ikonlu sabit `Beğenilenler` listesi yapıldı; silme, gizleme, düzenleme ve sabitleme seçenekleri bu liste için devre dışı bırakıldı.
+    - **3. "Google Hesabı" İbaresinin Temizlenmesi:** Çalma listesi alt metinlerinde `• Google Hesabı` veya `• Google H...` ibareleri engellendi; sadece `Çalma listesi • X şarkı`, `Çalma listesi • {kullanıcıAdı}` veya `Çalma listesi` temiz formatı sağlandı.
+    - **4. 3 Seçenekli Sıralama Dropdown'ı:** "Son çalınanlar", "Ad" (A-Z) ve "Özel sıralama" seçeneklerine sahip açılır menü oluşturuldu; aktif seçenekte `✓` onay ikonu gösterildi; `localStorage` kalıcılığı ve etkileşim zaman damgası (`interactionTimestamps`) entegre edildi. Sabitlenmiş listelerin her zaman en üstte kalması sağlandı.
+    - **5. Sol Menü Özel Sağ Tık Menüsü (`PlaylistContextMenu.tsx`) & "Gizlenenler" Klasörü:**
+      - Sağ tık menüsü Tubify masaüstü tasarım standartlarına uygun olarak kodlandı: `Çal`, `Karışık Çal`, divider, `Düzenle` (`EditPlaylistModal.tsx`), `Kitaplığından Sil`, `Kitaplığından Gizle` / `Kitaplığında Göster`, divider, `Başa Sabitle` / `Sabitlemeyi Kaldır` (kırmızı pin `📌`), `Bağlantıyı Kopyala`.
+    - **6. "Son Çalınanlar" Tetikleme Mantığı Düzeltmesi:** Çalma listesine yalnızca tıklayıp görüntüleme anında listenin en başa fırlaması engellendi (`handlePlaylistClick` temizlendi). Liste sırası yalnızca o çalma listesinden bir şarkı fiilen çalındığında (`onPlayTrack`, `onPlayAll` veya context menü `Çal`/`Karışık Çal`) en üste taşınacak şekilde `recordPlaylistPlayed` mimarisine bağlandı.
+    - **7. Çalma Listesi Toplam Şarkı Sayısı (Full Track Count):** Sayfayı aşağı kaydırıp tüm şarkıları yüklemeyi beklemeden toplam şarkı adedinin görünmesi sağlandı. Backend `fetch_user_playlists` (card subtitle runs) ve `fetch_playlist_tracks_page` (header runs) seviyesinde YouTube Music'in sağladığı gerçek toplam şarkı sayısı (`1.177 şarkı`, `73 şarkı` vb.) ayrıştırılarak hem sol Sidebar'a hem de `PlaylistView` üst başlığına aktarıldı.
+  - [x] **Aşama 28:** Mouse Wheel Sayfa Kaydırma Kilitlenmesi (Scroll Freezing) Düzeltmesi:
+    - **Sorun Tespiti:** Aşama 22'de eklenen `src/utils/smoothScroll.ts` içerisindeki global `window.addEventListener("wheel", ..., { passive: false })` dinleyicisinin her fare çentiğinde DOM hiyerarşisi boyunca senkron `window.getComputedStyle` çağrıları yaparak WebView2 ana iş parçacığında layout thrashing yaratması ve `e.preventDefault()` çağrısıyla tarayıcının yerel kaydırmasını kilitlemesi tespit edildi. Ayrıca CSS `scroll-smooth` ile JS `requestAnimationFrame` interpolasyonunun birbirini sıfırlama döngüsüne sokarak tekerleğin durmasına yol açtığı belirlendi.
+    - **Çözüm:** `smoothScroll.ts` ve `initSmoothScroll` tamamen kaldırıldı; sayfa kapsayıcılarındaki yapay `scroll-smooth` temizlendi. Windows / Chromium WebView2'nin donanımsal GPU Compositor seviyesinde çalışan doğal, sıfır gecikmeli ve asla kilitlenmeyen yerel fare tekerleği kaydırması tam stabiliteyle restore edildi.
+  - [x] **Aşama 29:** Sol Menü (Kitaplık) Aksiyon Butonları (Yeni Playlist, Grid Görünümü ve Mini-Sidebar Modu):
+    - **1. `+` Butonu & InnerTube Çalma Listesi Oluşturma/Silme (`CreatePlaylistModal.tsx`):**
+      - Yeni çalma listesi modalı oluşturuldu: Başlık (`title` zorunlu), Açıklama (`description` opsiyonel) ve 3 seçenekli Gizlilik seçimi (`PUBLIC`, `UNLISTED`, `PRIVATE`).
+      - Rust backend `src-tauri/src/auth.rs` ve `lib.rs` içerisine `create_yt_playlist` (`/youtubei/v1/playlist/create`) ve `delete_yt_playlist` (`/youtubei/v1/playlist/delete`) InnerTube endpoint'leri bağlandı.
+      - Çalma listesi oluşturulduğunda kullanıcı otomatik olarak yeni çalma listesinin detay sayfasına yönlendirilir; silme işleminde YouTube Music hesabıyla çift yönlü bulut senkronizasyonu sağlandı.
+    - **2. Izgara / Liste Görünümü Toggle'ı (`viewMode: "list" | "grid"`):**
+      - Durum duyarlı dinamik ikon: Liste modundayken 4 kareli Izgara (`LayoutGrid`), Izgara modundayken satırlı Liste (`List`) ikonu gösterilir; tercih `localStorage` (`tubify_sidebar_view_mode`) içine kaydedilir.
+      - Referans görsele (Görsel 2) birebir sadık 2 sütunlu kart ızgarası (`grid-cols-2 gap-2.5 px-1 py-1`):
+        - `aspect-square` kare kapak görselleri (`rounded-xl shadow-sm`).
+        - Sabitlenmiş kartların (Beğenilenler ve kullanıcı sabitleri) sol üst köşesinde koyu yarı saydam yuvarlak rozet içinde beyaz Pin (`📌`) ikonu.
+        - Kapağın altında kalın başlık (`text-[13px]`) ve altında şarkı sayısı veya sanatçı adı (`text-[11px]` - örn. `1177 şarkı` veya `murat`).
+    - **3. Daraltılabilir Mini-Sidebar Modu (`isCollapsed: boolean`, `w-[72px]`):**
+      - Sol menü paneli `PanelLeftClose` ve `PanelLeftOpen` butonlarıyla `w-[260px]` ile `w-[72px]` arasında akıcı CSS geçişi (`transition-all duration-200 ease-in-out`) yapar; tercih `localStorage` (`tubify_sidebar_collapsed`) içinde saklanır.
+      - Mini modda: Üst sekmeler (`Ana Sayfa`, `Ara`) yazısız, ortalanmış simgelere küçülür; Kitaplık başlığı yerini genişletme butonuna bırakır.
+      - Çalma listeleri dikey tek sütun halinde `48x48px` (`w-12 h-12 rounded-xl`) kare kapaklar olarak listelenir; aktif çalma listesi kırmızı halka (`ring-2 ring-[#ff0000]`) ile vurgulanır.
+      - `CustomTooltip.tsx` modülüne sağ yön (`data-tooltip-side="right"`) desteği eklenerek mini modda kapakların ve ikonların üzerine gelindiğinde sağ tarafta akıcı ve şık kayan tooltip gösterilmesi sağlandı.
+  - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.

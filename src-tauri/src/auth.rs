@@ -35,6 +35,7 @@ pub struct HomeSection {
 pub struct PlaylistTracksResult {
     pub tracks: Vec<Track>,
     pub continuation: Option<String>,
+    pub track_count: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -573,14 +574,37 @@ pub fn collect_playlists_recursive(
                 .and_then(|u| u.as_str())
                 .map(|v| v.to_string());
 
+            let mut track_count = None;
+            if let Some(runs) = card.pointer("/subtitle/runs").and_then(|v| v.as_array()) {
+                for r in runs {
+                    if let Some(text) = r.get("text").and_then(|t| t.as_str()).map(|s| s.trim()) {
+                        let t_lower = text.to_lowercase();
+                        if (t_lower.contains("şarkı") || t_lower.contains("parça") || t_lower.contains("song") || t_lower.contains("track") || t_lower.contains("video"))
+                            && text.chars().any(|c| c.is_ascii_digit()) {
+                            track_count = Some(text.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+
             if let Some(b_id) = browse_id {
+                let is_liked = b_id == "VLLM" || b_id == "LM" || b_id == "FEmusic_liked" || title.to_lowercase().contains("beğen") || title.to_lowercase().contains("liked");
+                if is_liked && track_count.is_some() {
+                    if let Some(first_pl) = playlists.first_mut() {
+                        if first_pl.id == "LM" || first_pl.id == "liked" {
+                            first_pl.track_count = track_count.clone();
+                        }
+                    }
+                }
+
                 if seen.insert(b_id.to_string()) {
                     playlists.push(Playlist {
                         id: b_id.to_string(),
                         title: title.to_string(),
                         description: subtitle,
                         thumbnail: thumb,
-                        track_count: None,
+                        track_count,
                     });
                 }
             }
@@ -733,6 +757,7 @@ pub async fn fetch_playlist_tracks_page(
         return Ok(PlaylistTracksResult {
             tracks,
             continuation: next_continuation,
+            track_count: None,
         });
     }
 
@@ -780,9 +805,40 @@ pub async fn fetch_playlist_tracks_page(
 
     let next_continuation = extract_continuation_token(&json);
 
+    // Extract total track count from playlist header
+    let mut track_count = None;
+    let header_opt = json.pointer("/header/musicResponsiveHeaderRenderer")
+        .or_else(|| json.pointer("/header/musicDetailHeaderRenderer"))
+        .or_else(|| json.pointer("/header/musicEditablePlaylistDetailHeaderRenderer/header/musicResponsiveHeaderRenderer"))
+        .or_else(|| json.pointer("/header/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer"))
+        .or_else(|| json.pointer("/contents/twoColumnBrowseResultsRenderer/header/musicResponsiveHeaderRenderer"))
+        .or_else(|| json.pointer("/contents/twoColumnBrowseResultsRenderer/header/musicDetailHeaderRenderer"))
+        .or_else(|| find_renderer(&json, &["musicResponsiveHeaderRenderer", "musicDetailHeaderRenderer", "musicEditablePlaylistDetailHeaderRenderer"]));
+
+    if let Some(header) = header_opt {
+        let mut runs = Vec::new();
+        if let Some(arr) = header.pointer("/secondSubtitle/runs").and_then(|v| v.as_array()) {
+            runs.extend(arr.iter());
+        }
+        if let Some(arr) = header.pointer("/subtitle/runs").and_then(|v| v.as_array()) {
+            runs.extend(arr.iter());
+        }
+        for r in runs {
+            if let Some(text) = r.get("text").and_then(|t| t.as_str()).map(|s| s.trim()) {
+                let t_lower = text.to_lowercase();
+                if (t_lower.contains("şarkı") || t_lower.contains("parça") || t_lower.contains("song") || t_lower.contains("track") || t_lower.contains("video"))
+                    && text.chars().any(|c| c.is_ascii_digit()) {
+                    track_count = Some(text.to_string());
+                    break;
+                }
+            }
+        }
+    }
+
     Ok(PlaylistTracksResult {
         tracks,
         continuation: next_continuation,
+        track_count,
     })
 }
 
@@ -1287,6 +1343,106 @@ pub async fn toggle_like_yt(video_id: &str, like: bool) -> Result<(), String> {
 
     if !res.status().is_success() {
         return Err(format!("Sunucu yanıtı: {}", res.status()));
+    }
+
+    Ok(())
+}
+
+pub async fn create_playlist(
+    title: &str,
+    description: Option<&str>,
+    privacy_status: Option<&str>,
+) -> Result<String, String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış".to_string())?;
+        (session.cookie.clone(), session.sapisid.clone())
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let url = "https://music.youtube.com/youtubei/v1/playlist/create";
+    let privacy = privacy_status.unwrap_or("PUBLIC");
+    let mut payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "title": title,
+        "privacyStatus": privacy
+    });
+
+    if let Some(desc) = description {
+        if !desc.trim().is_empty() {
+            payload["description"] = serde_json::Value::String(desc.to_string());
+        }
+    }
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("İstek gönderilemedi: {}", e))?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("Çalma listesi oluşturulamadı: {}", err_text));
+    }
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("JSON ayrıştırılamadı: {}", e))?;
+
+    if let Some(pid) = json.get("playlistId").and_then(|v| v.as_str()) {
+        return Ok(pid.to_string());
+    }
+
+    if let Some(pid) = json.pointer("/playlistId").and_then(|v| v.as_str()) {
+        return Ok(pid.to_string());
+    }
+
+    Err("Sunucudan çalma listesi kimliği (playlistId) alınamadı".to_string())
+}
+
+pub async fn delete_playlist(playlist_id: &str) -> Result<(), String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış".to_string())?;
+        (session.cookie.clone(), session.sapisid.clone())
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let clean_id = playlist_id.strip_prefix("VL").unwrap_or(playlist_id);
+    let url = "https://music.youtube.com/youtubei/v1/playlist/delete";
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "playlistId": clean_id
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Silme isteği gönderilemedi: {}", e))?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("Silme işlemi başarısız: {}", err_text));
     }
 
     Ok(())

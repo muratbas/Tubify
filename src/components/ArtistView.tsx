@@ -141,7 +141,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
   return (
     <div
       onScroll={onScroll}
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 scroll-smooth ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 ${
         isLight ? "text-neutral-900" : "text-white"
       }`}
     >

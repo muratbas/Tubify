@@ -14,6 +14,7 @@ export interface Track {
 export interface PlaylistTracksResult {
   tracks: Track[];
   continuation?: string | null;
+  track_count?: string | null;
 }
 
 export interface ArtistItem {

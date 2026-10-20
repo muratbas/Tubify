@@ -5,7 +5,7 @@ interface TooltipState {
   text: string;
   x: number;
   y: number;
-  side: "top" | "bottom";
+  side: "top" | "bottom" | "right";
   visible: boolean;
 }
 
@@ -50,16 +50,23 @@ export const CustomTooltip: FC = () => {
 
       if (timerRef.current) window.clearTimeout(timerRef.current);
 
-      // Fast, snappy delay (180ms) to feel responsive without flashing during fast mouse movement
+      // Fast, snappy delay (160ms) to feel responsive without flashing during fast mouse movement
       timerRef.current = window.setTimeout(() => {
         if (!activeElRef.current) return;
 
         const rect = activeElRef.current.getBoundingClientRect();
-        const preferredSide = (activeElRef.current.getAttribute("data-tooltip-side") as "top" | "bottom" | null) ||
-          (rect.top < 100 ? "bottom" : "top");
+        const attrSide = activeElRef.current.getAttribute("data-tooltip-side") as "top" | "bottom" | "right" | null;
+        const preferredSide: "top" | "bottom" | "right" = attrSide || (rect.top < 100 ? "bottom" : "top");
 
-        const x = Math.max(16, Math.min(window.innerWidth - 16, rect.left + rect.width / 2));
-        const y = preferredSide === "bottom" ? rect.bottom + 8 : rect.top - 8;
+        let x = 0;
+        let y = 0;
+        if (preferredSide === "right") {
+          x = rect.right + 10;
+          y = rect.top + rect.height / 2;
+        } else {
+          x = Math.max(16, Math.min(window.innerWidth - 16, rect.left + rect.width / 2));
+          y = preferredSide === "bottom" ? rect.bottom + 8 : rect.top - 8;
+        }
 
         setTooltip({
           text,
@@ -111,10 +118,12 @@ export const CustomTooltip: FC = () => {
     <div
       style={{
         left: `${tooltip.x}px`,
-        top: tooltip.side === "bottom" ? `${tooltip.y}px` : undefined,
+        top: tooltip.side === "right" ? `${tooltip.y}px` : tooltip.side === "bottom" ? `${tooltip.y}px` : undefined,
         bottom: tooltip.side === "top" ? `${window.innerHeight - tooltip.y}px` : undefined,
       }}
-      className={`fixed z-[999999] pointer-events-none px-3.5 py-1.5 rounded-xl shadow-xl text-xs font-semibold select-none -translate-x-1/2 animate-in fade-in zoom-in-95 duration-100 whitespace-nowrap transition-transform ${
+      className={`fixed z-[999999] pointer-events-none px-3.5 py-1.5 rounded-xl shadow-xl text-xs font-semibold select-none animate-in fade-in zoom-in-95 duration-100 whitespace-nowrap transition-transform ${
+        tooltip.side === "right" ? "-translate-y-1/2" : "-translate-x-1/2"
+      } ${
         isLight
           ? "bg-white text-neutral-900 border border-neutral-200/90 shadow-neutral-900/10"
           : "bg-[#202020] text-white border border-white/15 shadow-black/80"

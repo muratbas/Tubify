@@ -59,6 +59,20 @@ async fn toggle_yt_like(video_id: String, like: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn create_yt_playlist(
+    title: String,
+    description: Option<String>,
+    privacy_status: Option<String>,
+) -> Result<String, String> {
+    auth::create_playlist(&title, description.as_deref(), privacy_status.as_deref()).await
+}
+
+#[tauri::command]
+async fn delete_yt_playlist(playlist_id: String) -> Result<(), String> {
+    auth::delete_playlist(&playlist_id).await
+}
+
+#[tauri::command]
 async fn open_google_login(app: AppHandle) -> Result<(), String> {
     auth::open_login_webview(app).await
 }
@@ -157,6 +171,8 @@ pub fn run() {
             get_album_details,
             get_radio_tracks,
             toggle_yt_like,
+            create_yt_playlist,
+            delete_yt_playlist,
             open_google_login,
             check_login_status,
             open_external_url,

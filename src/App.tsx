@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, type FC } from "react";
 import { TitleBar } from "./components/TitleBar";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, isLikedSongsPlaylist, recordPlaylistPlayed } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
 import { PlaylistView } from "./components/PlaylistView";
 import { ArtistView } from "./components/ArtistView";
@@ -21,8 +21,9 @@ import {
   getYtLikedSongs,
   getYtPlaylists,
   getPlaylistTracksPage,
+  createYtPlaylist,
+  deleteYtPlaylist,
 } from "./services/api";
-import { initSmoothScroll } from "./utils/smoothScroll";
 import { CustomTooltip } from "./components/CustomTooltip";
 import type { Track, UserProfile, Playlist } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
@@ -204,10 +205,6 @@ export const App: FC = () => {
   }, []);
 
 
-  // Buttery Smooth Momentum Wheel Scrolling across all views
-  useEffect(() => {
-    return initSmoothScroll();
-  }, []);
 
   // Mouse 4 / 5 (Browser Back & Forward) Hardware Navigation
   useEffect(() => {
@@ -281,6 +278,13 @@ export const App: FC = () => {
     "account" | "appearance" | "playback" | "library" | "window" | "shortcuts"
   >("account");
   const [likedSongs, setLikedSongs] = useState<Track[]>([]);
+  const [likedSongsTotalCount, setLikedSongsTotalCount] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("tubify_liked_total_count");
+    } catch {
+      return null;
+    }
+  });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
@@ -326,10 +330,179 @@ export const App: FC = () => {
         player.syncLikedIds(liked.value.map((t) => t.id));
       }
       if (pls.status === "fulfilled" && pls.value.length > 0) {
-        setPlaylists(pls.value);
+        let deletedIds = new Set<string>();
+        let editedMap: Record<string, { title: string; description?: string }> = {};
+        try {
+          const delSaved = localStorage.getItem("tubify_deleted_playlist_ids");
+          if (delSaved) deletedIds = new Set(JSON.parse(delSaved));
+          const edSaved = localStorage.getItem("tubify_edited_playlists");
+          if (edSaved) editedMap = JSON.parse(edSaved);
+        } catch {}
+
+        const cleanPlaylists = pls.value
+          .filter((p) => !isLikedSongsPlaylist(p) && !deletedIds.has(p.id))
+          .map((p) => {
+            if (editedMap[p.id]) {
+              return {
+                ...p,
+                title: editedMap[p.id].title || p.title,
+                description:
+                  editedMap[p.id].description !== undefined
+                    ? editedMap[p.id].description
+                    : p.description,
+              };
+            }
+            return p;
+          });
+
+        setPlaylists(cleanPlaylists);
+
+        const lmPl = pls.value.find((p) => p.id === "LM" || p.id === "liked" || p.id === "VLLM");
+        if (lmPl?.track_count) {
+          setLikedSongsTotalCount(lmPl.track_count);
+          try {
+            localStorage.setItem("tubify_liked_total_count", lmPl.track_count);
+          } catch {}
+        }
       }
+
+      // Fetch Liked Songs page to ensure exact track count is retrieved without full scrolling
+      getPlaylistTracksPage("liked", null)
+        .then((page) => {
+          if (page.track_count) {
+            setLikedSongsTotalCount(page.track_count);
+            try {
+              localStorage.setItem("tubify_liked_total_count", page.track_count);
+            } catch {}
+          }
+          if (page.tracks.length > 0) {
+            setLikedSongs(page.tracks);
+            player.syncLikedIds(page.tracks.map((t) => t.id));
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       console.error("Library sync error:", e);
+    }
+  };
+
+  const handlePlayPlaylist = async (pl: Playlist | "liked", shuffle: boolean = false) => {
+    if (pl === "liked") {
+      let tracks = likedSongs;
+      if (tracks.length === 0) {
+        try {
+          const res = await getYtLikedSongs();
+          tracks = res;
+          setLikedSongs(res);
+        } catch {}
+      }
+      if (tracks.length > 0) {
+        if (shuffle) {
+          const randIdx = Math.floor(Math.random() * tracks.length);
+          player.playTrack(tracks[randIdx], tracks);
+          if (!player.isShuffle) player.toggleShuffle();
+        } else {
+          player.playTrack(tracks[0], tracks);
+          if (player.isShuffle) player.toggleShuffle();
+        }
+      } else {
+        player.showToast("Beğenilen şarkı bulunamadı");
+      }
+      return;
+    }
+
+    try {
+      if (typeof pl !== "string" && pl.id) {
+        recordPlaylistPlayed(pl.id);
+      }
+      const page = await getPlaylistTracksPage(pl.id, null);
+      let tracks = page.tracks;
+      if (tracks.length === 0) {
+        try {
+          const local = localStorage.getItem(`tubify_playlist_tracks_${pl.id}`);
+          if (local) tracks = JSON.parse(local);
+        } catch {}
+      }
+      if (tracks.length > 0) {
+        if (shuffle) {
+          const randIdx = Math.floor(Math.random() * tracks.length);
+          player.playTrack(tracks[randIdx], tracks);
+          if (!player.isShuffle) player.toggleShuffle();
+        } else {
+          player.playTrack(tracks[0], tracks);
+          if (player.isShuffle) player.toggleShuffle();
+        }
+      } else {
+        player.showToast("Bu çalma listesinde henüz şarkı yok");
+      }
+    } catch (e) {
+      console.error("Failed to play playlist:", e);
+      player.showToast("Çalma listesi oynatılamadı");
+    }
+  };
+
+  const handleCreatePlaylist = async (
+    title: string,
+    description?: string,
+    privacyStatus?: "PUBLIC" | "UNLISTED" | "PRIVATE"
+  ) => {
+    const playlistId = await createYtPlaylist(title, description, privacyStatus);
+    const newPlaylist: Playlist = {
+      id: playlistId,
+      title,
+      description: description || undefined,
+      thumbnail: null,
+      track_count: "0 şarkı",
+    };
+    setPlaylists((prev) => [newPlaylist, ...prev]);
+    player.showToast(`"${title}" çalma listesi oluşturuldu`);
+    navigateTo({ type: "playlist", playlist: newPlaylist });
+  };
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    try {
+      const saved = localStorage.getItem("tubify_deleted_playlist_ids");
+      const deletedIds: string[] = saved ? JSON.parse(saved) : [];
+      if (!deletedIds.includes(playlistId)) {
+        deletedIds.push(playlistId);
+        localStorage.setItem("tubify_deleted_playlist_ids", JSON.stringify(deletedIds));
+      }
+    } catch {}
+
+    setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+
+    if (currentNav.type === "playlist" && currentNav.playlist.id === playlistId) {
+      navigateTo({ type: "home" });
+    }
+
+    try {
+      await deleteYtPlaylist(playlistId);
+    } catch (err) {
+      console.warn("YouTube Music playlist delete error:", err);
+    }
+  };
+
+  const handleEditPlaylist = (playlistId: string, title: string, description?: string) => {
+    try {
+      const saved = localStorage.getItem("tubify_edited_playlists");
+      const editedMap = saved ? JSON.parse(saved) : {};
+      editedMap[playlistId] = { title, description };
+      localStorage.setItem("tubify_edited_playlists", JSON.stringify(editedMap));
+    } catch {}
+
+    setPlaylists((prev) =>
+      prev.map((p) => (p.id === playlistId ? { ...p, title, description } : p))
+    );
+
+    if (currentNav.type === "playlist" && currentNav.playlist.id === playlistId) {
+      const updated = { ...currentNav.playlist, title, description };
+      setHistory((prev) =>
+        prev.map((item, idx) =>
+          idx === historyIndex && item.type === "playlist"
+            ? { ...item, playlist: updated }
+            : item
+        )
+      );
     }
   };
 
@@ -407,6 +580,16 @@ export const App: FC = () => {
       setContinuationToken(page.continuation || null);
       if (playlistId === "liked" || playlistId === "LM") {
         setLikedSongs(page.tracks);
+        if (page.track_count) {
+          setLikedSongsTotalCount(page.track_count);
+          try {
+            localStorage.setItem("tubify_liked_total_count", page.track_count);
+          } catch {}
+        }
+      } else if (page.track_count) {
+        setPlaylists((prev) =>
+          prev.map((p) => (p.id === playlistId ? { ...p, track_count: page.track_count } : p))
+        );
       }
     } catch (e) {
       console.error("Failed to load playlist tracks:", e);
@@ -478,7 +661,11 @@ export const App: FC = () => {
         <Sidebar
           selectedPlaylistId={currentNav.type === "playlist" ? currentNav.playlist.id : null}
           onSelectPlaylist={handleSelectPlaylist}
-          likedSongsCount={likedSongs.length}
+          onPlayPlaylist={handlePlayPlaylist}
+          onCreatePlaylist={handleCreatePlaylist}
+          onDeletePlaylist={handleDeletePlaylist}
+          onEditPlaylist={handleEditPlaylist}
+          likedSongsCount={likedSongsTotalCount || likedSongs.length}
           playlists={playlists}
           userProfile={userProfile}
           onOpenLogin={() => setIsLoginModalOpen(true)}
@@ -568,11 +755,21 @@ export const App: FC = () => {
               <PlaylistView
                 playlist={currentNav.playlist}
                 tracks={activePlaylistTracks}
+                likedSongsTotalCount={likedSongsTotalCount}
+                userProfileName={userProfile.name}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
-                onPlayTrack={(t) => player.playTrack(t, activePlaylistTracks)}
+                onPlayTrack={(t) => {
+                  if (currentNav.playlist.id) {
+                    recordPlaylistPlayed(currentNav.playlist.id);
+                  }
+                  player.playTrack(t, activePlaylistTracks);
+                }}
                 onPlayAll={() => {
                   if (activePlaylistTracks.length > 0) {
+                    if (currentNav.playlist.id) {
+                      recordPlaylistPlayed(currentNav.playlist.id);
+                    }
                     player.playTrack(activePlaylistTracks[0], activePlaylistTracks);
                   }
                 }}
