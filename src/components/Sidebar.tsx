@@ -28,7 +28,13 @@ interface SidebarProps {
   onSelectPlaylist: (playlist: Playlist | "liked" | "episodes") => void;
   onPlayPlaylist?: (playlist: Playlist | "liked", shuffle?: boolean) => void;
   onDeletePlaylist?: (playlistId: string) => void;
-  onEditPlaylist?: (playlistId: string, title: string, description?: string) => void;
+  onEditPlaylist?: (
+    playlistId: string,
+    title: string,
+    description?: string,
+    privacyStatus?: PrivacyStatus
+  ) => Promise<void> | void;
+  onOpenEditModal?: (playlist: Playlist) => void;
   onCreatePlaylist?: (
     title: string,
     description?: string,
@@ -170,6 +176,7 @@ export const Sidebar: FC<SidebarProps> = ({
   onPlayPlaylist,
   onDeletePlaylist,
   onEditPlaylist,
+  onOpenEditModal,
   onCreatePlaylist,
   likedSongsCount,
   playlists,
@@ -470,11 +477,15 @@ export const Sidebar: FC<SidebarProps> = ({
     }
   };
 
-  const handleSaveEditedPlaylist = (playlistId: string, title: string, description?: string) => {
+  const handleSaveEditedPlaylist = async (
+    playlistId: string,
+    title: string,
+    description?: string,
+    privacyStatus?: PrivacyStatus
+  ) => {
     if (onEditPlaylist) {
-      onEditPlaylist(playlistId, title, description);
+      await onEditPlaylist(playlistId, title, description, privacyStatus);
     }
-    player.showToast("Çalma listesi güncellendi");
   };
 
   const handleDeleteContextMenuAction = (pl: Playlist) => {
@@ -1407,20 +1418,28 @@ export const Sidebar: FC<SidebarProps> = ({
           isPinned={contextMenu.isPinned}
           onClose={() => setContextMenu(null)}
           onPlay={handlePlayContextMenuAction}
-          onEdit={(pl) => setEditingPlaylist(pl)}
+          onEdit={(pl) => {
+            if (onOpenEditModal) {
+              onOpenEditModal(pl);
+            } else {
+              setEditingPlaylist(pl);
+            }
+          }}
           onDelete={handleDeleteContextMenuAction}
           onToggleHide={toggleHide}
           onTogglePin={togglePin}
         />
       )}
 
-      {/* Edit Playlist Modal */}
-      <EditPlaylistModal
-        isOpen={!!editingPlaylist}
-        playlist={editingPlaylist}
-        onClose={() => setEditingPlaylist(null)}
-        onSave={handleSaveEditedPlaylist}
-      />
+      {/* Edit Playlist Modal (Fallback if not provided globally) */}
+      {!onOpenEditModal && (
+        <EditPlaylistModal
+          isOpen={!!editingPlaylist}
+          playlist={editingPlaylist}
+          onClose={() => setEditingPlaylist(null)}
+          onSave={handleSaveEditedPlaylist}
+        />
+      )}
 
       {/* Create Playlist Modal */}
       <CreatePlaylistModal

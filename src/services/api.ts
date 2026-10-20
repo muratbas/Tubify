@@ -198,10 +198,47 @@ export async function createYtPlaylist(
 }
 
 export async function deleteYtPlaylist(playlistId: string): Promise<void> {
+  const cleanPlaylistId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_yt_playlist", { playlistId });
+    await invoke("delete_yt_playlist", { playlistId: cleanPlaylistId });
     return;
+  }
+}
+
+export async function editYtPlaylist(
+  playlistId: string,
+  title?: string,
+  description?: string,
+  privacyStatus?: "PUBLIC" | "UNLISTED" | "PRIVATE"
+): Promise<void> {
+  const cleanPlaylistId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
+
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("edit_yt_playlist", {
+      playlistId: cleanPlaylistId,
+      title: title || null,
+      description: description !== undefined ? description : null,
+      privacyStatus: privacyStatus || null,
+    });
+    return;
+  }
+
+  const res = await fetch("/api/playlist/edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      playlistId: cleanPlaylistId,
+      title,
+      description,
+      privacyStatus,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Çalma listesi düzenlenemedi");
   }
 }
 

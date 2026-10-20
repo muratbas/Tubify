@@ -74,6 +74,7 @@ export interface Playlist {
   description?: string | null;
   thumbnail?: string | null;
   track_count?: string | null;
+  privacy_status?: "PUBLIC" | "UNLISTED" | "PRIVATE" | string | null;
 }
 
 export type RightDrawerTab = "nowPlaying" | "queue" | "lyrics";

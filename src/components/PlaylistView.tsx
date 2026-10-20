@@ -10,6 +10,9 @@ import {
   Search,
   Plus,
   RotateCw,
+  Pencil,
+  Trash2,
+  Copy,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -48,6 +51,8 @@ interface PlaylistViewProps {
   onAddSuggestion?: (track: Track) => Promise<void> | void;
   onRefreshSuggestions?: () => void;
   isRefreshingSuggestions?: boolean;
+  onOpenEditModal?: (playlist: Playlist) => void;
+  onDeletePlaylist?: (playlistId: string) => void;
 }
 
 export const PlaylistView: FC<PlaylistViewProps> = ({
@@ -76,20 +81,45 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   onAddSuggestion,
   onRefreshSuggestions,
   isRefreshingSuggestions = false,
+  onOpenEditModal,
+  onDeletePlaylist,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { queueViewMode } = usePlayer();
+  const { queueViewMode, showToast } = usePlayer();
   const isLight = theme === "light";
 
   const [filterQuery, setFilterQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(50);
   const [imageError, setImageError] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const isLikedPlaylist = playlist.id === "liked" || playlist.id === "LM";
+  const isEditable = !isLikedPlaylist && playlist.id !== "episodes" && !!onOpenEditModal;
 
   const playlistThumbnail = "thumbnail" in playlist ? playlist.thumbnail : null;
   const displayCover = !imageError ? (playlistThumbnail || tracks[0]?.thumbnail) : null;
+
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
 
   useEffect(() => {
     setImageError(false);
@@ -151,7 +181,16 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
       <div className="relative px-8 pb-6 pt-6 flex flex-col gap-6 bg-transparent">
         <div className="flex items-end gap-6 pt-2">
           {/* Cover Art: 192x192px (w-48 h-48) with soft shadow */}
-          <div className="shrink-0 shadow-xl rounded-md overflow-hidden w-48 h-48">
+          <div
+            className={`shrink-0 shadow-xl rounded-md overflow-hidden w-48 h-48 relative ${
+              isEditable ? "group/cover cursor-pointer" : ""
+            }`}
+            onClick={() => {
+              if (isEditable && onOpenEditModal) {
+                onOpenEditModal(playlist as Playlist);
+              }
+            }}
+          >
             {isLikedPlaylist ? (
               <div className="w-full h-full bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center">
                 <svg
@@ -177,6 +216,19 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                 <Music2 className="w-16 h-16 text-neutral-400" />
               </div>
             )}
+
+            {/* In-page edit hover overlay */}
+            {isEditable && (
+              <div
+                className="absolute inset-0 bg-black/55 opacity-0 group-hover/cover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 text-white z-10"
+                title="Bilgileri düzenle"
+              >
+                <Pencil className="w-7 h-7 drop-shadow-md" />
+                <span className="text-xs font-bold tracking-tight drop-shadow-md">
+                  Bilgileri düzenle
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Details */}
@@ -188,13 +240,50 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             >
               Çalma Listesi
             </span>
-            <h1
-              className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 ${
-                isLight ? "text-neutral-900" : "text-white"
+            <div
+              className={`flex items-center gap-3 ${
+                isEditable ? "cursor-pointer group/title" : ""
               }`}
+              onClick={() => {
+                if (isEditable && onOpenEditModal) {
+                  onOpenEditModal(playlist as Playlist);
+                }
+              }}
+              title={isEditable ? "Bilgileri düzenlemek için tıkla" : undefined}
             >
-              {isLikedPlaylist ? "Beğenilenler" : playlist.title}
-            </h1>
+              <h1
+                className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 transition-colors ${
+                  isLight ? "text-neutral-900" : "text-white"
+                } ${isEditable ? "group-hover/title:text-[#ff0000]" : ""}`}
+              >
+                {isLikedPlaylist ? "Beğenilenler" : playlist.title}
+              </h1>
+              {isEditable && (
+                <button
+                  type="button"
+                  className="opacity-0 group-hover/title:opacity-100 transition-all p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-neutral-400 hover:text-[#ff0000] cursor-pointer"
+                  title="Bilgileri düzenle"
+                >
+                  <Pencil className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {playlist.description && (
+              <p
+                className={`text-sm max-w-2xl line-clamp-2 transition-colors ${
+                  isLight ? "text-neutral-600" : "text-neutral-300"
+                } ${isEditable ? "cursor-pointer hover:text-neutral-900 dark:hover:text-white" : ""}`}
+                onClick={() => {
+                  if (isEditable && onOpenEditModal) {
+                    onOpenEditModal(playlist as Playlist);
+                  }
+                }}
+              >
+                {playlist.description}
+              </p>
+            )}
+
             <p
               className={`text-sm mt-1 flex items-center gap-1.5 ${
                 isLight ? "text-neutral-600" : "text-neutral-400"
@@ -254,15 +343,84 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             <Shuffle className="w-6 h-6" />
           </button>
 
-          {/* More Options */}
-          <button
-            className={`transition-colors cursor-pointer p-2 ${
-              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-            }`}
-            title="Daha fazla seçenek"
-          >
-            <MoreHorizontal className="w-6 h-6" />
-          </button>
+          {/* More Options Dropdown */}
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              className={`transition-colors cursor-pointer p-2 rounded-full ${
+                isMoreMenuOpen
+                  ? isLight
+                    ? "bg-neutral-200 text-neutral-900"
+                    : "bg-white/20 text-white"
+                  : isLight
+                  ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                  : "text-neutral-400 hover:text-white hover:bg-white/10"
+              }`}
+              title="Daha fazla seçenek"
+            >
+              <MoreHorizontal className="w-6 h-6" />
+            </button>
+
+            {isMoreMenuOpen && (
+              <div
+                className={`absolute left-0 top-full mt-2 w-52 rounded-xl py-1.5 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 ${
+                  isLight
+                    ? "bg-white border-neutral-200 text-neutral-800 shadow-neutral-400/20"
+                    : "bg-[#282828] border-white/10 text-neutral-200 shadow-black/80"
+                }`}
+              >
+                {isEditable && (
+                  <button
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      if (onOpenEditModal) onOpenEditModal(playlist as Playlist);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Pencil className="w-4 h-4 text-neutral-400" />
+                    <span>Bilgileri düzenle</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    const cleanId = (playlist.id || "").replace(/^VL/, "");
+                    const url = `https://music.youtube.com/playlist?list=${cleanId}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      showToast("Bağlantı panoya kopyalandı");
+                    }).catch(() => {
+                      showToast("Bağlantı kopyalanamadı");
+                    });
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                    isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Copy className="w-4 h-4 text-neutral-400" />
+                  <span>Bağlantıyı kopyala</span>
+                </button>
+
+                {isEditable && onDeletePlaylist && (
+                  <>
+                    <div className="h-px bg-neutral-200 dark:bg-white/10 my-1" />
+                    <button
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onDeletePlaylist(playlist.id);
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Kitaplığından sil</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Filter Search Input (🔍 Filtrele) */}
           <div className="ml-auto relative">

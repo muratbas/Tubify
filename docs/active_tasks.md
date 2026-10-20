@@ -428,7 +428,30 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **6. Doğrulama:**
       - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 41:** Çalma Listesi Düzenleme (İsim, Açıklama, Gizlilik) ve Sayfa İçi Düzenleme Entegrasyonu:
+    - **1. InnerTube `browse/edit_playlist` API Entegrasyonu & `VL` Temizliği (Bug Fix):**
+      - Rust backend `src-tauri/src/auth.rs` ve `src-tauri/src/lib.rs` içerisine `edit_playlist` fonksiyonu ve `edit_yt_playlist` Tauri IPC komutu eklendi.
+      - YouTube Music InnerTube `https://music.youtube.com/youtubei/v1/browse/edit_playlist` endpoint'ine `Cookie`, `Authorization: SAPISIDHASH`, `X-Origin`, `X-YouTube-Client-Name: 67` yetkilendirme başlıklarıyla POST isteği atıldı (404 veren `playlist/edit` yerine gerçek endpoint olan `browse/edit_playlist` bağlandı).
+      - `playlistId`'nin başındaki `VL` ön eki temizlenerek (`playlist_id.strip_prefix("VL")`) saf `PL...` ID'si gönderildi.
+      - Dinamik `actions` yapısı oluşturuldu: Ad için `ACTION_SET_PLAYLIST_NAME` (`playlistName`), açıklama için `ACTION_SET_PLAYLIST_DESCRIPTION` (`playlistDescription`), gizlilik için `ACTION_SET_PLAYLIST_PRIVACY` (`playlistPrivacy`).
+      - Web/dev modu için `vite.config.ts` sunucusuna `/api/playlist/edit` proxy middleware'i eklendi (`browse/edit_playlist` ile güncellendi).
+    - **2. `EditPlaylistModal.tsx` Geliştirmesi (Gizlilik, Loading ve Hata Yönetimi):**
+      - Modal arayüzüne 3 seçenekli Gizlilik seçimi eklendi: "Herkese Açık" (`Globe`), "Liste Dışı" (`EyeOff`), "Özel" (`Lock`).
+      - Kaydet butonuna `Loader2` animasyonlu spinner ve `isSubmitting` durum kontrolü eklendi; kaydetme sırasında inputlar dondurulur.
+      - API hatası durumunda modal kapanmaz, kullanıcı girdileri korunur ve kırmızı hata bildirim kutusu gösterilir.
+    - **3. Sayfa İçi (In-Page) Çalma Listesi Düzenleme Tetikleyicileri (`PlaylistView.tsx`):**
+      - **Kapak Görseli Hover Overlay'i:** Kullanıcı listelerinde kapağın üzerine gelindiğinde Spotify masaüstü tarzı koyu overlay, `Pencil` ikonu ve "Bilgileri düzenle" ipucu belirir; tıklandığında düzenleme modalı açılır.
+      - **Başlık (`<h1>`) ve Açıklama Tıklanabilirliği:** Çalma listesi başlığı üzerine gelindiğinde kırmızıya dönen hover efekti ve yanında beliren zarif kalem ikonu eklendi; başlığa veya açıklamaya tıklandığında doğrudan düzenleme penceresi tetiklenir.
+      - **Aksiyon Çubuğu Üç Nokta (`...`) Açılır Menüsü:** `PlaylistView` aksiyon çubuğundaki `MoreHorizontal` butonuna tıklandığında Spotify tarzı zengin açılır menü oluşturuldu: "Bilgileri düzenle" (`Pencil`), "Bağlantıyı kopyala" (`Copy`), ve "Kitaplığından sil" (`Trash2`).
+    - **4. Global State & Optimistic UI Senkronizasyonu (`App.tsx`):**
+      - `handleEditPlaylist` merkezi hale getirildi; sol kenar çubuğundaki liste adları, o anda açık olan çalma listesi başlığı/açıklaması ve sayfa geçmişi (`history`) anında güncellenir.
+      - `tubify_edited_playlists` localStorage önbelleği güncellenir.
+      - API hatası durumunda rollback yapılarak önceki durum geri yüklenir ve kullanıcıya toast ile hata detayı bildirilir.
+    - **5. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+
 
 

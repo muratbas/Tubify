@@ -1582,6 +1582,101 @@ pub async fn delete_playlist(playlist_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub async fn edit_playlist(
+    playlist_id: &str,
+    title: Option<&str>,
+    description: Option<&str>,
+    privacy_status: Option<&str>,
+) -> Result<(), String> {
+    let (cookie, sapisid) = {
+        let lock = SESSION.lock().unwrap();
+        let session = lock.as_ref().ok_or_else(|| "Giriş yapılmamış".to_string())?;
+        (session.cookie.clone(), session.sapisid.clone())
+    };
+
+    let (client, _) = build_client(&cookie, sapisid.as_deref())?;
+
+    let clean_id = playlist_id.strip_prefix("VL").unwrap_or(playlist_id);
+    let url = "https://music.youtube.com/youtubei/v1/browse/edit_playlist";
+
+    let mut actions = Vec::new();
+
+    if let Some(name) = title {
+        let trimmed = name.trim();
+        if !trimmed.is_empty() {
+            actions.push(serde_json::json!({
+                "action": "ACTION_SET_PLAYLIST_NAME",
+                "playlistName": trimmed
+            }));
+        }
+    }
+
+    if let Some(desc) = description {
+        actions.push(serde_json::json!({
+            "action": "ACTION_SET_PLAYLIST_DESCRIPTION",
+            "playlistDescription": desc.trim()
+        }));
+    }
+
+    if let Some(privacy) = privacy_status {
+        let trimmed = privacy.trim();
+        if !trimmed.is_empty() {
+            actions.push(serde_json::json!({
+                "action": "ACTION_SET_PLAYLIST_PRIVACY",
+                "playlistPrivacy": trimmed
+            }));
+        }
+    }
+
+    if actions.is_empty() {
+        return Ok(());
+    }
+
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": "1.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "playlistId": clean_id,
+        "actions": actions
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Düzenleme isteği gönderilemedi: {}", e))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let err_text = res.text().await.unwrap_or_default();
+        return Err(format!("Çalma listesi düzenlenemedi (HTTP {}): {}", status, err_text));
+    }
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("JSON ayrıştırılamadı: {}", e))?;
+
+    if let Some(err) = json.get("error") {
+        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Bilinmeyen hata");
+        return Err(format!("YouTube Music hatası: {}", msg));
+    }
+
+    if let Some(status) = json.get("status").and_then(|v| v.as_str()) {
+        if status != "STATUS_SUCCEEDED" && status != "OK" {
+            return Err(format!("İşlem başarısız: {}", status));
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn add_track_to_playlist(playlist_id: &str, video_id: &str) -> Result<(), String> {
     let (cookie, sapisid) = {
         let lock = SESSION.lock().unwrap();

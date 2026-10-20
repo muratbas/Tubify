@@ -22,10 +22,12 @@ import {
   getPlaylistTracksPage,
   createYtPlaylist,
   deleteYtPlaylist,
+  editYtPlaylist,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
 } from "./services/api";
 import { CustomTooltip } from "./components/CustomTooltip";
+import { EditPlaylistModal, type PrivacyStatus } from "./components/EditPlaylistModal";
 import type { Track, UserProfile, Playlist } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { AlertCircle, Check } from "lucide-react";
@@ -271,6 +273,7 @@ export const App: FC = () => {
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
 
   // Global Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -463,20 +466,49 @@ export const App: FC = () => {
     }
   };
 
-  const handleEditPlaylist = (playlistId: string, title: string, description?: string) => {
-    try {
-      const saved = localStorage.getItem("tubify_edited_playlists");
-      const editedMap = saved ? JSON.parse(saved) : {};
-      editedMap[playlistId] = { title, description };
-      localStorage.setItem("tubify_edited_playlists", JSON.stringify(editedMap));
-    } catch {}
+  const handleEditPlaylist = async (
+    playlistId: string,
+    title: string,
+    description?: string,
+    privacyStatus?: PrivacyStatus
+  ) => {
+    const cleanId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
 
+    // Snapshot state for rollback if network/IPC fails
+    const prevPlaylists = playlists;
+    const prevHistory = history;
+
+    // 1. Optimistic UI update for playlists state
     setPlaylists((prev) =>
-      prev.map((p) => (p.id === playlistId ? { ...p, title, description } : p))
+      prev.map((p) => {
+        const pClean = p.id.startsWith("VL") ? p.id.slice(2) : p.id;
+        if (pClean === cleanId || p.id === playlistId) {
+          return {
+            ...p,
+            title,
+            description: description !== undefined ? description : p.description,
+            privacy_status: privacyStatus || p.privacy_status,
+          };
+        }
+        return p;
+      })
     );
 
-    if (currentNav.type === "playlist" && currentNav.playlist.id === playlistId) {
-      const updated = { ...currentNav.playlist, title, description };
+    // 2. Optimistic UI update for current view & history if this playlist is active
+    if (
+      currentNav.type === "playlist" &&
+      (currentNav.playlist.id === playlistId ||
+        currentNav.playlist.id === cleanId ||
+        currentNav.playlist.id === `VL${cleanId}`)
+    ) {
+      const updated = {
+        ...currentNav.playlist,
+        title,
+        description: description !== undefined ? description : currentNav.playlist.description,
+        privacy_status:
+          privacyStatus ||
+          ("privacy_status" in currentNav.playlist ? currentNav.playlist.privacy_status : undefined),
+      };
       setHistory((prev) =>
         prev.map((item, idx) =>
           idx === historyIndex && item.type === "playlist"
@@ -484,6 +516,29 @@ export const App: FC = () => {
             : item
         )
       );
+    }
+
+    // 3. Update localStorage cache
+    try {
+      const saved = localStorage.getItem("tubify_edited_playlists");
+      const editedMap = saved ? JSON.parse(saved) : {};
+      editedMap[playlistId] = { title, description, privacyStatus };
+      editedMap[cleanId] = { title, description, privacyStatus };
+      localStorage.setItem("tubify_edited_playlists", JSON.stringify(editedMap));
+    } catch {}
+
+    // 4. InnerTube API call
+    try {
+      await editYtPlaylist(cleanId, title, description, privacyStatus);
+      player.showToast("Çalma listesi güncellendi");
+    } catch (err: unknown) {
+      console.error("YouTube Music playlist edit error:", err);
+      // Rollback on failure
+      setPlaylists(prevPlaylists);
+      setHistory(prevHistory);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      player.showToast(`Çalma listesi güncellenemedi: ${errMsg}`);
+      throw err;
     }
   };
 
@@ -960,6 +1015,7 @@ export const App: FC = () => {
           onCreatePlaylist={handleCreatePlaylist}
           onDeletePlaylist={handleDeletePlaylist}
           onEditPlaylist={handleEditPlaylist}
+          onOpenEditModal={(pl) => setEditingPlaylist(pl)}
           likedSongsCount={likedSongsTotalCount || likedSongs.length}
           playlists={playlists}
           userProfile={userProfile}
@@ -1088,6 +1144,8 @@ export const App: FC = () => {
                 onAddSuggestion={handleAddSuggestionToPlaylist}
                 onRefreshSuggestions={handleRefreshSuggestions}
                 isRefreshingSuggestions={isRefreshingSuggestions}
+                onOpenEditModal={(pl) => setEditingPlaylist(pl)}
+                onDeletePlaylist={handleDeletePlaylist}
               />
             )}
 
@@ -1218,6 +1276,14 @@ export const App: FC = () => {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Global Edit Playlist Modal */}
+      <EditPlaylistModal
+        isOpen={!!editingPlaylist}
+        playlist={editingPlaylist}
+        onClose={() => setEditingPlaylist(null)}
+        onSave={handleEditPlaylist}
       />
 
       {/* Track Context Menu */}

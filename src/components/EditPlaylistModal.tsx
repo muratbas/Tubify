@@ -1,13 +1,20 @@
 import { useState, useEffect, type FC, type FormEvent } from "react";
-import { X, Music2 } from "lucide-react";
+import { X, Music2, Globe, EyeOff, Lock, Loader2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import type { Playlist } from "../types/music";
+
+export type PrivacyStatus = "PUBLIC" | "UNLISTED" | "PRIVATE";
 
 export interface EditPlaylistModalProps {
   isOpen: boolean;
   playlist: Playlist | null;
   onClose: () => void;
-  onSave: (playlistId: string, title: string, description?: string) => void;
+  onSave: (
+    playlistId: string,
+    title: string,
+    description?: string,
+    privacyStatus?: PrivacyStatus
+  ) => Promise<void> | void;
 }
 
 export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
@@ -21,39 +28,67 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>("PUBLIC");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (playlist) {
       setTitle(playlist.title || "");
       setDescription(playlist.description || "");
+      const priv =
+        playlist.privacy_status === "PRIVATE" ||
+        playlist.privacy_status === "UNLISTED" ||
+        playlist.privacy_status === "PUBLIC"
+          ? playlist.privacy_status
+          : "PUBLIC";
+      setPrivacyStatus(priv);
+      setError(null);
+      setIsSubmitting(false);
     }
-  }, [playlist]);
+  }, [playlist, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isSubmitting, onClose]);
 
   if (!isOpen || !playlist) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cleanTitle = title.trim();
-    if (!cleanTitle) return;
-    onSave(playlist.id, cleanTitle, description.trim() || undefined);
-    onClose();
+    if (!cleanTitle || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await onSave(
+        playlist.id,
+        cleanTitle,
+        description.trim(),
+        privacyStatus
+      );
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Çalma listesi güncellenemedi");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
-      onClick={onClose}
+      onClick={() => {
+        if (!isSubmitting) onClose();
+      }}
     >
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl p-6 relative border transition-all animate-in zoom-in-95 duration-150 ${
@@ -68,6 +103,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
           <h3 className="text-base font-bold tracking-tight">Bilgileri düzenle</h3>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             className={`p-1.5 rounded-full transition-colors cursor-pointer ${
               isLight ? "hover:bg-neutral-100 text-neutral-500" : "hover:bg-white/10 text-neutral-400"
             }`}
@@ -75,6 +111,13 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Error message banner */}
+        {error && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+            {error}
+          </div>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -100,12 +143,13 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-xs font-semibold mb-1 text-neutral-500 dark:text-neutral-400">
-                  Ad
+                  Ad <span className="text-[#ff0000]">*</span>
                 </label>
                 <input
                   type="text"
                   autoFocus
                   required
+                  disabled={isSubmitting}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Çalma listesi adı"
@@ -123,6 +167,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                 </label>
                 <textarea
                   rows={2}
+                  disabled={isSubmitting}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Açıklama ekle"
@@ -136,10 +181,78 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
             </div>
           </div>
 
+          {/* Privacy Selector */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5 text-neutral-500 dark:text-neutral-400">
+              Gizlilik
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setPrivacyStatus("PUBLIC")}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  privacyStatus === "PUBLIC"
+                    ? isLight
+                      ? "border-[#ff0000] bg-red-50/50 text-[#ff0000] shadow-sm font-semibold"
+                      : "border-[#ff0000] bg-[#ff0000]/10 text-white shadow-sm font-semibold"
+                    : isLight
+                    ? "border-neutral-200 hover:bg-neutral-50 text-neutral-600"
+                    : "border-white/10 hover:bg-white/5 text-neutral-400"
+                }`}
+              >
+                <Globe className="w-4 h-4 mb-1" />
+                <span className="text-[11px]">Herkese Açık</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setPrivacyStatus("UNLISTED")}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  privacyStatus === "UNLISTED"
+                    ? isLight
+                      ? "border-[#ff0000] bg-red-50/50 text-[#ff0000] shadow-sm font-semibold"
+                      : "border-[#ff0000] bg-[#ff0000]/10 text-white shadow-sm font-semibold"
+                    : isLight
+                    ? "border-neutral-200 hover:bg-neutral-50 text-neutral-600"
+                    : "border-white/10 hover:bg-white/5 text-neutral-400"
+                }`}
+              >
+                <EyeOff className="w-4 h-4 mb-1" />
+                <span className="text-[11px]">Liste Dışı</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setPrivacyStatus("PRIVATE")}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  privacyStatus === "PRIVATE"
+                    ? isLight
+                      ? "border-[#ff0000] bg-red-50/50 text-[#ff0000] shadow-sm font-semibold"
+                      : "border-[#ff0000] bg-[#ff0000]/10 text-white shadow-sm font-semibold"
+                    : isLight
+                    ? "border-neutral-200 hover:bg-neutral-50 text-neutral-600"
+                    : "border-white/10 hover:bg-white/5 text-neutral-400"
+                }`}
+              >
+                <Lock className="w-4 h-4 mb-1" />
+                <span className="text-[11px]">Özel</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1.5 px-0.5">
+              {privacyStatus === "PUBLIC" && "Herkes arayabilir ve görüntüleyebilir."}
+              {privacyStatus === "UNLISTED" && "Yalnızca bağlantıya sahip olanlar görüntüleyebilir."}
+              {privacyStatus === "PRIVATE" && "Yalnızca siz görüntüleyebilirsiniz."}
+            </p>
+          </div>
+
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-4">
+          <div className="flex items-center justify-end gap-2.5 pt-3">
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={onClose}
               className={`px-4 py-2 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                 isLight
@@ -151,10 +264,11 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!title.trim()}
-              className="px-5 py-2 text-xs font-bold rounded-full bg-[#ff0000] text-white hover:bg-[#e60000] disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-95"
+              disabled={!title.trim() || isSubmitting}
+              className="px-5 py-2 text-xs font-bold rounded-full bg-[#ff0000] text-white hover:bg-[#e60000] disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
             >
-              Kaydet
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</span>
             </button>
           </div>
         </form>
