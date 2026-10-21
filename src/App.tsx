@@ -323,20 +323,24 @@ export const App: FC = () => {
           if (edSaved) editedMap = JSON.parse(edSaved);
         } catch {}
 
+        let customCovers: Record<string, string> = {};
+        try {
+          const covSaved = localStorage.getItem("tubify_custom_playlist_covers");
+          if (covSaved) customCovers = JSON.parse(covSaved);
+        } catch {}
+
         const cleanPlaylists = pls.value
           .filter((p) => !isLikedSongsPlaylist(p) && !deletedIds.has(p.id))
           .map((p) => {
-            if (editedMap[p.id]) {
-              return {
-                ...p,
-                title: editedMap[p.id].title || p.title,
-                description:
-                  editedMap[p.id].description !== undefined
-                    ? editedMap[p.id].description
-                    : p.description,
-              };
-            }
-            return p;
+            const cleanId = p.id.startsWith("VL") ? p.id.slice(2) : p.id;
+            const ed = editedMap[p.id] || editedMap[cleanId];
+            const customCover = customCovers[p.id] || customCovers[cleanId];
+            return {
+              ...p,
+              title: ed?.title || p.title,
+              description: ed?.description !== undefined ? ed.description : p.description,
+              thumbnail: customCover !== undefined ? customCover : p.thumbnail,
+            };
           });
 
         setPlaylists(cleanPlaylists);
@@ -470,7 +474,8 @@ export const App: FC = () => {
     playlistId: string,
     title: string,
     description?: string,
-    privacyStatus?: PrivacyStatus
+    privacyStatus?: PrivacyStatus,
+    customThumbnail?: string | null
   ) => {
     const cleanId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
 
@@ -488,6 +493,7 @@ export const App: FC = () => {
             title,
             description: description !== undefined ? description : p.description,
             privacy_status: privacyStatus || p.privacy_status,
+            thumbnail: customThumbnail !== undefined ? customThumbnail : p.thumbnail,
           };
         }
         return p;
@@ -508,6 +514,7 @@ export const App: FC = () => {
         privacy_status:
           privacyStatus ||
           ("privacy_status" in currentNav.playlist ? currentNav.playlist.privacy_status : undefined),
+        thumbnail: customThumbnail !== undefined ? customThumbnail : currentNav.playlist.thumbnail,
       };
       setHistory((prev) =>
         prev.map((item, idx) =>
@@ -527,6 +534,22 @@ export const App: FC = () => {
       localStorage.setItem("tubify_edited_playlists", JSON.stringify(editedMap));
     } catch {}
 
+    // Save custom cover if modified
+    if (customThumbnail !== undefined) {
+      try {
+        const savedCovers = localStorage.getItem("tubify_custom_playlist_covers");
+        const coversMap = savedCovers ? JSON.parse(savedCovers) : {};
+        if (customThumbnail) {
+          coversMap[playlistId] = customThumbnail;
+          coversMap[cleanId] = customThumbnail;
+        } else {
+          delete coversMap[playlistId];
+          delete coversMap[cleanId];
+        }
+        localStorage.setItem("tubify_custom_playlist_covers", JSON.stringify(coversMap));
+      } catch {}
+    }
+
     // 4. InnerTube API call
     try {
       await editYtPlaylist(cleanId, title, description, privacyStatus);
@@ -540,6 +563,57 @@ export const App: FC = () => {
       player.showToast(`Çalma listesi güncellenemedi: ${errMsg}`);
       throw err;
     }
+  };
+
+  const handleUpdatePlaylistCover = (playlistId: string, customThumbnail: string) => {
+    const cleanId = playlistId.startsWith("VL") ? playlistId.slice(2) : playlistId;
+
+    // 1. Optimistic UI update for playlists state
+    setPlaylists((prev) =>
+      prev.map((p) => {
+        const pClean = p.id.startsWith("VL") ? p.id.slice(2) : p.id;
+        if (pClean === cleanId || p.id === playlistId) {
+          return { ...p, thumbnail: customThumbnail };
+        }
+        return p;
+      })
+    );
+
+    // 2. Optimistic UI update for current view & history if this playlist is active
+    if (
+      currentNav.type === "playlist" &&
+      (currentNav.playlist.id === playlistId ||
+        currentNav.playlist.id === cleanId ||
+        currentNav.playlist.id === `VL${cleanId}`)
+    ) {
+      const updated = {
+        ...currentNav.playlist,
+        thumbnail: customThumbnail,
+      };
+      setHistory((prev) =>
+        prev.map((item, idx) =>
+          idx === historyIndex && item.type === "playlist"
+            ? { ...item, playlist: updated }
+            : item
+        )
+      );
+    }
+
+    // 3. Save custom cover to localStorage
+    try {
+      const savedCovers = localStorage.getItem("tubify_custom_playlist_covers");
+      const coversMap = savedCovers ? JSON.parse(savedCovers) : {};
+      if (customThumbnail) {
+        coversMap[playlistId] = customThumbnail;
+        coversMap[cleanId] = customThumbnail;
+      } else {
+        delete coversMap[playlistId];
+        delete coversMap[cleanId];
+      }
+      localStorage.setItem("tubify_custom_playlist_covers", JSON.stringify(coversMap));
+    } catch {}
+
+    player.showToast("Çalma listesi kapağı güncellendi");
   };
 
   const handleToggleLike = async (track: Track) => {
@@ -1146,6 +1220,7 @@ export const App: FC = () => {
                 isRefreshingSuggestions={isRefreshingSuggestions}
                 onOpenEditModal={(pl) => setEditingPlaylist(pl)}
                 onDeletePlaylist={handleDeletePlaylist}
+                onEditCover={handleUpdatePlaylistCover}
               />
             )}
 

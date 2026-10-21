@@ -447,11 +447,42 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - `handleEditPlaylist` merkezi hale getirildi; sol kenar çubuğundaki liste adları, o anda açık olan çalma listesi başlığı/açıklaması ve sayfa geçmişi (`history`) anında güncellenir.
       - `tubify_edited_playlists` localStorage önbelleği güncellenir.
       - API hatası durumunda rollback yapılarak önceki durum geri yüklenir ve kullanıcıya toast ile hata detayı bildirilir.
-    - **5. Doğrulama:**
+    - **5. Yerel Özel Kapak Görseli Desteği (Custom Playlist Artwork):**
+      - `EditPlaylistModal.tsx` içindeki kapak alanı interaktif hale getirildi; tıklandığında yerel dosya seçici açılır, hover yapıldığında `Camera` ikonu ile "Fotoğraf seç" overlay'i gösterilir.
+      - Seçilen resim dosya boyutu sınırı ve bellek optimizasyonu için HTML5 Canvas ile en boy oranı korunarak 500x500 JPEG formatında optimize edilir (~40KB).
+      - İstenirse kapağı varsayılana döndürmek için "Kaldır" butonu eklendi.
+      - Özel kapaklar `localStorage` (`tubify_custom_playlist_covers`) üzerinde kalıcı hale getirildi; hem sol menüde, hem çalma listesi sayfasında, hem de ana sayfada anında güncellenir.
+    - **6. Doğrulama:**
       - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 42:** Çalma Listesi Düzenleme Sadeleştirmesi & Sürükle-Bırak (Drag & Drop) Kapak Desteği:
+    - **1. Düzenleme Tetikleyicilerinin Sadeleştirilmesi (Redundancy Cleanup):**
+      - `PlaylistView.tsx` içindeki kapak tıklaması, kapağın üzerindeki kalem/overlay, liste başlığı (`<h1>`) tıklaması, başlık yanındaki hover kalem butonu ve açıklama tıklaması tamamen kaldırıldı.
+      - Sayfa içerisindeki görsel kalabalık temizlendi; liste başlığı ve açıklaması temiz/doğal görünümüne kavuşturuldu.
+      - Düzenleme menüsüne erişim kullanıcının isteği doğrultusunda **yalnızca iki kontrollü ve ergonomik noktaya** sınırlandırıldı:
+        1. Çalma listesi sayfasındaki üç nokta (`...` / `MoreHorizontal`) açılır menüsü ("Bilgileri düzenle").
+        2. Sol menüdeki çalma listesi sağ tık (context menu) seçeneği ("Düzenle").
+    - **2. Tut-Çek-Bırak (Drag & Drop) ile Kapak Görseli Yükleme:**
+      - **Çalma Listesi Sayfası (`PlaylistView.tsx`):**
+        - Çalma listesi kapak alanına HTML5 Drag & Drop (`onDragEnter`, `onDragOver`, `onDragLeave`, `onDrop`) desteği entegre edildi.
+        - Titremeyi (child element flickering) önleyen `dragEnterCounterRef` sayacı kuruldu.
+        - Kullanıcı bir görseli kapak üzerine sürüklediğinde kırmızı halka (`ring-4 ring-[#ff0000]`), koyu backdrop ve zıplayan `Upload` ikonuyla "Fotoğrafı buraya bırakın" animasyonu gösterilir.
+        - Masaüstünden, dosya yöneticisinden veya internet tarayıcısından sürüklenen görsel dosyaları ya da görsel bağlantıları anında 500x500 JPEG formatında optimize edilip çalma listesi kapağı olarak kaydedilir.
+      - **Düzenleme Modalı (`EditPlaylistModal.tsx`):**
+        - Modaldaki kapak kutusuna da hem tıklama hem sürükle-bırak desteği eklendi; dosya veya web resmi sürüklendiğinde kesik çizgili kırmızı çerçeve ve animasyonlu bilgilendirme belirir.
+      - **Global State Senkronizasyonu (`App.tsx`):**
+        - `handleUpdatePlaylistCover` fonksiyonu kurularak kapak sürüklendiğinde anında hem sol sidebar'da hem aktif playlist sayfasında hem de `tubify_custom_playlist_covers` yerel depolamasında güncellenmesi sağlandı.
+    - **3. Doğrulama:**
+      - `npx tsc --noEmit` ve `cargo check` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 43:** Klavye Kısayolu (Space ile Oynat/Duraklat):
+    - [PlayerContext.tsx](file:///c:/Projeler/Tubify/src/context/PlayerContext.tsx) içindeki `window` klavye dinleyicisine Space tuşu (`e.code === "Space"`) kısayolu eklendi.
+    - Program odaktayken (focus) Space tuşuna basıldığında anında `togglePlayPause` tetiklenir ve tarayıcının varsayılan sayfa kaydırma (`e.preventDefault()`) davranışı engellenir.
+    - Metin giriş alanları (arama çubuğu, çalma listesi adı/açıklaması, textarea vb.) akıllıca tespit edilerek bu alanlarda yazı yazarken Space tuşunun normal boşluk karakteri bırakması korundu.
+    - `npx tsc --noEmit` ile sıfır hata doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
-- Kullanıcı onayından sonra yeni özellikler veya ek UI/UX isteklerinin uygulanması.
+- Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
 
 
 

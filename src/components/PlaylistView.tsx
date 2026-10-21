@@ -13,11 +13,13 @@ import {
   Pencil,
   Trash2,
   Copy,
+  Upload,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import type { Track, Playlist } from "../types/music";
+import { resizeImageFile } from "./EditPlaylistModal";
 
 interface PlaylistViewProps {
   playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null; track_count?: string | null };
@@ -53,6 +55,7 @@ interface PlaylistViewProps {
   isRefreshingSuggestions?: boolean;
   onOpenEditModal?: (playlist: Playlist) => void;
   onDeletePlaylist?: (playlistId: string) => void;
+  onEditCover?: (playlistId: string, customThumbnail: string) => Promise<void> | void;
 }
 
 export const PlaylistView: FC<PlaylistViewProps> = ({
@@ -83,6 +86,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   isRefreshingSuggestions = false,
   onOpenEditModal,
   onDeletePlaylist,
+  onEditCover,
 }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -93,6 +97,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   const [visibleCount, setVisibleCount] = useState(50);
   const [imageError, setImageError] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isCoverDraggingOver, setIsCoverDraggingOver] = useState(false);
+  const dragEnterCounterRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const isLikedPlaylist = playlist.id === "liked" || playlist.id === "LM";
@@ -100,6 +106,72 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
   const playlistThumbnail = "thumbnail" in playlist ? playlist.thumbnail : null;
   const displayCover = !imageError ? (playlistThumbnail || tracks[0]?.thumbnail) : null;
+
+  const handleCoverDragEnter = (e: React.DragEvent) => {
+    if (!isEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragEnterCounterRef.current += 1;
+    setIsCoverDraggingOver(true);
+  };
+
+  const handleCoverDragOver = (e: React.DragEvent) => {
+    if (!isEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleCoverDragLeave = (e: React.DragEvent) => {
+    if (!isEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragEnterCounterRef.current = Math.max(0, dragEnterCounterRef.current - 1);
+    if (dragEnterCounterRef.current === 0) {
+      setIsCoverDraggingOver(false);
+    }
+  };
+
+  const handleCoverDrop = async (e: React.DragEvent) => {
+    if (!isEditable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragEnterCounterRef.current = 0;
+    setIsCoverDraggingOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        showToast("Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WebP)");
+        return;
+      }
+      try {
+        const resized = await resizeImageFile(file, 500, 0.85);
+        if (onEditCover) {
+          await onEditCover(playlist.id, resized);
+        }
+      } catch (err) {
+        console.error("Kapak resmi işlenirken hata oluştu:", err);
+        showToast("Kapak resmi işlenirken bir sorun oluştu");
+      }
+      return;
+    }
+
+    const droppedUrl =
+      e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if (
+      droppedUrl &&
+      (droppedUrl.startsWith("http://") ||
+        droppedUrl.startsWith("https://") ||
+        droppedUrl.startsWith("data:image/"))
+    ) {
+      if (onEditCover) {
+        await onEditCover(playlist.id, droppedUrl);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!isMoreMenuOpen) return;
@@ -182,14 +254,13 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
         <div className="flex items-end gap-6 pt-2">
           {/* Cover Art: 192x192px (w-48 h-48) with soft shadow */}
           <div
-            className={`shrink-0 shadow-xl rounded-md overflow-hidden w-48 h-48 relative ${
-              isEditable ? "group/cover cursor-pointer" : ""
+            onDragEnter={handleCoverDragEnter}
+            onDragOver={handleCoverDragOver}
+            onDragLeave={handleCoverDragLeave}
+            onDrop={handleCoverDrop}
+            className={`shrink-0 shadow-xl rounded-md overflow-hidden w-48 h-48 relative transition-all ${
+              isCoverDraggingOver ? "ring-4 ring-[#ff0000] scale-[1.02]" : ""
             }`}
-            onClick={() => {
-              if (isEditable && onOpenEditModal) {
-                onOpenEditModal(playlist as Playlist);
-              }
-            }}
           >
             {isLikedPlaylist ? (
               <div className="w-full h-full bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center">
@@ -217,15 +288,15 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               </div>
             )}
 
-            {/* In-page edit hover overlay */}
-            {isEditable && (
-              <div
-                className="absolute inset-0 bg-black/55 opacity-0 group-hover/cover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 text-white z-10"
-                title="Bilgileri düzenle"
-              >
-                <Pencil className="w-7 h-7 drop-shadow-md" />
-                <span className="text-xs font-bold tracking-tight drop-shadow-md">
-                  Bilgileri düzenle
+            {/* Drag and Drop Over Overlay */}
+            {isEditable && isCoverDraggingOver && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-20 p-3 text-center pointer-events-none animate-in fade-in duration-150">
+                <Upload className="w-8 h-8 text-[#ff0000] animate-bounce" />
+                <span className="text-xs font-bold leading-tight drop-shadow">
+                  Fotoğrafı buraya bırakın
+                </span>
+                <span className="text-[10px] text-white/70">
+                  Kapak hemen güncellenir
                 </span>
               </div>
             )}
@@ -240,45 +311,19 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             >
               Çalma Listesi
             </span>
-            <div
-              className={`flex items-center gap-3 ${
-                isEditable ? "cursor-pointer group/title" : ""
+            <h1
+              className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 transition-colors ${
+                isLight ? "text-neutral-900" : "text-white"
               }`}
-              onClick={() => {
-                if (isEditable && onOpenEditModal) {
-                  onOpenEditModal(playlist as Playlist);
-                }
-              }}
-              title={isEditable ? "Bilgileri düzenlemek için tıkla" : undefined}
             >
-              <h1
-                className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 transition-colors ${
-                  isLight ? "text-neutral-900" : "text-white"
-                } ${isEditable ? "group-hover/title:text-[#ff0000]" : ""}`}
-              >
-                {isLikedPlaylist ? "Beğenilenler" : playlist.title}
-              </h1>
-              {isEditable && (
-                <button
-                  type="button"
-                  className="opacity-0 group-hover/title:opacity-100 transition-all p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-neutral-400 hover:text-[#ff0000] cursor-pointer"
-                  title="Bilgileri düzenle"
-                >
-                  <Pencil className="w-5 h-5" />
-                </button>
-              )}
-            </div>
+              {isLikedPlaylist ? "Beğenilenler" : playlist.title}
+            </h1>
 
             {playlist.description && (
               <p
                 className={`text-sm max-w-2xl line-clamp-2 transition-colors ${
                   isLight ? "text-neutral-600" : "text-neutral-300"
-                } ${isEditable ? "cursor-pointer hover:text-neutral-900 dark:hover:text-white" : ""}`}
-                onClick={() => {
-                  if (isEditable && onOpenEditModal) {
-                    onOpenEditModal(playlist as Playlist);
-                  }
-                }}
+                }`}
               >
                 {playlist.description}
               </p>

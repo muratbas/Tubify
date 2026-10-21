@@ -1,5 +1,5 @@
-import { useState, useEffect, type FC, type FormEvent } from "react";
-import { X, Music2, Globe, EyeOff, Lock, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, type FC, type FormEvent } from "react";
+import { X, Music2, Globe, EyeOff, Lock, Loader2, Camera, Trash2, Upload } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import type { Playlist } from "../types/music";
 
@@ -13,8 +13,47 @@ export interface EditPlaylistModalProps {
     playlistId: string,
     title: string,
     description?: string,
-    privacyStatus?: PrivacyStatus
+    privacyStatus?: PrivacyStatus,
+    customThumbnail?: string | null
   ) => Promise<void> | void;
+}
+
+export function resizeImageFile(file: File, maxDim: number = 500, quality: number = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
@@ -29,8 +68,13 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus>("PUBLIC");
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [isCoverModified, setIsCoverModified] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (playlist) {
@@ -43,6 +87,9 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
           ? playlist.privacy_status
           : "PUBLIC";
       setPrivacyStatus(priv);
+      setCoverPreview(playlist.thumbnail || null);
+      setIsCoverModified(false);
+      setIsDraggingOver(false);
       setError(null);
       setIsSubmitting(false);
     }
@@ -61,6 +108,84 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
 
   if (!isOpen || !playlist) return null;
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WebP).");
+      return;
+    }
+
+    try {
+      const resized = await resizeImageFile(file, 500, 0.85);
+      setCoverPreview(resized);
+      setIsCoverModified(true);
+      setError(null);
+    } catch {
+      setError("Resim işlenirken bir sorun oluştu.");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingOver) setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        setError("Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WebP).");
+        return;
+      }
+
+      try {
+        const resized = await resizeImageFile(file, 500, 0.85);
+        setCoverPreview(resized);
+        setIsCoverModified(true);
+        setError(null);
+      } catch {
+        setError("Resim işlenirken bir sorun oluştu.");
+      }
+      return;
+    }
+
+    const droppedUrl =
+      e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if (
+      droppedUrl &&
+      (droppedUrl.startsWith("http://") ||
+        droppedUrl.startsWith("https://") ||
+        droppedUrl.startsWith("data:image/"))
+    ) {
+      setCoverPreview(droppedUrl);
+      setIsCoverModified(true);
+      setError(null);
+    }
+  };
+
+  const handleRemoveCover = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCoverPreview(null);
+    setIsCoverModified(true);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cleanTitle = title.trim();
@@ -73,7 +198,8 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
         playlist.id,
         cleanTitle,
         description.trim(),
-        privacyStatus
+        privacyStatus,
+        isCoverModified ? coverPreview : undefined
       );
       onClose();
     } catch (err: unknown) {
@@ -98,6 +224,15 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Hidden file input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+        />
+
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-white/10">
           <h3 className="text-base font-bold tracking-tight">Bilgileri düzenle</h3>
@@ -122,20 +257,64 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div className="flex items-start gap-4">
-            {/* Thumbnail Preview */}
-            <div
-              className={`w-28 h-28 rounded-xl overflow-hidden shrink-0 flex items-center justify-center shadow-sm ${
-                isLight ? "bg-neutral-100 border border-neutral-200" : "bg-neutral-800 border border-white/5"
-              }`}
-            >
-              {playlist.thumbnail ? (
-                <img
-                  src={playlist.thumbnail}
-                  alt={playlist.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Music2 className="w-8 h-8 text-neutral-400" />
+            {/* Thumbnail Preview with Click-to-Upload */}
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              <div
+                onClick={() => {
+                  if (!isSubmitting) fileInputRef.current?.click();
+                }}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`w-28 h-28 rounded-xl overflow-hidden shrink-0 relative group/thumb cursor-pointer flex items-center justify-center shadow-sm transition-all border ${
+                  isDraggingOver
+                    ? "border-2 border-dashed border-[#ff0000] bg-red-500/10 scale-[1.02]"
+                    : isLight
+                    ? "bg-neutral-100 border-neutral-200 hover:border-neutral-400"
+                    : "bg-neutral-800 border-white/10 hover:border-white/30"
+                }`}
+                title="Kapak görseli seçmek veya sürükleyip bırakmak için tıkla"
+              >
+                {coverPreview ? (
+                  <img
+                    src={coverPreview}
+                    alt={playlist.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Music2 className="w-8 h-8 text-neutral-400" />
+                )}
+
+                {/* Dragging over overlay */}
+                {isDraggingOver ? (
+                  <div className="absolute inset-0 bg-[#ff0000]/25 backdrop-blur-xs flex flex-col items-center justify-center gap-1 text-white z-20 p-2 text-center pointer-events-none">
+                    <Upload className="w-6 h-6 text-white animate-bounce" />
+                    <span className="text-[10px] font-bold tracking-tight leading-tight drop-shadow">
+                      Buraya bırakın
+                    </span>
+                  </div>
+                ) : (
+                  /* Hover overlay with Camera icon */
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white z-10 p-2 text-center">
+                    <Camera className="w-5 h-5 drop-shadow" />
+                    <span className="text-[10px] font-bold tracking-tight leading-tight drop-shadow">
+                      Fotoğraf seç veya sürükle
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {coverPreview && (
+                <button
+                  type="button"
+                  onClick={handleRemoveCover}
+                  disabled={isSubmitting}
+                  className="text-[11px] font-medium text-neutral-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Kaldır</span>
+                </button>
               )}
             </div>
 

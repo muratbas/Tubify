@@ -32,7 +32,8 @@ interface SidebarProps {
     playlistId: string,
     title: string,
     description?: string,
-    privacyStatus?: PrivacyStatus
+    privacyStatus?: PrivacyStatus,
+    customThumbnail?: string | null
   ) => Promise<void> | void;
   onOpenEditModal?: (playlist: Playlist) => void;
   onCreatePlaylist?: (
@@ -481,10 +482,11 @@ export const Sidebar: FC<SidebarProps> = ({
     playlistId: string,
     title: string,
     description?: string,
-    privacyStatus?: PrivacyStatus
+    privacyStatus?: PrivacyStatus,
+    customThumbnail?: string | null
   ) => {
     if (onEditPlaylist) {
-      await onEditPlaylist(playlistId, title, description, privacyStatus);
+      await onEditPlaylist(playlistId, title, description, privacyStatus, customThumbnail);
     }
   };
 

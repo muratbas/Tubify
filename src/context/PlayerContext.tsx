@@ -458,8 +458,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 2. Hardware Keyboard Media Key listener (catches MediaTrackNext / MediaTrackPrevious / MediaPlayPause)
+    // 2. Hardware Keyboard Media Key & Space shortcut listener
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Space key shortcut: toggle playback when program is focused (ignored in text inputs)
+      if (e.code === "Space" || e.key === " ") {
+        const target = e.target as HTMLElement | null;
+        const isTextInput =
+          target &&
+          (target.tagName === "TEXTAREA" ||
+            (target.tagName === "INPUT" &&
+              !["range", "checkbox", "radio", "button", "submit", "reset"].includes(
+                (target as HTMLInputElement).type
+              )) ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable ||
+            Boolean(target.closest("textarea, select, [contenteditable='true']")) ||
+            Boolean(
+              target.closest("input:not([type='range']):not([type='checkbox']):not([type='radio'])")
+            ));
+
+        if (!isTextInput) {
+          e.preventDefault();
+          togglePlayPauseRef.current();
+          return;
+        }
+      }
+
       if (e.key === "MediaTrackNext") {
         e.preventDefault();
         nextTrackRef.current();
