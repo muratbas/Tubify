@@ -1,4 +1,10 @@
-import { useEffect, useRef, useMemo, type FC } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type FC,
+} from "react";
 import {
   Play,
   Shuffle,
@@ -32,20 +38,52 @@ export interface PlaylistContextMenuProps {
   isPinned?: boolean;
 }
 
-function getClampedPosition(pos: ContextMenuPosition | null) {
-  if (!pos) return { x: 0, y: 0 };
-  const menuWidth = 220;
-  const menuHeight = 280;
-  let x = pos.x;
-  let y = pos.y;
-  if (typeof window !== "undefined") {
-    if (x + menuWidth > window.innerWidth - 10) {
-      x = Math.max(10, window.innerWidth - menuWidth - 10);
-    }
-    if (y + menuHeight > window.innerHeight - 10) {
-      y = Math.max(10, window.innerHeight - menuHeight - 10);
-    }
+const PLAYER_BAR_HEIGHT = 84;
+const SAFETY_MARGIN = 8;
+const DEFAULT_MENU_WIDTH = 220;
+const DEFAULT_MENU_HEIGHT = 280;
+
+function calculateMenuPosition(
+  pos: ContextMenuPosition | null,
+  measuredWidth = DEFAULT_MENU_WIDTH,
+  measuredHeight = DEFAULT_MENU_HEIGHT
+) {
+  if (!pos || typeof window === "undefined") {
+    return { x: 0, y: 0 };
   }
+
+  const maxAvailableHeight = window.innerHeight - PLAYER_BAR_HEIGHT;
+
+  // 1. Dikey Eksen (Y Ekseni / Alt Taşma Kontrolü):
+  // Eğer tıklananY + menuYuksekligi > maxAvailableHeight ise menüyü tıklanan noktanın yukarısına aç
+  let y = pos.y;
+  if (pos.y + measuredHeight > maxAvailableHeight) {
+    y = pos.y - measuredHeight;
+  } else {
+    y = pos.y;
+  }
+
+  // 2. Yatay Eksen (X Ekseni / Sağ Taşma Kontrolü):
+  // Eğer tıklananX + menuGenisligi > window.innerWidth ise menüyü soluna doğru yasla
+  let x = pos.x;
+  if (pos.x + measuredWidth > window.innerWidth - SAFETY_MARGIN) {
+    x = pos.x - measuredWidth;
+  } else {
+    x = pos.x;
+  }
+
+  // 3. Güvenlik Payı: 0'dan küçük olmasını engelle (Math.max(8, y) ve Math.max(8, x))
+  y = Math.max(SAFETY_MARGIN, y);
+  x = Math.max(SAFETY_MARGIN, x);
+
+  // Pencere sınırları içine sıkıştır
+  if (y + measuredHeight > maxAvailableHeight) {
+    y = Math.max(SAFETY_MARGIN, maxAvailableHeight - measuredHeight);
+  }
+  if (x + measuredWidth > window.innerWidth - SAFETY_MARGIN) {
+    x = Math.max(SAFETY_MARGIN, window.innerWidth - measuredWidth - SAFETY_MARGIN);
+  }
+
   return { x, y };
 }
 
@@ -66,7 +104,21 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
   const player = usePlayer();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const coords = useMemo(() => getClampedPosition(position), [position]);
+  const [coords, setCoords] = useState<{ x: number; y: number }>(() =>
+    calculateMenuPosition(position)
+  );
+
+  // Akıllı Boyut & Viewport Collision Tespiti (useLayoutEffect ile paint öncesi)
+  useLayoutEffect(() => {
+    if (!position) return;
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const adjusted = calculateMenuPosition(position, rect.width, rect.height);
+      setCoords(adjusted);
+    } else {
+      setCoords(calculateMenuPosition(position));
+    }
+  }, [position, playlist]);
 
   // Click outside, ESC key, and Scroll/Wheel auto-close listeners
   useEffect(() => {
@@ -97,16 +149,22 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
       }
     };
 
+    const handleResize = () => {
+      onClose();
+    };
+
     window.addEventListener("mousedown", handleClickOutside, true);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("scroll", handleScroll, true);
     window.addEventListener("wheel", handleWheel, { passive: true, capture: true });
+    window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("mousedown", handleClickOutside, true);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("scroll", handleScroll, true);
       window.removeEventListener("wheel", handleWheel, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, [position, onClose]);
 
@@ -163,7 +221,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
     <div
       ref={menuRef}
       style={{ left: `${coords.x}px`, top: `${coords.y}px` }}
-      className={`fixed z-[9999] min-w-[210px] rounded-lg shadow-2xl p-1.5 text-xs font-medium select-none animate-in fade-in zoom-in-95 duration-100 ${
+      className={`fixed z-[9999] min-w-[210px] max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-none rounded-lg shadow-2xl p-1.5 text-xs font-medium select-none animate-in fade-in zoom-in-95 duration-100 ${
         isLight
           ? "bg-white border border-neutral-200 text-neutral-800 shadow-neutral-500/20"
           : "bg-[#282828] border border-white/10 text-white shadow-black/80"

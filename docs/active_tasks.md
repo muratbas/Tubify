@@ -481,8 +481,47 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - Metin giriş alanları (arama çubuğu, çalma listesi adı/açıklaması, textarea vb.) akıllıca tespit edilerek bu alanlarda yazı yazarken Space tuşunun normal boşluk karakteri bırakması korundu.
     - `npx tsc --noEmit` ile sıfır hata doğrulandı.
 
+  - [x] **Aşama 44:** Ses Kaydırıcısı (Volume Slider) Kararsızlığı & %100'e Fırlama Hatasının Düzeltilmesi:
+    - **1. Global Ses Durumu (Single Source of Truth) ve localStorage Kalıcılığı:**
+      - [PlayerContext.tsx](file:///c:/Projeler/Tubify/src/context/PlayerContext.tsx) içindeki `volume` (0.0 - 1.0) ve `isMuted` (boolean) state'leri tekil gerçeklik kaynağı olarak güçlendirildi.
+      - Başlangıçta `localStorage.getItem("tubify_volume")` okunurken hem `0.0 - 1.0` float değerleri hem de `1 - 100` yüzdelik değerleri otomatik normalize edilerek güvenli başlatma sağlandı.
+      - Asenkron işlem ve olay dinleyicisi kapanımlarında (closure) bayat veriyi (stale state) önlemek için senkron `volumeRef` ve `isMutedRef` referansları bağlandı.
+      - `setVolume` ve `toggleMute` fonksiyonları her çağrıda state'i, ref'leri ve `localStorage` kayıtlarını (`tubify_volume` ve `tubify_muted`) günceller; ardından aktif `audioElement.volume` ve arka plandaki `preloadAudio.volume` değerini derhal senkronize eder.
+    - **2. Event Listener ve Oynatıcı Sıfırlama Çakışması Kontrolü (Volume Enforcement):**
+      - Chromium / WebView2 motorunun şarkı yüklenirken (`src` değişimi), meta veriler çözümlenirken veya tamponlama esnasında `audio.volume` değerini gizlice varsayılan `1.0` (%100) seviyesine çekmesini önleyen koruma kalkanı kuruldu.
+      - `audio` elementinin `loadedmetadata`, `canplay`, `play`, `playing`, `timeupdate` ve `volumechange` olaylarına `enforceVolume` kilit mekanizması bağlandı. Tarayıcı veya dahili bir olay sesi hedef değerden saptırdığı anda milisaniyeler içinde zorunlu olarak hafızadaki gerçek `volume` değerine geri çekilir.
+      - `playTrackInternal` fonksiyonunun her 3 yürütme dalında (önbellek takası, bellek önbelleği ve taze InnerTube akışı) ses kaynağı atanırken ve oynatma başlatılırken `audioRef.current.volume` zorunlu olarak senkronize edildi.
+    - **3. Çift Oynatıcı (Dual-Audio / Preload) Senkronizasyonu:**
+      - Arka planda kesintisiz geçiş için tamponlanan `preloadAudioRef.current` nesnesinin ses oranı, oluşturulma ve güncelleme anlarında aktif oynatıcıyla aynı ses seviyesine eşitlendi.
+      - Önceden tamponlanan şarkı çalınmaya başlandığında ses seviyesi sıfır gecikmeyle güncel kullanıcı seviyesine çekilir.
+    - **4. PlayerBar Sıfır Gecikmeli Yumuşak Sürükleme (Scrubbing / Dragging State):**
+      - [PlayerBar.tsx](file:///c:/Projeler/Tubify/src/components/PlayerBar.tsx) içerisine zaman çizelgesindeki gibi dokunsal `isDraggingVolume` ve `dragVolume` sürükleme state'i eklendi.
+      - Kullanıcı ses kaydırıcısını tuttuğunda veya çubuğun herhangi bir yerine tıkladığında UI %10'a anında oturur; React re-render döngüsünden kaynaklanabilecek mikro-sıçramalar ve geriye fırlamalar tamamen engellendi.
+    - **5. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 45:** Context Menu Ekran Taşması Önleme (Viewport Collision Detection & Submenu Sınır Kontrolü):
+    - **1. Akıllı Dikey / Yatay Viewport Sınır Kontrolü (`calculateMenuPosition`):**
+      - Alt oynatıcı barı (`PLAYER_BAR_HEIGHT = 84px`) ve güvenlik payı (`SAFETY_MARGIN = 8px`) hesaba katılarak kullanılabilir pencere yüksekliği (`maxAvailableHeight = window.innerHeight - 84`) formüle edildi.
+      - Tıklanan Y koordinatı + menü yüksekliği `maxAvailableHeight`'i aşıyorsa menü aşağıya doğru değil, farenin tıklandığı noktanın yukarısına doğru (`top: tıklananY - menuYuksekligi`) açılır.
+      - Tıklanan X koordinatı + menü genişliği pencere genişliğini aşıyorsa menü farenin soluna doğru (`left: tıklananX - menuGenisligi`) yaslanır.
+      - Negatif koordinatları ve ekran dışına taşmaları önlemek için `Math.max(8, ...)` koruma kalkanı eklendi.
+    - **2. useLayoutEffect ile DOM Render Öncesi (Zero-Flicker) Boyutlama:**
+      - Menü ekrana çizilmeden hemen önce `useLayoutEffect` ve `getBoundingClientRect()` ile gerçek piksel boyutları (`width`, `height`) ölçülerek menü koordinatları milimetrik hizalanır.
+      - [TrackContextMenu.tsx](file:///c:/Projeler/Tubify/src/components/TrackContextMenu.tsx) ve [PlaylistContextMenu.tsx](file:///c:/Projeler/Tubify/src/components/PlaylistContextMenu.tsx) bileşenlerine entegre edildi.
+    - **3. Alt Menüler (Submenu) İçin Çok Yönlü Taşma Kontrolü:**
+      - "Çalma Listesine Ekle" yan menüsü `createPortal` ile doğrudan `document.body` üzerine taşınarak ana menünün `overflow-y` sınırlarından bağımsızlaştırıldı.
+      - Ana menünün sağına açıldığında pencere dışına taşıyorsa alt menü ana menünün sol tarafına yaslanır.
+      - Alt menünün boyu pencere altına taşıyorsa tetikleyici öğenin yukarısına doğru hizalanır.
+      - Çapraz fare geçişlerinde menünün kazara kapanmasını önleyen 150ms'lik hover gecikmesi eklendi.
+    - **4. Max-Height ve Dahili Scrollbar Güvencesi:**
+      - Context menu kapsayıcılarına `max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-none` eklendi; çok küçük pencerelerde veya uzun listelerde menünün taşmadan kendi içinde kaydırılabilmesi sağlandı.
+    - **5. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
+
 
 
 

@@ -102,13 +102,16 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
   const [isVolumeInteracting, setIsVolumeInteracting] = useState(false);
+  const [isDraggingVolume, setIsDraggingVolume] = useState(false);
+  const [dragVolume, setDragVolume] = useState(volume);
   const [isDraggingSeek, setIsDraggingSeek] = useState(false);
   const [dragSeekTime, setDragSeekTime] = useState(0);
 
   const displayTime = isDraggingSeek ? dragSeekTime : currentTime;
   const progressPercent = duration > 0 ? (displayTime / duration) * 100 : 0;
-  const volumePercent = isMuted ? 0 : Math.min(100, Math.max(0, volume * 100));
-  const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const displayVolume = isDraggingVolume ? dragVolume : (isMuted ? 0 : volume);
+  const volumePercent = Math.min(100, Math.max(0, displayVolume * 100));
+  const VolumeIcon = isMuted || displayVolume === 0 ? VolumeX : displayVolume < 0.5 ? Volume1 : Volume2;
 
   return (
     <footer
@@ -477,18 +480,38 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
                 min={0}
                 max={1}
                 step={0.01}
-                value={isMuted ? 0 : volume}
-                onMouseDown={() => setIsVolumeInteracting(true)}
-                onMouseUp={() => setIsVolumeInteracting(false)}
-                onTouchStart={() => setIsVolumeInteracting(true)}
-                onTouchEnd={() => setIsVolumeInteracting(false)}
+                value={displayVolume}
+                onMouseDown={() => {
+                  setIsVolumeInteracting(true);
+                  setIsDraggingVolume(true);
+                  setDragVolume(isMuted ? 0 : volume);
+                }}
+                onMouseUp={() => {
+                  setIsVolumeInteracting(false);
+                  setIsDraggingVolume(false);
+                }}
+                onTouchStart={() => {
+                  setIsVolumeInteracting(true);
+                  setIsDraggingVolume(true);
+                  setDragVolume(isMuted ? 0 : volume);
+                }}
+                onTouchEnd={() => {
+                  setIsVolumeInteracting(false);
+                  setIsDraggingVolume(false);
+                }}
                 onInput={(e) => {
                   const val = parseFloat((e.target as HTMLInputElement).value);
-                  if (!isNaN(val)) onVolumeChange(val);
+                  if (!isNaN(val)) {
+                    setDragVolume(val);
+                    onVolumeChange(val);
+                  }
                 }}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) onVolumeChange(val);
+                  if (!isNaN(val)) {
+                    setDragVolume(val);
+                    onVolumeChange(val);
+                  }
                 }}
                 aria-label="Ses seviyesi"
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"

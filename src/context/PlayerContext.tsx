@@ -115,8 +115,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     try {
       const saved = localStorage.getItem("tubify_volume");
       if (saved !== null) {
-        const val = parseFloat(saved);
-        if (!isNaN(val) && val >= 0 && val <= 1) return val;
+        let val = parseFloat(saved);
+        if (!isNaN(val)) {
+          if (val > 1 && val <= 100) val = val / 100;
+          if (val >= 0 && val <= 1) return val;
+        }
       }
     } catch {}
     return 0.85;
@@ -183,6 +186,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const isRepeatRef = useRef(isRepeat);
   isRepeatRef.current = isRepeat;
+
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
 
   // Preloading & Stream Caching Refs
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -261,12 +270,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
 
       // Pre-buffer in secondary invisible audio element
+      const targetVol = isMutedRef.current ? 0 : volumeRef.current;
       if (!preloadAudioRef.current) {
         const pAudio = new Audio();
         pAudio.preload = "auto";
-        pAudio.volume = 0;
+        pAudio.volume = targetVol;
         pAudio.muted = true;
         preloadAudioRef.current = pAudio;
+      } else {
+        preloadAudioRef.current.volume = targetVol;
       }
 
       preloadAudioRef.current.src = streamUrl;
@@ -365,14 +377,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.volume = !isNaN(initVol) ? initVol : 0.85;
     audioRef.current = audio;
 
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const enforceVolume = () => {
+      const target = isMutedRef.current ? 0 : volumeRef.current;
+      if (!isNaN(target) && isFinite(target) && Math.abs(audio.volume - target) > 0.005) {
+        audio.volume = target;
+      }
+    };
+
+    const onTimeUpdate = () => {
+      enforceVolume();
+      setCurrentTime(audio.currentTime);
+    };
     const onDurationChange = () => setDuration(audio.duration || 0);
-    const onPlay = () => setPlaybackStatus("playing");
+    const onPlay = () => {
+      enforceVolume();
+      setPlaybackStatus("playing");
+    };
     const onPause = () => setPlaybackStatus("paused");
     const onEnded = () => {
       if (repeatModeRef.current === "one") {
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
+          enforceVolume();
           audioRef.current.play().catch(console.error);
         }
         return;
@@ -384,22 +410,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setPlaybackStatus("error");
       setPlaybackError("Audio stream could not be loaded. Trying backup route...");
     };
+    const onVolumeChange = () => {
+      enforceVolume();
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", enforceVolume);
+    audio.addEventListener("loadedmetadata", enforceVolume);
+    audio.addEventListener("canplay", enforceVolume);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
+    audio.addEventListener("volumechange", onVolumeChange);
 
     return () => {
       audio.pause();
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", enforceVolume);
+      audio.removeEventListener("loadedmetadata", enforceVolume);
+      audio.removeEventListener("canplay", enforceVolume);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
+      audio.removeEventListener("volumechange", onVolumeChange);
       if (preloadAudioRef.current) {
         preloadAudioRef.current.src = "";
         preloadAudioRef.current = null;
@@ -409,10 +446,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Separate effect to handle volume & mute changes without resetting audio element
   useEffect(() => {
-    if (audioRef.current) {
-      const targetVol = isMuted ? 0 : Math.max(0, Math.min(1, volume));
-      if (!isNaN(targetVol) && isFinite(targetVol)) {
+    const targetVol = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+    if (!isNaN(targetVol) && isFinite(targetVol)) {
+      if (audioRef.current && Math.abs(audioRef.current.volume - targetVol) > 0.005) {
         audioRef.current.volume = targetVol;
+      }
+      if (preloadAudioRef.current && Math.abs(preloadAudioRef.current.volume - targetVol) > 0.005) {
+        preloadAudioRef.current.volume = targetVol;
       }
     }
   }, [volume, isMuted]);
@@ -639,7 +679,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       try {
         audioRef.current.src = preloadedUrl;
         audioRef.current.currentTime = 0;
+        const targetVol = isMutedRef.current ? 0 : volumeRef.current;
+        audioRef.current.volume = targetVol;
         await audioRef.current.play();
+        audioRef.current.volume = targetVol;
         setPlaybackStatus("playing");
         return;
       } catch (e) {
@@ -653,7 +696,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       try {
         audioRef.current.src = cached.url;
         audioRef.current.currentTime = 0;
+        const targetVol = isMutedRef.current ? 0 : volumeRef.current;
+        audioRef.current.volume = targetVol;
         await audioRef.current.play();
+        audioRef.current.volume = targetVol;
         setPlaybackStatus("playing");
         return;
       } catch {
@@ -668,7 +714,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       streamCacheRef.current.set(track.id, { url: stream.url, timestamp: Date.now() });
       if (audioRef.current) {
         audioRef.current.src = stream.url;
+        const targetVol = isMutedRef.current ? 0 : volumeRef.current;
+        audioRef.current.volume = targetVol;
         await audioRef.current.play();
+        audioRef.current.volume = targetVol;
         setPlaybackStatus("playing");
       }
     } catch (err: unknown) {
@@ -705,31 +754,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const num = isNaN(vol) ? 0.85 : vol;
     const clamped = Math.max(0, Math.min(1, num));
     setVolumeState(clamped);
-    setIsMuted(clamped === 0);
+    volumeRef.current = clamped;
+
+    const newMuted = clamped === 0;
+    setIsMuted(newMuted);
+    isMutedRef.current = newMuted;
+
     try {
       localStorage.setItem("tubify_volume", clamped.toString());
-      localStorage.setItem("tubify_muted", (clamped === 0).toString());
+      localStorage.setItem("tubify_muted", newMuted.toString());
     } catch {}
+
+    const target = newMuted ? 0 : clamped;
     if (audioRef.current) {
-      audioRef.current.volume = clamped;
+      audioRef.current.volume = target;
+    }
+    if (preloadAudioRef.current) {
+      preloadAudioRef.current.volume = target;
     }
   };
 
   const toggleMute = () => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      const vol = volume > 0 ? Math.min(1, volume) : 0.85;
-      audioRef.current.volume = vol;
-      setIsMuted(false);
-      try {
-        localStorage.setItem("tubify_muted", "false");
-      } catch {}
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-      try {
-        localStorage.setItem("tubify_muted", "true");
-      } catch {}
+    const newMuted = !isMutedRef.current;
+    setIsMuted(newMuted);
+    isMutedRef.current = newMuted;
+
+    try {
+      localStorage.setItem("tubify_muted", String(newMuted));
+    } catch {}
+
+    const target = newMuted ? 0 : (volumeRef.current > 0 ? volumeRef.current : 0.85);
+    if (audioRef.current) {
+      audioRef.current.volume = target;
+    }
+    if (preloadAudioRef.current) {
+      preloadAudioRef.current.volume = target;
     }
   };
 
