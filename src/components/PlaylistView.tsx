@@ -14,10 +14,14 @@ import {
   Trash2,
   Copy,
   Upload,
+  CheckCircle2,
+  ArrowDownToLine,
+  Loader2,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useDownload } from "../context/DownloadContext";
 import type { Track, Playlist } from "../types/music";
 import { resizeImageFile } from "./EditPlaylistModal";
 
@@ -91,7 +95,17 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { queueViewMode, showToast } = usePlayer();
+  const {
+    isDownloaded,
+    isDownloading,
+    downloadPlaylistTracks,
+    startTrackDownload,
+    deleteTrackDownload,
+  } = useDownload();
   const isLight = theme === "light";
+
+  const isAnyPlaylistTrackDownloading = tracks.some((t) => isDownloading(t.id));
+  const areAllTracksDownloaded = tracks.length > 0 && tracks.every((t) => isDownloaded(t.id));
 
   const [filterQuery, setFilterQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(50);
@@ -214,11 +228,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
   const isQueueExpanded = queueViewMode === "expanded";
   const gridTemplate = isQueueExpanded
-    ? "grid-cols-[40px_minmax(200px,1fr)_70px_50px] xl:grid-cols-[40px_minmax(200px,1fr)_140px_70px_50px]"
-    : "grid-cols-[40px_minmax(200px,1.5fr)_minmax(120px,1fr)_70px_50px]";
+    ? "grid-cols-[40px_minmax(200px,1fr)_84px_50px] xl:grid-cols-[40px_minmax(200px,1fr)_140px_84px_50px]"
+    : "grid-cols-[40px_minmax(200px,1.5fr)_minmax(120px,1fr)_84px_50px]";
   const suggestionGridTemplate = isQueueExpanded
-    ? "grid-cols-[minmax(200px,1fr)_70px_48px] xl:grid-cols-[minmax(200px,1fr)_140px_70px_48px]"
-    : "grid-cols-[minmax(200px,1.5fr)_minmax(120px,1fr)_70px_48px]";
+    ? "grid-cols-[minmax(200px,1fr)_84px_48px] xl:grid-cols-[minmax(200px,1fr)_140px_84px_48px]"
+    : "grid-cols-[minmax(200px,1.5fr)_minmax(120px,1fr)_84px_48px]";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -386,6 +400,36 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             title="Karışık Çal"
           >
             <Shuffle className="w-6 h-6" />
+          </button>
+
+          {/* Download Playlist Button */}
+          <button
+            onClick={() => downloadPlaylistTracks(tracks)}
+            disabled={tracks.length === 0 || isAnyPlaylistTrackDownloading || areAllTracksDownloaded}
+            className={`transition-colors cursor-pointer p-2 rounded-full ${
+              areAllTracksDownloaded
+                ? "text-[#ff0000]"
+                : isAnyPlaylistTrackDownloading
+                ? "text-[#ff0000] cursor-wait"
+                : isLight
+                ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                : "text-neutral-400 hover:text-white hover:bg-white/10"
+            } disabled:opacity-50`}
+            title={
+              areAllTracksDownloaded
+                ? "Tüm liste indirildi"
+                : isAnyPlaylistTrackDownloading
+                ? "Liste indiriliyor..."
+                : "Listeyi İndir"
+            }
+          >
+            {isAnyPlaylistTrackDownloading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-[#ff0000]" />
+            ) : areAllTracksDownloaded ? (
+              <CheckCircle2 className="w-6 h-6 text-[#ff0000]" />
+            ) : (
+              <ArrowDownToLine className="w-6 h-6" />
+            )}
           </button>
 
           {/* More Options Dropdown */}
@@ -670,8 +714,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                       );
                     })()}
 
-                    {/* LIKE BUTTON + MORE OPTIONS on Hover */}
+                    {/* ACTIONS: LIKE + DOWNLOAD + MORE */}
                     <div className="flex items-center justify-center gap-1">
+                      {/* Like Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -691,6 +736,52 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                         />
                       </button>
 
+                      {/* Download / Cached Track Button */}
+                      {(() => {
+                        const downloaded = isDownloaded(track.id);
+                        const downloading = isDownloading(track.id);
+
+                        return (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (downloaded) {
+                                deleteTrackDownload(track.id);
+                              } else if (!downloading) {
+                                startTrackDownload(track);
+                              }
+                            }}
+                            className={`p-1 transition-transform active:scale-110 cursor-pointer ${
+                              downloaded || downloading
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            title={
+                              downloaded
+                                ? "İndirildi (Silmek için tıkla)"
+                                : downloading
+                                ? "İndiriliyor..."
+                                : "İndir"
+                            }
+                          >
+                            {downloading ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
+                            ) : downloaded ? (
+                              <CheckCircle2 className="w-4 h-4 text-[#ff0000]" />
+                            ) : (
+                              <ArrowDownToLine
+                                className={`w-4 h-4 ${
+                                  isLight
+                                    ? "text-neutral-400 hover:text-neutral-900"
+                                    : "text-neutral-400 hover:text-white"
+                                } transition-colors`}
+                              />
+                            )}
+                          </button>
+                        );
+                      })()}
+
+                      {/* More Options Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -698,7 +789,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             onContextMenuTrack(track, e);
                           }
                         }}
-                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 transition-opacity cursor-pointer"
+                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-opacity cursor-pointer"
                         title="Diğer seçenekler"
                       >
                         <MoreHorizontal className="w-4 h-4" />
@@ -707,11 +798,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
                     {/* DURATION */}
                     <div
-                      className={`text-xs text-right font-mono ${
+                      className={`text-xs text-right font-mono flex items-center justify-end ${
                         isLight ? "text-neutral-500" : "text-neutral-400"
                       }`}
                     >
-                      {track.duration || "3:30"}
+                      <span>{track.duration || "3:30"}</span>
                     </div>
                   </div>
                 );

@@ -13,6 +13,8 @@ import {
   toggleYtLike,
   getRadioTracks,
   updateMediaMetadata,
+  getDownloadedTracks,
+  getDownloadedAudioBlobUrl,
 } from "../services/api";
 
 const INITIAL_RECENT: Track[] = [
@@ -205,6 +207,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const streamCacheRef = useRef<Map<string, { url: string; timestamp: number }>>(new Map());
   const upcomingTrackRef = useRef<Track | null>(null);
 
+  // Downloaded track IDs ref for offline playback
+  const downloadedIdsRef = useRef<Set<string>>(new Set());
+  const retryFallbackRef = useRef<(track: Track, reason: string) => Promise<void>>(() => Promise.resolve());
+
+  useEffect(() => {
+    getDownloadedTracks()
+      .then((tracks) => {
+        tracks.forEach((t) => downloadedIdsRef.current.add(t.track_id));
+      })
+      .catch((err) => console.warn("Failed to check downloaded tracks:", err));
+
+    const unlisteners: (() => void)[] = [];
+    const setupDownloadListeners = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisteners.push(
+          await listen<{ track_id: string }>("download_completed", (e) => {
+            if (e.payload?.track_id) downloadedIdsRef.current.add(e.payload.track_id);
+          })
+        );
+        unlisteners.push(
+          await listen<{ track_id: string }>("download_deleted", (e) => {
+            if (e.payload?.track_id) downloadedIdsRef.current.delete(e.payload.track_id);
+          })
+        );
+      } catch {}
+    };
+    setupDownloadListeners();
+    return () => unlisteners.forEach((u) => u());
+  }, []);
+
   // Sync liked IDs to localStorage
   useEffect(() => {
     try {
@@ -266,13 +299,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     try {
       let streamUrl = "";
-      const cached = streamCacheRef.current.get(candidate.id);
-      if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
-        streamUrl = cached.url;
+      if (downloadedIdsRef.current.has(candidate.id) || queueSourceIdRef.current === "downloads") {
+        try {
+          streamUrl = await getDownloadedAudioBlobUrl(candidate.id);
+        } catch {
+          streamUrl = `http://tubify-local.localhost/track/${candidate.id}`;
+        }
       } else {
-        const stream = await getStreamUrl(candidate.id);
-        streamUrl = stream.url;
-        streamCacheRef.current.set(candidate.id, { url: streamUrl, timestamp: Date.now() });
+        const cached = streamCacheRef.current.get(candidate.id);
+        if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
+          streamUrl = cached.url;
+        } else {
+          const stream = await getStreamUrl(candidate.id);
+          streamUrl = stream.url;
+          streamCacheRef.current.set(candidate.id, { url: streamUrl, timestamp: Date.now() });
+        }
       }
 
       // Pre-buffer in secondary invisible audio element
@@ -413,8 +454,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nextTrackRef.current();
     };
     const onError = () => {
+      const track = currentTrackRef.current;
+      const src = audio.src || "";
+      if (track) {
+        if (src.includes("tubify-local.localhost") || src.includes("tubify-local://")) {
+          retryFallbackRef.current(track, "offline_failed");
+          return;
+        }
+        if (streamCacheRef.current.has(track.id)) {
+          retryFallbackRef.current(track, "cached_failed");
+          return;
+        }
+      }
       setPlaybackStatus("error");
-      setPlaybackError("Audio stream could not be loaded. Trying backup route...");
+      setPlaybackError("Audio stream could not be loaded. Please check your connection.");
     };
     const onVolumeChange = () => {
       enforceVolume();
@@ -677,6 +730,72 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
+    const playNetworkStream = async (trackToPlay: Track, forceFresh = false) => {
+      setPlaybackStatus("loading");
+      setPlaybackError(null);
+      try {
+        let streamUrl = "";
+        if (!forceFresh) {
+          const cached = streamCacheRef.current.get(trackToPlay.id);
+          if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
+            streamUrl = cached.url;
+          }
+        }
+        if (!streamUrl) {
+          const stream = await getStreamUrl(trackToPlay.id);
+          streamUrl = stream.url;
+          streamCacheRef.current.set(trackToPlay.id, { url: streamUrl, timestamp: Date.now() });
+        }
+        if (audioRef.current && currentTrackRef.current?.id === trackToPlay.id) {
+          audioRef.current.src = streamUrl;
+          const targetVol = isMutedRef.current ? 0 : volumeRef.current;
+          audioRef.current.volume = targetVol;
+          await audioRef.current.play();
+          audioRef.current.volume = targetVol;
+          setPlaybackStatus("playing");
+        }
+      } catch (err: unknown) {
+        setPlaybackStatus("error");
+        setPlaybackError(err instanceof Error ? err.message : "Failed to load audio stream");
+      }
+    };
+
+    retryFallbackRef.current = async (failedTrack: Track, reason: string) => {
+      console.warn(`[Player] Fallback triggered for "${failedTrack.title}": ${reason}`);
+      if (reason === "offline_failed") {
+        downloadedIdsRef.current.delete(failedTrack.id);
+      } else if (reason === "cached_failed") {
+        streamCacheRef.current.delete(failedTrack.id);
+      }
+      await playNetworkStream(failedTrack, true);
+    };
+
+    // 0. OFFLINE / DOWNLOADED CHECK (HIGHEST PRIORITY):
+    // If track is downloaded or queue is downloads, directly play via local disk with 0ms loading!
+    const isOffline = downloadedIdsRef.current.has(track.id) || queueSourceIdRef.current === "downloads";
+    if (isOffline) {
+      try {
+        let offlineUrl = "";
+        try {
+          offlineUrl = await getDownloadedAudioBlobUrl(track.id);
+        } catch {
+          offlineUrl = `http://tubify-local.localhost/track/${track.id}`;
+        }
+        if (audioRef.current && currentTrackRef.current?.id === track.id) {
+          audioRef.current.src = offlineUrl;
+          audioRef.current.currentTime = 0;
+          const targetVol = isMutedRef.current ? 0 : volumeRef.current;
+          audioRef.current.volume = targetVol;
+          await audioRef.current.play();
+          audioRef.current.volume = targetVol;
+          setPlaybackStatus("playing");
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to play local offline track, falling back to network fetch:", err);
+      }
+    }
+
     // 1. INSTANT SWAP: If track is already preloaded and buffered, play immediately!
     if (preloadedTrackRef.current && preloadedTrackRef.current.trackId === track.id) {
       const preloadedUrl = preloadedTrackRef.current.url;
@@ -696,40 +815,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 2. MEMORY CACHE PATH: Check if stream URL is in memory cache
-    const cached = streamCacheRef.current.get(track.id);
-    if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
-      try {
-        audioRef.current.src = cached.url;
-        audioRef.current.currentTime = 0;
-        const targetVol = isMutedRef.current ? 0 : volumeRef.current;
-        audioRef.current.volume = targetVol;
-        await audioRef.current.play();
-        audioRef.current.volume = targetVol;
-        setPlaybackStatus("playing");
-        return;
-      } catch {
-        // Fallback to fresh network fetch
-      }
-    }
-
-    // 3. NORMAL PATH: Fresh network fetch
-    setPlaybackStatus("loading");
-    try {
-      const stream = await getStreamUrl(track.id);
-      streamCacheRef.current.set(track.id, { url: stream.url, timestamp: Date.now() });
-      if (audioRef.current) {
-        audioRef.current.src = stream.url;
-        const targetVol = isMutedRef.current ? 0 : volumeRef.current;
-        audioRef.current.volume = targetVol;
-        await audioRef.current.play();
-        audioRef.current.volume = targetVol;
-        setPlaybackStatus("playing");
-      }
-    } catch (err: unknown) {
-      setPlaybackStatus("error");
-      setPlaybackError(err instanceof Error ? err.message : "Failed to load audio stream");
-    }
+    // 2. NORMAL / CACHED NETWORK FETCH:
+    await playNetworkStream(track, false);
   };
 
   const playTrack = async (track: Track, newQueue?: Track[], sourceId?: string) => {

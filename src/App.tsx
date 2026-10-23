@@ -7,6 +7,8 @@ import { ArtistView } from "./components/ArtistView";
 import { AlbumView } from "./components/AlbumView";
 import { SettingsView } from "./components/SettingsView";
 import { SearchView } from "./components/SearchView";
+import { LyricsView } from "./components/LyricsView";
+import { DownloadsView } from "./components/DownloadsView";
 import { PlayerBar } from "./components/PlayerBar";
 import { RightDrawer } from "./components/RightDrawer";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
@@ -117,6 +119,8 @@ export const App: FC = () => {
       | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
       | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
       | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
+      | { type: "lyrics" }
+      | { type: "downloads" }
     )[]
   >([{ type: "home" }]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -133,11 +137,15 @@ export const App: FC = () => {
       | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
       | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
       | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
+      | { type: "lyrics" }
+      | { type: "downloads" }
   ) => {
     const cur = history[historyIndex];
     if (
       cur.type === entry.type &&
       (entry.type === "home" ||
+        entry.type === "lyrics" ||
+        entry.type === "downloads" ||
         (entry.type === "search" && cur.type === "search" && cur.query === entry.query) ||
         (entry.type === "playlist" && cur.type === "playlist" && cur.playlist.id === entry.playlist.id) ||
         (entry.type === "artist" && cur.type === "artist" && cur.artistId === entry.artistId) ||
@@ -245,6 +253,21 @@ export const App: FC = () => {
   ) => {
     navigateTo({ type: "album", albumId, albumTitle, artistName, thumbnail });
   };
+
+  const handleToggleLyrics = useCallback(() => {
+    if (currentNav.type === "lyrics") {
+      if (canGoBack) {
+        handleGoBack();
+      } else {
+        navigateTo({ type: "home" });
+      }
+    } else {
+      if (player.queueViewMode !== "closed") {
+        player.setQueueViewMode("closed");
+      }
+      navigateTo({ type: "lyrics" });
+    }
+  }, [currentNav.type, canGoBack, player.queueViewMode, player.setQueueViewMode]);
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -1122,6 +1145,8 @@ export const App: FC = () => {
                   ? currentNav.artistName
                   : currentNav.type === "album"
                   ? currentNav.albumTitle
+                  : currentNav.type === "lyrics"
+                  ? "Şarkı Sözleri"
                   : player.activeTrack?.title
               }
               onOpenLogin={() => setIsLoginModalOpen(true)}
@@ -1129,6 +1154,7 @@ export const App: FC = () => {
               onNavigateHome={() => navigateTo({ type: "home" })}
               onNavigateBack={handleGoBack}
               onNavigateForward={handleGoForward}
+              onOpenDownloadsView={() => navigateTo({ type: "downloads" })}
               canGoBack={canGoBack}
               canGoForward={canGoForward}
               isScrolled={isScrolled}
@@ -1326,8 +1352,30 @@ export const App: FC = () => {
                 onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
                 onNavigateArtist={handleNavigateArtist}
                 onNavigateAlbum={handleNavigateAlbum}
+                onNavigateDownloads={() => navigateTo({ type: "downloads" })}
+                onNavigateBrowse={() => navigateTo({ type: "search", query: "" })}
                 onContextMenuTrack={handleOpenContextMenu}
                 onScroll={handleViewScroll}
+              />
+            )}
+
+            {/* VIEW 7: Synced Lyrics View */}
+            {currentNav.type === "lyrics" && (
+              <LyricsView
+                activeTrack={player.activeTrack}
+                currentTime={player.currentTime}
+                duration={player.duration}
+                onSeek={player.seek}
+                onClose={() => (canGoBack ? handleGoBack() : navigateTo({ type: "home" }))}
+                onScroll={handleViewScroll}
+              />
+            )}
+
+            {/* VIEW 8: Downloads View */}
+            {currentNav.type === "downloads" && (
+              <DownloadsView
+                onScroll={handleViewScroll}
+                onContextMenuTrack={handleOpenContextMenu}
               />
             )}
             </main>
@@ -1348,6 +1396,8 @@ export const App: FC = () => {
         onNavigateAlbum={handleNavigateAlbum}
         onContextMenuTrack={handleOpenContextMenu}
         onToggleLike={() => player.activeTrack && handleToggleLike(player.activeTrack)}
+        onToggleLyrics={handleToggleLyrics}
+        isLyricsActive={currentNav.type === "lyrics"}
       />
 
       {/* HUD mini-player overlay */}

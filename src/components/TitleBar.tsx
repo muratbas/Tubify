@@ -8,11 +8,14 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ArrowDownToLine,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { minimizeWindow, toggleMaximizeWindow, closeWindow } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useDownload } from "../context/DownloadContext";
+import { DownloadsPopover } from "./DownloadsPopover";
 import type { UserProfile } from "../types/music";
 
 interface TitleBarProps {
@@ -20,13 +23,14 @@ interface TitleBarProps {
   onSearchChange: (query: string) => void;
   onSearchSubmit: () => void;
   userProfile: UserProfile;
-  currentView: "home" | "playlist" | "search" | "settings" | "artist" | "album";
+  currentView: "home" | "playlist" | "search" | "settings" | "artist" | "album" | "lyrics" | "downloads";
   currentTabTitle?: string;
   onOpenLogin: () => void;
   onOpenSettings: (tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts") => void;
   onNavigateHome: () => void;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;
+  onOpenDownloadsView?: () => void;
   canGoBack?: boolean;
   canGoForward?: boolean;
   isScrolled?: boolean;
@@ -42,6 +46,7 @@ export const TitleBar: FC<TitleBarProps> = ({
   onNavigateHome,
   onNavigateBack,
   onNavigateForward,
+  onOpenDownloadsView,
   canGoBack = false,
   canGoForward = false,
   isScrolled = false,
@@ -50,6 +55,13 @@ export const TitleBar: FC<TitleBarProps> = ({
   const { theme } = useTheme();
   const { t } = useLanguage();
   const isLight = theme === "light";
+
+  const {
+    isPopoverOpen: isDownloadsOpen,
+    togglePopover: toggleDownloadsPopover,
+    setIsPopoverOpen: setIsDownloadsOpen,
+    isDownloadingAny,
+  } = useDownload();
 
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
@@ -199,6 +211,38 @@ export const TitleBar: FC<TitleBarProps> = ({
 
       {/* Settings and Profile */}
       <div className="flex items-center gap-2 shrink-0 mr-28">
+        {/* Downloads Button and Popover */}
+        <div className="relative">
+          <button
+            onClick={toggleDownloadsPopover}
+            data-tooltip="İndirilenler"
+            data-tooltip-side="bottom"
+            className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+              isLight
+                ? "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
+                : "text-neutral-300 hover:text-white hover:bg-white/10"
+            } ${isDownloadsOpen ? (isLight ? "bg-black/10 text-neutral-900" : "bg-white/15 text-white") : ""}`}
+          >
+            {isDownloadingAny ? (
+              <div className="relative flex items-center justify-center">
+                <ArrowDownToLine className="w-4 h-4 text-[#ff0000]" />
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff0000] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff0000]"></span>
+                </span>
+              </div>
+            ) : (
+              <ArrowDownToLine className="w-4 h-4" />
+            )}
+          </button>
+
+          <DownloadsPopover
+            isOpen={isDownloadsOpen}
+            onClose={() => setIsDownloadsOpen(false)}
+            onOpenDownloadsView={onOpenDownloadsView || (() => {})}
+          />
+        </div>
+
         {/* Settings Button */}
         <button
           onClick={() => onOpenSettings("account")}

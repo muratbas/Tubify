@@ -51,6 +51,8 @@ interface PlayerBarProps {
     thumbnail?: string
   ) => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
+  onToggleLyrics?: () => void;
+  isLyricsActive?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -98,6 +100,11 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
     props.onToggleLike || (() => track && player.toggleLike(track));
   const onToggleShuffle = props.onToggleShuffle || player.toggleShuffle;
   const onToggleRepeat = props.onToggleRepeat || player.toggleRepeat;
+
+  const isLyricsActive =
+    props.isLyricsActive !== undefined
+      ? props.isLyricsActive
+      : player.isRightDrawerOpen && player.rightDrawerTab === "lyrics";
 
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
@@ -392,11 +399,17 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
       <div className="flex items-center gap-3 w-[30%] justify-end">
         {/* Lyrics */}
         <button
-          onClick={() => player.toggleRightDrawer("lyrics")}
+          onClick={() => {
+            if (props.onToggleLyrics) {
+              props.onToggleLyrics();
+            } else {
+              player.toggleRightDrawer("lyrics");
+            }
+          }}
           data-tooltip="Şarkı Sözleri"
           data-tooltip-side="top"
           className={`p-1.5 transition-colors cursor-pointer ${
-            player.isRightDrawerOpen && player.rightDrawerTab === "lyrics"
+            isLyricsActive
               ? "text-[#ff0000]"
               : isLight
               ? "text-neutral-500 hover:text-neutral-900"

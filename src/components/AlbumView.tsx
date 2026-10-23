@@ -11,8 +11,11 @@ import {
   Loader2,
   AlertCircle,
   MoreHorizontal,
+  CheckCircle2,
+  ArrowDownToLine,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useDownload } from "../context/DownloadContext";
 import { getAlbumDetails } from "../services/api";
 import type { AlbumDetails, Track } from "../types/music";
 
@@ -54,6 +57,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
 }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
+  const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
   const [albumData, setAlbumData] = useState<AlbumDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,7 +242,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
       <div className="px-8 pt-4 pb-16">
         <div className="w-full">
           <div
-            className={`grid grid-cols-[40px_1fr_70px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
+            className={`grid grid-cols-[40px_1fr_84px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
               isLight ? "text-neutral-700 border-black/10" : "text-neutral-300 border-white/10"
             }`}
           >
@@ -273,7 +277,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                         onContextMenuTrack(track, e);
                       }
                     }}
-                    className={`grid grid-cols-[40px_1fr_70px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
+                    className={`grid grid-cols-[40px_1fr_84px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
                           ? "bg-black/[0.07] text-neutral-950 font-medium"
@@ -361,7 +365,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Like Button & More */}
+                    {/* ACTIONS: LIKE + DOWNLOAD + MORE */}
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={(e) => {
@@ -382,6 +386,51 @@ export const AlbumView: FC<AlbumViewProps> = ({
                         />
                       </button>
 
+                      {/* Download / Cached Track Button */}
+                      {(() => {
+                        const downloaded = isDownloaded(track.id);
+                        const downloading = isDownloading(track.id);
+
+                        return (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (downloaded) {
+                                deleteTrackDownload(track.id);
+                              } else if (!downloading) {
+                                startTrackDownload(track);
+                              }
+                            }}
+                            className={`p-1 transition-transform active:scale-110 cursor-pointer ${
+                              downloaded || downloading
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            title={
+                              downloaded
+                                ? "İndirildi (Silmek için tıkla)"
+                                : downloading
+                                ? "İndiriliyor..."
+                                : "İndir"
+                            }
+                          >
+                            {downloading ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
+                            ) : downloaded ? (
+                              <CheckCircle2 className="w-4 h-4 text-[#ff0000]" />
+                            ) : (
+                              <ArrowDownToLine
+                                className={`w-4 h-4 ${
+                                  isLight
+                                    ? "text-neutral-400 hover:text-neutral-900"
+                                    : "text-neutral-400 hover:text-white"
+                                } transition-colors`}
+                              />
+                            )}
+                          </button>
+                        );
+                      })()}
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -389,7 +438,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                             onContextMenuTrack(track, e);
                           }
                         }}
-                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 transition-opacity cursor-pointer"
+                        className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-opacity cursor-pointer"
                         title="Diğer seçenekler"
                       >
                         <MoreHorizontal className="w-4 h-4" />

@@ -28,6 +28,8 @@ interface HomeViewProps {
   onPlayPlaylist?: (playlist: Playlist) => void;
   onNavigateArtist?: (artistId: string, artistName: string) => void;
   onNavigateAlbum?: (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => void;
+  onNavigateDownloads?: () => void;
+  onNavigateBrowse?: () => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
 }
@@ -460,6 +462,8 @@ export const HomeView: FC<HomeViewProps> = ({
   onPlayPlaylist,
   onNavigateArtist,
   onNavigateAlbum,
+  onNavigateDownloads,
+  onNavigateBrowse,
   onContextMenuTrack,
   onScroll,
 }) => {
@@ -742,6 +746,13 @@ export const HomeView: FC<HomeViewProps> = ({
             return (
               <div
                 key={item.id}
+                onClick={() => {
+                  if (item.id === "downloads") {
+                    onNavigateDownloads?.();
+                  } else if (item.id === "browse") {
+                    onNavigateBrowse?.();
+                  }
+                }}
                 className={`transition-all duration-200 ease-out cursor-pointer group rounded-2xl p-4 flex items-center gap-3.5 hover:-translate-y-0.5 hover:shadow-sm ${
                   isLight
                     ? "bg-neutral-100/70 hover:bg-neutral-200/60"

@@ -530,6 +530,171 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **4. Doğrulama:**
       - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
+  - [x] **Aşama 47:** Apple Music & Spotifast Tarzı Senkronize Şarkı Sözleri Ekranı (Synced Lyrics View):
+    - **1. LRCLIB API Entegrasyonu & Akıllı Arama Zinciri (`src/services/lyrics.ts`):**
+      - Ücretsiz, kotsuz LRCLIB API (`https://lrclib.net/api`) entegre edildi; `Lrclib-Client` ve `User-Agent` başlıkları bağlandı.
+      - YouTube başlıklarındaki gereksiz kalabalığı temizleyen `cleanTrackTitle` fonksiyonu geliştirildi (`(Official Video)`, `[Remix]`, `(feat. ...)`, `[Official Audio]`, `(Lyrics)`, sanatçı ön eki `Artist - ` vb.).
+      - Çok aşamalı arama köprüsü: İlk olarak tam parametreli `/api/get` (başlık, sanatçı, albüm ve süre); yanıt gelmezse gevşetilmiş `/api/get`; yine gelmezse `/api/search` fallback'i çalışarak en yüksek doğrulukla `syncedLyrics` veya `plainLyrics` çözümlenir.
+      - Bellek önbelleği (`lyricsCache: Map<string, LyricsData>`) kurularak sayfa geçişlerinde veya şarkı duraklatılıp açıldığında gereksiz ağ istekleri tamamen engellendi.
+    - **2. LRC Zaman Damgası Ayrıştırıcısı (`parseLrc`):**
+      - `[mm:ss.xx]` veya `[mm:ss.xxx]` formatındaki zaman damgaları milisaniye hassasiyetinde saniyeye (`number`) dönüştürüldü.
+      - Satır içindeki çoklu zaman damgaları ve instrumental boşluklar (`♪`) desteklendi; çıktılar kronolojik sıralandı.
+    - **3. Apple Music / Spotifast Referansına Sadık 2-Sütunlu Arayüz (`src/components/LyricsView.tsx`):**
+      - **Sol Sütun (Sabit Parça Bilgisi - `w-72 flex-shrink-0`):**
+        - Büyük, yuvarlatılmış albüm kapağı (`aspect-square w-full rounded-2xl object-cover shadow-md mb-4`).
+        - Şarkı adı (`font-bold text-lg text-neutral-950 dark:text-white leading-snug line-clamp-2`).
+        - Sanatçı adı (`text-sm font-medium text-neutral-500 mt-1 truncate`).
+        - Sol alt footer'da minik durum rozeti: `Synced • via LRCLIB` (yeşil nokta) veya `Plain • via LRCLIB` (amber nokta).
+      - **Sağ Sütun (Kaydırılabilir Şarkı Sözleri Akışı):**
+        - Dikeyde taşan ve yumuşak kaydırılabilir (`overflow-y-auto scroll-smooth scrollbar-none py-28 px-8 md:px-14`).
+        - **Aktif Satır:** Koyu, belirgin tipografi (`text-2xl md:text-3xl font-extrabold text-neutral-950 dark:text-white scale-100 transition-all duration-300`) ve solunda dikey kırmızı çizgi (`w-1 h-6 bg-red-500 rounded-full mr-3 inline-block align-middle`).
+        - **Pasif Satırlar:** Yarı saydam, soluk metin (`text-2xl md:text-3xl font-bold text-neutral-300 dark:text-neutral-600 hover:text-neutral-500 transition-colors cursor-pointer`); aktifleştiğinde satır kaymasını önleyen görünmez yer tutucu hizalama.
+      - **Düz Metin (Plain Lyrics) & Fallback Durumları:**
+        - Zaman damgalı olmayan şarkılarda statik düz metin şık tipografi ile gösterilir.
+        - Söz bulunamayan parçalarda `MicOff` ikonlu zarif kart ve "Tekrar Dene" butonu sunulur.
+        - Sağ üst köşede `X` kapatma butonu ve `Escape` tuşu dinleyicisi eklendi.
+    - **4. Otomatik Kaydırma (Auto-Scroll), Manuel Kaydırma Koruması & Tıklayarak Sarma:**
+      - `currentTime` değiştikçe en yakın söz satırı anında `activeIndex` olarak saptanır ve ekran dikey merkezine yumuşakça kaydırılır (`scrollIntoView({ behavior: 'smooth', block: 'center' })`).
+      - Şarkı sözü satırına tıklandığında müzik çalar anında o satırın zamanına (`onSeek(line.time)`) sarar ve derhal o satıra kilitlenir.
+      - Fare tekerleğiyle (`onWheel`) manuel gezinildiğinde otomatik kaydırma 3.5 saniye askıya alınır (`isUserScrollingRef`); kullanıcı tekerleği bıraktıktan sonra otomatik merkezleme nazikçe geri devreye girer.
+    - **5. Navigasyon & PlayerBar Entegrasyonu (`App.tsx`, `PlayerBar.tsx`, `TitleBar.tsx`):**
+      - `{ type: "lyrics" }` rotası sayfa geçmişine (`history`) dahil edildi; TitleBar `<` ve `>` yön butonları ile Mouse 4/5 donanım butonları üzerinden geri-ileri gezinti tam desteklendi.
+      - Alt PlayerBar'daki mikrofon ikonu (`Mic2`), şarkı sözleri ekranı açıkken YouTube Music Kırmızısı (`text-[#ff0000]`) olur; tıklandığında ekranı açar veya önceki sayfaya geri döndürür.
+    - **6. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 48:** Senkronize Şarkı Sözlerinde Odak Derinliği ve Kademeli Bulanıklık (Focus Blur / Depth of Field):
+    - **1. Mesafe Bazlı Derinlik Hesaplaması (`distance = Math.abs(index - activeIndex)`):**
+      - **Aktif Satır (`distance === 0`):** Tam net, sıfır bulanıklık ve tam opaklık (`opacity-100 filter-none text-neutral-950 dark:text-white font-extrabold scale-100`) ile solunda `w-1.5 h-7 bg-red-500 rounded-full inline-block mr-3` kırmızı vurgu çizgisi.
+      - **1 Satır Uzaktakiler (`distance === 1`):** `opacity-70 blur-[0.4px] text-neutral-800 dark:text-neutral-200 font-bold`.
+      - **2 Satır Uzaktakiler (`distance === 2`):** `opacity-45 blur-[1.2px] text-neutral-600 dark:text-neutral-400 font-bold`.
+      - **3 ve Daha Fazla Uzaktakiler (`distance >= 3`):** `opacity-20 blur-[2.5px] text-neutral-500 dark:text-neutral-500 font-bold`.
+    - **2. Dokunsal Hover Etkileşimi:**
+      - Pasif satırların üzerine fareyle gelindiğinde bulanıklık anında sıfırlanır ve satır netleşir: `hover:blur-none hover:opacity-85 hover:text-neutral-900 dark:hover:text-neutral-100`.
+      - `transition-all duration-300 ease-out cursor-pointer` ile ipeksi geçiş ve tıklayarak saniyeye atlama (`onSeek`) işlevi eksiksiz korundu.
+    - **3. Sıfır Satır Kayması (Zero Layout Shift):**
+      - Pasif satırlara `w-1.5 h-7 rounded-full mr-3 inline-block opacity-0` yer tutucu atanarak aktif satıra geçişte metinlerin sağa-sola sıçraması tamamen engellendi.
+    - **4. Doğrulama:**
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 49:** Şarkı Sözleri Ekranı UI Sadeleştirmesi ve Yüksek Çözünürlüklü Kapak:
+    - **1. Albüm Adının Kaldırılması:** Sol taraftaki parça bilgi sütunundan albüm başlığı temizlendi; yalnızca kalın şarkı adı ve sanatçı bilgisi bırakıldı.
+    - **2. Yüksek Çözünürlüklü Kapak (`getOptimizedThumbnail`):** YouTube / Google CDN küçük resimleri (`mqdefault.jpg`, `sddefault.jpg`, düşük çözünürlüklü `=w...`) otomatik olarak `maxresdefault.jpg` ve `=w544-h544-l90-rj` formatına yükseltildi; 404 durumunda `hqdefault.jpg` ve orijinal URL fallback mekanizması bağlandı.
+    - **3. Söz Bulunamadı Alanı Temizliği:** "Şarkı sözü bulunamadı" başlığının altındaki açıklama metni kaldırıldı; sade ve ferah bir düzen sağlandı.
+    - **4. Düz Mikrofon İkonu:** Üst kısımdaki üzeri çizili `MicOff` ikonu yerine sade, modern `Mic` ikonu yerleştirildi.
+  - [x] **Aşama 50:** Çevrimdışı (Offline) Müzik İndirme Sistemi ve İndirme Yöneticisi Popover'ı:
+    - **1. Rust / Tauri Backend İndirme Motoru (`downloader.rs`, `lib.rs`):**
+      - Depolama mimarisi: Parçalar `$APP_DATA_DIR/downloads/tracks/{track_id}.mp3`, kapak görselleri `$APP_DATA_DIR/downloads/covers/{track_id}.jpg` ve metadata dizini `$APP_DATA_DIR/downloads/downloads.json` altında yapılandırıldı.
+      - Tauri komutları:
+        - `start_download`: `reqwest` ile parçayı stream ederek indirir; indirme ilerlemesini (`download_progress: { track_id, progress, downloaded_bytes, total_bytes }`) frontend'e gerçek zamanlı IPC event'i olarak yayar (`emit`). İptal durumunda `.tmp` geçici dosyasını otomatik temizler.
+        - `cancel_download`: Devam eden indirmeyi `tokio::sync::oneshot` sinyaliyle anında abort eder ve yarım kalan dosyayı diskten kaldırır.
+        - `get_downloaded_tracks`: Disk üzerindeki dosya varlığını doğrulayarak indirilmiş şarkıların metadata ve dosya boyutları listesini döner.
+        - `delete_downloaded_track`: Dosyayı ve kapağını diskten, kaydını `downloads.json` dosyasından siler.
+      - Özel URI Şeması & Offline Oynatma Protokolü (`tubify-local://`):
+        - `register_asynchronous_uri_scheme_protocol` ile `tubify-local://localhost/track/{track_id}` ve `tubify-local://localhost/cover/{track_id}` URI protokolü tanımlandı.
+        - HTTP Range (`Accept-Ranges: bytes`, `206 Partial Content`) desteğiyle yerel MP3 dosyaları HTML5 Audio üzerinde gecikmesiz, anlık ve kusursuz seek (zaman atlama) desteğiyle offline çalınabilir hale getirildi.
+    - **2. Titlebar İndirme Yöneticisi & Popover (`DownloadsPopover.tsx`, `TitleBar.tsx`):**
+      - Titlebar sağ üstteki Ayarlar çarkının hemen soluna `ArrowDownToLine` butonu eklendi; aktif indirme sürerken kırmızı yanıp sönen durum halkası belirmesi sağlandı.
+      - Referans tasarıma birebir uygun popover kartı: Başlıkta `Downloads` ve `X saved • Y MB` sayaçları, dikey kaydırılabilir liste akışında aktif indirmelerde anlık % ilerleme çubuğu ve İptal (`XCircle`) butonu; tamamlanan parçalarda kapak resmi, başlık, dosya boyutu ve kırmızı onay ikonu (`CheckCircle2`).
+      - Listenin altında "Open downloads" butonu ile ana içerikteki İndirilenler sayfasına yönlendirme sağlandı.
+    - **3. Çalma Listesi (Playlist) Toplu İndirme Butonu (`PlaylistView.tsx`):**
+      - Büyük Play ve Shuffle butonlarının yanındaki `...` menüsünün hemen soluna hap şeklinde "Listeyi İndir" (`ArrowDownToLine`) butonu entegre edildi.
+      - Tıklandığında listedeki henüz indirilmemiş parçaları sırayla kuyruğa alır; indirme sürerken spinner ve "İndiriliyor..." durumu gösterilir; tüm parçalar indiğinde buton "İndirildi" (`Check`) haline geçer.
+    - **4. Context Menu ve Şarkı Satırı Entegrasyonu (`TrackContextMenu.tsx`, `PlaylistView.tsx`):**
+      - Şarkı satırına sağ tıklandığında açılan menüye durum duyarlı "İndir" (`ArrowDownToLine`) ve "İndirilenlerden Kaldır" (`Trash2`) seçenekleri eklendi.
+      - Şarkı tablolarında sürenin hemen soluna indirilmiş parçalar için minik "İndirildi" (`Check`) onay rozeti eklendi.
+    - **5. Yerel Çevrimdışı Kütüphane Görünümü (`DownloadsView.tsx`, `App.tsx`):**
+      - `{ type: "downloads" }` rotası eklendi; indirilen tüm müziklerin listelendiği, tek tıkla çevrimdışı toplu/karışık oynatıldığı, arama yapılabildiği ve silinebildiği zengin bir İndirilenler sayfası oluşturuldu.
+      - `PlayerContext.tsx` içerisine en yüksek öncelikli `OFFLINE / DOWNLOADED CHECK` katmanı eklendi; indirilen şarkılar ağa gitmeden doğrudan yerel disk protokolünden (`tubify-local://`) milisaniyeler içinde başlatılır.
+  - [x] **Aşama 51:** Ses Akışı Çözümlemesinde Android Client Entegrasyonu ve İndirme Throttling Koruması:
+    - **1. Android Client İstemci Bağlamı (`stream.rs`):**
+      - Arayüz, arama, kütüphane ve çalma listelerindeki `WEB_REMIX` akışına kesinlikle dokunulmadan, yalnızca `player` endpoint'i istekleri izole edildi.
+      - `https://music.youtube.com/youtubei/v1/player` endpoint'ine `ANDROID_MUSIC` (`6.42.52`, `androidSdkVersion: 34`, `hl: "tr"`, `gl: "TR"`) gövdesi ve `com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; tr_TR; Pixel 7 Pro)` User-Agent başlığı ile POST isteği atıldı.
+      - n-token kısıtlaması ve imza şifrelemesi (cipher) içermeyen doğrudan ham akış URL'si milisaniyeler içinde alındı.
+    - **2. Öncelikli Ses Akış Seçimi:**
+      - Öncelik 1: `audio/webm; codecs="opus"` (ITAG 251 - ~160kbps).
+      - Öncelik 2: `audio/mp4; codecs="mp4a.40.2"` (ITAG 140 - ~128kbps).
+      - Yedek: Herhangi bir geçerli ses formatı ve hata durumunda `yt-dlp` fallback köprüsü.
+    - **3. İndirme Motoru Optimizasyonu (`downloader.rs`):**
+      - İndirme isteklerine `Range: bytes=0-` başlığı ve Android Music User-Agent eklendi (YouTube bant genişliği kısıtlaması engellendi).
+      - Disk yazma performansı için `tokio::io::BufWriter::with_capacity(128 * 1024, file)` (128 KB buffer) entegre edildi.
+      - `download_progress` event yayını her %2.5 veya minimum 120ms aralıklarla debounced edilerek IPC köprüsünün kilitlenmesi önlendi.
+    - **4. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
+
+  - [x] **Aşama 52:** "Audio stream could not be loaded. Trying backup route..." Hatasının Düzeltilmesi & Dayanıklı Oynatma Mimarisi:
+    - **Kök Neden Tespiti:**
+      1. İndirilen şarkılar diskte WebM/Opus biçiminde depolandığı halde, `downloader.rs` içindeki `serve_file` MIME tipini sabit olarak `"audio/mpeg"` gönderiyordu. WebView2 demuxer WebM magic byte'larını görünce ses elementinde `MEDIA_ERR_DECODE` üretiyordu.
+      2. WebView2 üzerinden gelen CORS `OPTIONS` preflight istekleri yanıtlanmıyor (400 Bad Request dönüyor) ve yerel `tubify-local://` istekleri engellenebiliyordu.
+      3. HTML5 `<audio>` elementinin `onError` dinleyicisi ekranda "Trying backup route..." yazmasına rağmen gerçekte hiçbir yedek rotaya geçiş yapmıyordu.
+      4. `stream.rs` içerisindeki yt-dlp komutunda Windows `CREATE_NO_WINDOW` bayrağı ve node js-runtime optimizasyonu eksikti.
+    - **Yapılan İyileştirmeler:**
+      - **Dinamik Ses MIME Tipi Tespiti (`downloader.rs`):** `detect_audio_mime_type` fonksiyonu ile dosya başlığı okunarak `1A 45 DF A3` için `audio/webm`, `ftyp` için `audio/mp4`, `ID3`/MPEG için `audio/mpeg` otomatik belirlendi.
+      - **CORS Preflight & Range Başlıkları (`downloader.rs`):** OPTIONS isteklerine 204 No Content ve eksiksiz CORS başlıkları dönüldü; HEAD ve 206 Partial Content akışı güvenceye alındı.
+      - **Gerçek Yedek Rota Kurtarma Mekanizması (`PlayerContext.tsx`):** `onError` tetiklendiğinde; eğer parça yerel `tubify-local://` üzerinden çalınmaya çalışılmışsa veya önbellekteki ağ linki eskimişse, otomatik olarak live stream API'sinden taze stream linki çekilip oynatma kesintisiz sürdürülür.
+      - **yt-dlp Çözümleyici & Yol İyileştirmesi (`stream.rs`):** Çoklu dizin taraması, `--prefer-free-formats`, `--js-runtimes node` ve `CREATE_NO_WINDOW` bayraklarıyla akış linki alma işlemi 3-4 saniyeye optimize edildi.
+    - **Doğrulama:** `cargo check` ve `npx tsc --noEmit` ile hatasız derlendiği ve tip güvenliği doğrulandı.
+
+  - [x] **Aşama 53:** İndirilen Parçaların 0ms Anında (Zero-Loading) Doğrudan Yerel Diskten Oynatılması:
+    - **Sorun:** İndirilenler listesindeki şarkı başlatıldığında Chromium'un standart olmayan `tubify-local://` URI şemasını doğrudan `<audio>` etiketinde reddetmesi sonucu parça ağ yedek rotasına düşüyor ve YouTube'dan yüklenerek (loading state) gecikmeli açılıyordu.
+    - **Çözüm:**
+      1. **Rust Binary IPC Köprüsü (`downloader.rs`, `lib.rs`):** `get_downloaded_audio_bytes` Tauri komutu eklendi. Yerel diskteki indirilen parça dosyasını doğrudan `tokio::fs::read` ile okuyup tespit edilen gerçek MIME tipiyle (`audio/webm`, `audio/mp4`, `audio/mpeg`) döndürür.
+      2. **Bellek İçi Blob Oynatma (`api.ts`, `PlayerContext.tsx`):** `getDownloadedAudioBlobUrl` fonksiyonu ile diskten okunan baytlar doğrudan tarayıcı `URL.createObjectURL(new Blob([bytes], { type: mime }))` nesnesine çevrilir.
+      3. **0ms Doğrudan Oynatma:** İndirilenler görünümünden (`queueSourceId === "downloads"`) veya indirilmiş parçalar listesinden bir şarkı tıklandığında ağ bağlantısına hiç gitmeden ve `loading` durumuna girmeden mikrosaniyeler içinde `playing` durumunda başlar.
+      4. **Protokol Standartlaştırması:** Kapak ve akış URI'leri Windows WebView2 standardı olan `http://tubify-local.localhost/` ile uyumlu hale getirildi.
+    - **Doğrulama:** `cargo check` ve `npx tsc --noEmit` ile hatasız doğrulandı.
+
+  - [x] **Aşama 54:** WebView2 WebResourceRequested Callback Panic ("no reactor running") Düzeltmesi:
+    - **Kök Neden:** Windows WebView2 kapak resmi ve medya isteklerini thread `main` (Windows mesaj döngüsü) üzerinden tetiklediğinde, `handle_uri_scheme` içindeki `tokio::spawn` çağrısı UI thread'inde Tokio reaktörü bulunmadığı için panic (`there is no reactor running`) veriyor ve program abort oluyordu.
+    - **Çözüm:**
+      - `tokio::spawn` yerine Tauri'nin güvenli küresel Tokio havuzunu kullanan `tauri::async_runtime::spawn` entegre edildi.
+      - `serve_file` fonksiyonu `std::fs` ve `std::io::{Read, Seek}` ile senkronize, reaktör bağımsız ve sıfır hata toleranslı hale getirildi.
+  - [x] **Aşama 55:** Spotify & Zuno Tarzı İkili Önbellek (.bin Cache) Mimarisine Geçiş:
+    - **1. Ham İkili Depolama & Güvenli Önbellek Yapısı (`downloader.rs`):**
+      - İndirilen parçalar diskte açık `.mp3` formatında değil, doğrudan video ID'sine bağlı ikili önbellek (`$APP_DATA_DIR/cache/tracks/{videoId}.bin`) olarak saklanır.
+      - Kapak görselleri `$APP_DATA_DIR/cache/covers/{videoId}.bin` altında depolanır.
+      - YouTube'dan gelen ham akış (Opus/AAC) transcode edilmeden doğrudan binary chunk'lar halinde `.bin` dosyasına yazılır.
+      - İndirilen şarkıların meta verileri (başlık, sanatçı, süre, kapak yolu, MIME türü, boyut, önbellek tarihi) `$APP_DATA_DIR/cache/library.json` dosyasında video ID'si ile indekslenir.
+      - Önceki sürümlerden kalan `downloads/tracks/*.mp3` ve `downloads.json` dosyalarını otomatik olarak `cache/tracks/{videoId}.bin` ve `library.json`'a taşıyan şeffaf otomatik geçiş (migration) mekanizması eklendi.
+    - **2. Tauri Komutları & Oynatma Protokolü (`downloader.rs`, `lib.rs`, `api.ts`):**
+      - `get_cached_library`: İndirilen tüm şarkıların meta verilerini döner (mevcut `get_downloaded_tracks` ile de tam uyumlu).
+      - `delete_cached_track(video_id)`: İlgili `.bin` dosyasını diskten siler ve `library.json` indeksini günceller.
+      - `get_cached_track_bytes(video_id)`: Parça baytlarını ve tespit edilen MIME türünü (`audio/webm`, `audio/mp4`) döner.
+      - `handle_uri_scheme`: Özel protokol üzerinden `.bin` dosyalarını uygun `Content-Type` ve tam CORS başlıklarıyla stream eder; ses nesnesi için `Blob URL` (`URL.createObjectURL`) köprüsü kesintisiz 0ms oynatma sağlar.
+    - **3. Güvenlik & Dosya Gizliliği:**
+      - Dosya yöneticisinde gezinildiğinde parçalar çalınabilir MP3 dosyası olarak görünmez, ham binary blob olarak izole edilir.
+    - **4. Doğrulama:**
+      - `cargo check` (4.6s), `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon sağlandı.
+
+  - [x] **Aşama 56:** İndirme Arayüzü İyileştirmeleri (Minimal İkon, Context Menu Sadeleştirme & Doğrudan İndirme/Silme Butonu):
+    - **1. Çalma Listesi İndirme Butonu Sadeleştirmesi (`PlaylistView.tsx`):**
+      - Uzun "Listeyi İndir" yazısı ve etrafındaki border kaldırıldı.
+      - Proje tasarım diline uygun borderless, dairesel (`p-2 rounded-full`) mikro etkileşimli ikon butonuna dönüştürüldü (`ArrowDownToLine` / `Loader2` / `CheckCircle2`).
+    - **2. İndirme Popup/Toast Bildirimlerinin Kaldırılması:**
+      - Şarkı indirme ve kaldırma işlemlerinde çıkan gereksiz toast bildirimleri (`"${title}" indiriliyor...` vb.) tamamen kaldırıldı.
+    - **3. Context Menu Temizliği (`TrackContextMenu.tsx`):**
+      - Sağ tık context menüsünden indirme seçeneği tamamen çıkarıldı.
+    - **4. Satır İçi (Inline) İndirme & Tik Butonu (`PlaylistView.tsx`, `SearchView.tsx`, `ArtistView.tsx`, `AlbumView.tsx`):**
+      - Şarkı satırlarında Like (Kalp) butonunun hemen yanına indirme ikonu yerleştirildi.
+      - Şarkı indirilmemişse: Hover'da beliren `ArrowDownToLine` butonu; tıklandığında popup çıkarmadan indirmeyi başlatır.
+      - Şarkı indiriliyorsa: Dönen kırmızı `Loader2` animasyonu.
+      - Şarkı indirilmişse: Doğrudan yeşil tik (`CheckCircle2`) ikonu sabit olarak gösterilir.
+      - İndirilmiş şarkının tik ikonuna tıklandığında parça doğrudan önbellekten silinir ve anında reaktif olarak güncellenir.
+      - Süre sütunundaki mükerrer pasif tik ikonu temizlendi.
+  - [x] **Aşama 57:** İndirilenler Arayüzü İnce Ayarları & Ana Sayfa Navigasyonu:
+    - **1. CheckCircle2 Kırmızı Renk Standardizasyonu:**
+      - Tüm indirildi / onay tik ikonları yeşilden Tubify kırmızısına (`text-[#ff0000]`) çevrildi; hover durumunda renk değişimi kaldırılarak homojen ve stabil bir kırmızı stil sağlandı (`PlaylistView.tsx`, `DownloadsView.tsx`, `SearchView.tsx`, `ArtistView.tsx`, `AlbumView.tsx`).
+    - **2. İndirilenler Albüm Kapağı & Başlık İyileştirmesi (`DownloadsView.tsx`):**
+      - Albüm kapağındaki "Çevrimdışı" metni kaldırıldı; yalnızca dairesel kırmızı indirme ikonu bırakıldı.
+      - Başlığın üzerindeki "Yerel Depolama" metni kaldırıldı.
+      - "İndirilenler" başlığında Türkçe noktalı büyük "İ" harfindeki üst kırpılma (clipping) sorunu `overflow-visible`, `pt-1 pb-1` ve `leading-normal` ile giderildi.
+    - **3. Arama Çubuğu Uyumlaştırması (`DownloadsView.tsx`):**
+      - "İndirilenlerde ara..." metni diğer çalma listelerindeki standart olan "Filtrele" ile değiştirildi; boyut ve borderless stilleri birebir eşitlendi.
+    - **4. Ana Sayfa "İndirilenler" Kartı Navigasyonu (`HomeView.tsx`, `App.tsx`):**
+      - Ana sayfadaki Hızlı Erişim kutularındaki "İndirilenler" kartına tıklandığında doğrudan İndirilenler Çalma Listesi sayfasına (`DownloadsView`) yönlendirme sağlandı.
+    - **5. Doğrulama:**
+      - `npx tsc --noEmit` (0 hata), `npm run build` (2.12s) ile sıfır hata/regresyon sağlandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
 

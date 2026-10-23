@@ -7,6 +7,8 @@ import type {
   ArtistDetails,
   AlbumDetails,
   HomeFeedResult,
+  DownloadedTrack,
+  CachedTrack,
 } from "../types/music";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -408,4 +410,76 @@ export async function getHomeFeed(continuation?: string | null): Promise<HomeFee
   }
   return { sections: [], continuation: null };
 }
+
+export async function startDownload(
+  trackId: string,
+  title: string,
+  artist: string,
+  audioUrl?: string | null,
+  coverUrl?: string | null,
+  album?: string | null,
+  duration?: string | null
+): Promise<DownloadedTrack> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<DownloadedTrack>("start_download", {
+      trackId,
+      title,
+      artist,
+      audioUrl: audioUrl || null,
+      coverUrl: coverUrl || null,
+      album: album || null,
+      duration: duration || null,
+    });
+  }
+  throw new Error("Tauri ortamı gereklidir.");
+}
+
+export async function cancelDownload(trackId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("cancel_download", { trackId });
+    return;
+  }
+}
+
+export async function getCachedLibrary(): Promise<CachedTrack[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<CachedTrack[]>("get_cached_library");
+  }
+  return [];
+}
+
+export async function deleteCachedTrack(videoId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("delete_cached_track", { videoId });
+    return;
+  }
+}
+
+export async function getCachedTrackBlobUrl(videoId: string): Promise<string> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const [bytes, mime] = await invoke<[number[], string]>("get_cached_track_bytes", { videoId });
+    const u8 = new Uint8Array(bytes);
+    const blob = new Blob([u8], { type: mime || "audio/webm" });
+    return URL.createObjectURL(blob);
+  }
+  return `http://tubify-local.localhost/track/${videoId}`;
+}
+
+export async function getDownloadedTracks(): Promise<DownloadedTrack[]> {
+  return await getCachedLibrary();
+}
+
+export async function deleteDownloadedTrack(trackId: string): Promise<void> {
+  return await deleteCachedTrack(trackId);
+}
+
+export async function getDownloadedAudioBlobUrl(trackId: string): Promise<string> {
+  return await getCachedTrackBlobUrl(trackId);
+}
+
 

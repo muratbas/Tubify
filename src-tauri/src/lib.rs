@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod downloader;
 pub mod media;
 pub mod search;
 pub mod stream;
@@ -189,6 +190,10 @@ pub fn run() {
     auth::load_saved_session();
 
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol("tubify-local", |ctx, req, resp| {
+            let app = ctx.app_handle();
+            downloader::handle_uri_scheme(app, req, resp);
+        })
         .plugin(tauri_plugin_opener::init())
         .setup(media::setup_system_tray_and_media)
         .invoke_handler(tauri::generate_handler![
@@ -219,7 +224,15 @@ pub fn run() {
             toggle_maximize_window,
             close_window,
             media::update_media_metadata,
-            media::update_playback_status
+            media::update_playback_status,
+            downloader::start_download,
+            downloader::cancel_download,
+            downloader::get_downloaded_tracks,
+            downloader::delete_downloaded_track,
+            downloader::get_downloaded_audio_bytes,
+            downloader::get_cached_library,
+            downloader::delete_cached_track,
+            downloader::get_cached_track_bytes
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tubify tauri application");

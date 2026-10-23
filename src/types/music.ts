@@ -107,3 +107,51 @@ export interface HomeFeedResult {
   sections: HomeSection[];
   continuation?: string | null;
 }
+
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
+export interface LyricsData {
+  syncedLyrics: LyricLine[] | null;
+  plainLyrics: string | null;
+  instrumental: boolean;
+  isSynced: boolean;
+  source: "lrclib";
+}
+
+export interface CachedTrack {
+  track_id: string;
+  title: string;
+  artist: string;
+  album?: string | null;
+  duration?: string | null;
+  file_path: string;
+  cover_path?: string | null;
+  mime_type?: string;
+  file_size: number;
+  cached_at?: number;
+  downloaded_at?: number;
+}
+
+export type DownloadedTrack = CachedTrack;
+
+export interface DownloadProgressPayload {
+  track_id: string;
+  progress: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+}
+
+export interface ActiveDownload {
+  track_id: string;
+  title: string;
+  artist: string;
+  thumbnail?: string | null;
+  progress: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+  status: "downloading" | "cancelling" | "completed" | "error";
+}
+

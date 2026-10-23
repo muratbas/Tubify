@@ -12,9 +12,12 @@ import {
   Mic2,
   Flame,
   Sparkles,
+  CheckCircle2,
+  ArrowDownToLine,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useDownload } from "../context/DownloadContext";
 import { MicroVisualizer } from "./MicroVisualizer";
 import { getOptimizedThumbnail } from "./HomeView";
 import type { Track, Playlist } from "../types/music";
@@ -161,6 +164,7 @@ export const SearchView: FC<SearchViewProps> = ({
   const { theme } = useTheme();
   const { t: _t } = useLanguage();
   const isLight = theme === "light";
+  const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
   const [activeCategory, setActiveCategory] = useState<SearchCategory>("all");
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -603,31 +607,70 @@ export const SearchView: FC<SearchViewProps> = ({
 
                           {/* Sağ Taraf: Süre & Hover Heart + MoreHorizontal */}
                           <div className="flex items-center gap-2 shrink-0">
-                            <div className="hidden group-hover:flex items-center gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onToggleLike(track);
-                                }}
-                                className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
-                                title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
-                              >
-                                <Heart
-                                  className={`w-4 h-4 ${
-                                    isLiked ? "fill-[#ff0000] text-[#ff0000]" : ""
-                                  }`}
-                                />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onContextMenuTrack?.(track, e);
-                                }}
-                                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                                title="Diğer seçenekler"
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
+                            <div className="flex items-center gap-1">
+                              {/* If downloaded or downloading, show status indicator */}
+                              {(() => {
+                                const downloaded = isDownloaded(track.id);
+                                const downloading = isDownloading(track.id);
+                                if (!downloaded && !downloading) return null;
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (downloaded) deleteTrackDownload(track.id);
+                                    }}
+                                    className="p-1.5 rounded-full cursor-pointer transition-transform active:scale-110"
+                                    title={downloaded ? "İndirildi (Silmek için tıkla)" : "İndiriliyor..."}
+                                  >
+                                    {downloading ? (
+                                      <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
+                                    ) : (
+                                      <CheckCircle2 className="w-4 h-4 text-[#ff0000]" />
+                                    )}
+                                  </button>
+                                );
+                              })()}
+
+                              <div className="hidden group-hover:flex items-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleLike(track);
+                                  }}
+                                  className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
+                                  title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
+                                >
+                                  <Heart
+                                    className={`w-4 h-4 ${
+                                      isLiked ? "fill-[#ff0000] text-[#ff0000]" : ""
+                                    }`}
+                                  />
+                                </button>
+
+                                {!isDownloaded(track.id) && !isDownloading(track.id) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startTrackDownload(track);
+                                    }}
+                                    className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                                    title="İndir"
+                                  >
+                                    <ArrowDownToLine className="w-4 h-4" />
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onContextMenuTrack?.(track, e);
+                                  }}
+                                  className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                                  title="Diğer seçenekler"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                             <span className="text-xs text-neutral-400 group-hover:hidden min-w-[36px] text-right font-mono">
                               {track.duration || "3:30"}
@@ -857,31 +900,70 @@ export const SearchView: FC<SearchViewProps> = ({
                         </span>
                       )}
 
-                      <div className="hidden group-hover:flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleLike(track);
-                          }}
-                          className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
-                          title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
-                        >
-                          <Heart
-                            className={`w-4 h-4 ${
-                              isLiked ? "fill-[#ff0000] text-[#ff0000]" : ""
-                            }`}
-                          />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onContextMenuTrack?.(track, e);
-                          }}
-                          className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                          title="Diğer seçenekler"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
+                      <div className="flex items-center gap-1">
+                        {/* If downloaded or downloading, show status indicator */}
+                        {(() => {
+                          const downloaded = isDownloaded(track.id);
+                          const downloading = isDownloading(track.id);
+                          if (!downloaded && !downloading) return null;
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (downloaded) deleteTrackDownload(track.id);
+                              }}
+                              className="p-1.5 rounded-full cursor-pointer transition-transform active:scale-110"
+                              title={downloaded ? "İndirildi (Silmek için tıkla)" : "İndiriliyor..."}
+                            >
+                              {downloading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4 text-[#ff0000]" />
+                              )}
+                            </button>
+                          );
+                        })()}
+
+                        <div className="hidden group-hover:flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleLike(track);
+                            }}
+                            className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
+                            title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
+                          >
+                            <Heart
+                              className={`w-4 h-4 ${
+                                isLiked ? "fill-[#ff0000] text-[#ff0000]" : ""
+                              }`}
+                            />
+                          </button>
+
+                          {!isDownloaded(track.id) && !isDownloading(track.id) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startTrackDownload(track);
+                              }}
+                              className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                              title="İndir"
+                            >
+                              <ArrowDownToLine className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onContextMenuTrack?.(track, e);
+                            }}
+                            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                            title="Diğer seçenekler"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <span className="text-xs text-neutral-400 group-hover:hidden min-w-[36px] text-right font-mono">
