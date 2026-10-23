@@ -99,7 +99,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
   return (
     <div
       onScroll={onScroll}
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-10 pt-16 pb-12 space-y-7 transition-colors ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-10 pt-6 pb-12 space-y-7 transition-colors ${
         isLight ? "bg-[#f0f0f0] text-[#111111]" : "bg-[#030303] text-white"
       }`}
     >

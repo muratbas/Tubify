@@ -179,7 +179,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
 
   return (
     <div
-      className={`relative flex-1 flex h-full w-full overflow-hidden pt-14 select-none transition-colors duration-200 ${
+      className={`relative flex-1 flex h-full w-full overflow-hidden pt-0 select-none transition-colors duration-200 ${
         isLight ? "bg-white text-neutral-950" : "bg-[#0c0c0c] text-white"
       }`}
     >

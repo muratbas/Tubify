@@ -1125,8 +1125,8 @@ export const App: FC = () => {
             isLight ? "bg-white" : "bg-[#0c0c0c]"
           }`}
         >
-          {/* Header / TitleBar (z-20) */}
-          <div className="absolute top-0 left-0 right-0 z-20 pointer-events-auto">
+          {/* Header / TitleBar */}
+          <div className="relative w-full z-20 shrink-0 pointer-events-auto">
             <TitleBar
               searchQuery={searchQuery}
               onSearchChange={(q) => {
@@ -1167,7 +1167,7 @@ export const App: FC = () => {
 
             {/* Audio error banner */}
             {player.playbackError && (
-              <div className="mx-6 mt-16 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between z-20">
+              <div className="mx-6 mt-4 p-3 rounded-2xl bg-[#ff0000]/10 border border-[#ff0000]/30 text-rose-500 text-xs flex items-center justify-between z-20">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-[#ff0000]" />
                   <span>{player.playbackError}</span>
@@ -1382,7 +1382,7 @@ export const App: FC = () => {
 
             {/* Module 3: Sağ Panel (Queue / Lyrics / NowPlaying) */}
             {player.queueViewMode !== "closed" && (
-              <div className="pt-14 flex h-full shrink-0">
+              <div className="h-full flex shrink-0 overflow-hidden">
                 <RightDrawer onContextMenuTrack={handleOpenContextMenu} />
               </div>
             )}

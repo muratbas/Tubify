@@ -693,11 +693,21 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **4. Ana Sayfa "İndirilenler" Kartı Navigasyonu (`HomeView.tsx`, `App.tsx`):**
       - Ana sayfadaki Hızlı Erişim kutularındaki "İndirilenler" kartına tıklandığında doğrudan İndirilenler Çalma Listesi sayfasına (`DownloadsView`) yönlendirme sağlandı.
     - **5. Doğrulama:**
-      - `npx tsc --noEmit` (0 hata), `npm run build` (2.12s) ile sıfır hata/regresyon sağlandı.
+  - [x] **Aşama 58:** Tüm Scrollbar'ların TitleBar Altına Alınması, Queue Scrollbar'ının Kaldırılması, Sıralama Oku Temizliği & Süre/Şarkı Formatı:
+    - **1. Tüm Scrollbar'ların Kesin Olarak TitleBar Altından Başlaması (`App.tsx`, Görünümler):**
+      - `TitleBar` bileşeni `absolute` yerleşimden çıkarılıp `Module 2`'nin ana flex akışı (`relative w-full z-20 shrink-0`) içerisine alındı.
+      - Böylece alttaki ana içerik alanı (`<main>` ve tüm sayfalar: `PlaylistView`, `AlbumView`, `ArtistView`, `SearchView`, `HomeView`, `SettingsView`, `DownloadsView`, `LyricsView`) kesin ve fiziksel olarak TitleBar'ın bittiği noktadan (`y = 56px`) başlar.
+      - Hiçbir sayfa kaydırma çubuğu pencere başlığı / TitleBar (y=0-56px) bölgesine taşamaz; tüm scrollbar'lar doğal olarak TitleBar'ın hemen altından başlar. Sayfaların gereksiz `pt-14` / `pt-16` paddingleri temizlendi.
+    - **2. Queue (Sıradaki Şarkılar) Paneli Scrollbar'ının Tamamen Kaldırılması (`RightDrawer.tsx`):**
+      - Queue paneli hem Mini Strip hem de Expanded modlarında `.scrollbar-none` sınıfına geçirildi.
+      - Kaydırma çubuğu görsel olarak tamamen gizlendi; pürüzsüz fare tekerleği kaydırması korunurken sıfır görsel çubuk sağlandı.
+    - **3. Çalma Listesi Tablo Başlığındaki Kırmızı Yukarı Okun (`▲`) Kaldırılması (`PlaylistView.tsx`):**
+      - `#` (sıra numarası) sütun başlığı yanındaki kırmızı `▲` sıralama oku kaldırıldı.
+    - **4. Çalma Listesi Şarkı Sayısı & Toplam Süre Gösterimi (`PlaylistView.tsx`, `Sidebar.tsx`):**
+      - InnerTube API'sinden gelen "parça" ibaresi filtrelenerek "parça şarkı" çakışması önlendi; standart `xx şarkı` formatı sağlandı.
+      - Çalma listesindeki parçaların toplam süresi saat ve dakika olarak hesaplandı (`totalDurationSeconds` & `formattedTotalDuration`); şarkı sayısının yanına ikinci bir nokta (`•`) ile dinamik süre bilgisi eklendi (Örn: `murat • 42 şarkı • 2 sa 41 dk`).
+    - **5. Doğrulama:**
+      - `npx tsc --noEmit` (0 hata) ile sıfır hata/regresyon sağlandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
-
-
-
-

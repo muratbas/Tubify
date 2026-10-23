@@ -59,7 +59,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
   if (isMini) {
     return (
       <aside
-        className={`w-[60px] h-full flex flex-col shrink-0 border-l transition-all duration-200 ease-in-out select-none relative z-20 ${
+        className={`w-[60px] h-full flex flex-col shrink-0 border-l border-t transition-all duration-200 ease-in-out select-none relative z-20 ${
           isLight
             ? "bg-white border-neutral-200/80 text-neutral-900"
             : "bg-[#0c0c0c] border-white/10 text-white"
@@ -81,7 +81,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
         </div>
 
         {/* Vertical Strip of Artwork Covers (Shows ALL tracks: past, active, upcoming) */}
-        <div className="flex-1 overflow-y-auto no-scrollbar py-3 px-2 flex flex-col items-center gap-2.5">
+        <div className="flex-1 overflow-y-auto scrollbar-none py-3 px-2 flex flex-col items-center gap-2.5">
           {/* If activeTrack is not in queue list, show it at top */}
           {activeTrack && activeIndex === -1 && (
             <div
@@ -198,7 +198,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
   // -------------------------------------------------------------
   return (
     <aside
-      className={`w-[300px] h-full flex flex-col shrink-0 border-l transition-all duration-200 ease-in-out select-none relative z-20 ${
+      className={`w-[300px] h-full flex flex-col shrink-0 border-l border-t transition-all duration-200 ease-in-out select-none relative z-20 ${
         isLight
           ? "bg-white border-neutral-200/80 text-neutral-900"
           : "bg-[#0c0c0c] border-white/10 text-white"
@@ -270,7 +270,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
       </div>
 
       {/* Queue Content (Scrollable) */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-2.5 space-y-1">
+      <div className="flex-1 overflow-y-auto scrollbar-none p-2.5 space-y-1">
         {/* Fallback Now Playing Card if activeTrack is not part of queue array */}
         {activeTrack && activeIndex === -1 && (
           <div

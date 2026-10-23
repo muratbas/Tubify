@@ -77,18 +77,23 @@ export function isLikedSongsPlaylist(pl: { id?: string; title?: string } | null 
   return false;
 }
 
+function cleanSidebarTrackCount(raw: string): string {
+  const cleaned = raw
+    .replace(/parça(lar)?/gi, "")
+    .replace(/şarkı(lar)?/gi, "")
+    .replace(/videos?/gi, "")
+    .replace(/tracks?/gi, "")
+    .replace(/songs?/gi, "")
+    .trim();
+  return cleaned ? `${cleaned} şarkı` : raw;
+}
+
 /**
  * Clean subtitle helper ensuring "Google Hesabı" or "Google Account" NEVER appears
  */
 function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): string {
   if (pl.track_count && pl.track_count.trim()) {
-    const rawCount = pl.track_count.trim();
-    const countText =
-      rawCount.toLowerCase().includes("şarkı") ||
-      rawCount.toLowerCase().includes("parça") ||
-      rawCount.toLowerCase().includes("song")
-        ? rawCount
-        : `${rawCount} şarkı`;
+    const countText = cleanSidebarTrackCount(pl.track_count.trim());
     return `Çalma listesi • ${countText}`;
   }
 
@@ -121,14 +126,7 @@ function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): str
  */
 function getGridSubtitle(pl: Playlist, userProfileName?: string | null): string {
   if (pl.track_count && pl.track_count.trim()) {
-    const rawCount = pl.track_count.trim();
-    const countText =
-      rawCount.toLowerCase().includes("şarkı") ||
-      rawCount.toLowerCase().includes("parça") ||
-      rawCount.toLowerCase().includes("song")
-        ? rawCount
-        : `${rawCount} şarkı`;
-    return countText;
+    return cleanSidebarTrackCount(pl.track_count.trim());
   }
 
   try {

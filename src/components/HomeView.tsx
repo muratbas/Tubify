@@ -725,7 +725,7 @@ export const HomeView: FC<HomeViewProps> = ({
   return (
     <div
       onScroll={onScroll}
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 pt-16 pb-28 space-y-10 relative z-10 bg-transparent ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none px-6 md:px-8 pt-4 pb-28 space-y-10 relative z-10 bg-transparent ${
         isLight ? "text-neutral-900" : "text-white"
       }`}
     >

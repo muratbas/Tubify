@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FC } from "react";
+import { useState, useRef, useEffect, useMemo, type FC } from "react";
 import {
   Play,
   Pause,
@@ -226,6 +226,48 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
   const renderedTracks = displayTracks.slice(0, visibleCount);
 
+  // Total playlist duration calculation
+  const totalDurationSeconds = useMemo(() => {
+    return tracks.reduce((sum, track) => {
+      if (!track.duration) return sum;
+      const parts = track.duration.trim().split(":").map((p) => parseInt(p, 10));
+      if (parts.some((p) => isNaN(p))) return sum;
+      if (parts.length === 3) return sum + parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return sum + parts[0] * 60 + parts[1];
+      if (parts.length === 1) return sum + parts[0];
+      return sum;
+    }, 0);
+  }, [tracks]);
+
+  const formattedTotalDuration = useMemo(() => {
+    if (totalDurationSeconds <= 0) return null;
+    const hours = Math.floor(totalDurationSeconds / 3600);
+    const minutes = Math.floor((totalDurationSeconds % 3600) / 60);
+    if (hours > 0) {
+      return minutes > 0 ? `${hours} sa ${minutes} dk` : `${hours} sa`;
+    }
+    return `${Math.max(1, minutes)} dk`;
+  }, [totalDurationSeconds]);
+
+  // Clean track count string ensuring "parça" is never concatenated with "şarkı"
+  const trackCountText = useMemo(() => {
+    const raw = isLikedPlaylist
+      ? likedSongsTotalCount
+      : "track_count" in playlist && playlist.track_count
+      ? playlist.track_count
+      : null;
+
+    if (!raw) return `${tracks.length.toLocaleString()} şarkı`;
+    const cleaned = raw
+      .replace(/parça(lar)?/gi, "")
+      .replace(/şarkı(lar)?/gi, "")
+      .replace(/videos?/gi, "")
+      .replace(/tracks?/gi, "")
+      .replace(/songs?/gi, "")
+      .trim();
+    return cleaned ? `${cleaned} şarkı` : `${tracks.length.toLocaleString()} şarkı`;
+  }, [isLikedPlaylist, likedSongsTotalCount, playlist, tracks.length]);
+
   const isQueueExpanded = queueViewMode === "expanded";
   const gridTemplate = isQueueExpanded
     ? "grid-cols-[40px_minmax(200px,1fr)_84px_50px] xl:grid-cols-[40px_minmax(200px,1fr)_140px_84px_50px]"
@@ -259,7 +301,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   return (
     <div
       onScroll={onScroll}
-      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-14 pb-28 transition-colors bg-transparent relative z-10 ${
+      className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-0 pb-28 transition-colors bg-transparent relative z-10 ${
         isLight ? "text-neutral-900" : "text-white"
       }`}
     >
@@ -354,19 +396,13 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   : "murat"}
               </span>
               <span>•</span>
-              <span>
-                {isLikedPlaylist
-                  ? likedSongsTotalCount
-                    ? likedSongsTotalCount.toLowerCase().includes("şarkı")
-                      ? likedSongsTotalCount
-                      : `${likedSongsTotalCount} şarkı`
-                    : `${tracks.length.toLocaleString()} şarkı`
-                  : "track_count" in playlist && playlist.track_count && playlist.track_count.trim()
-                  ? playlist.track_count.toLowerCase().includes("şarkı")
-                    ? playlist.track_count
-                    : `${playlist.track_count} şarkı`
-                  : `${tracks.length.toLocaleString()} şarkı`}
-              </span>
+              <span>{trackCountText}</span>
+              {formattedTotalDuration && (
+                <>
+                  <span>•</span>
+                  <span>{formattedTotalDuration}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -564,7 +600,6 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             >
               <span className="flex items-center">
                 <span>#</span>
-                <span className="text-[#ff0000] text-[9px] ml-1">▲</span>
               </span>
               <span className="min-w-[200px]">BAŞLIK</span>
               <span className={isQueueExpanded ? "hidden xl:block truncate" : "truncate"}>ALBÜM</span>
