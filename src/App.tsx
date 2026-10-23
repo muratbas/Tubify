@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, type FC } from "react";
+import { useState, useEffect, useCallback, type FC } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar, isLikedSongsPlaylist, recordPlaylistPlayed } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
@@ -385,12 +385,13 @@ export const App: FC = () => {
         } catch {}
       }
       if (tracks.length > 0) {
+        const sourceId = "playlist:liked";
         if (shuffle) {
           const randIdx = Math.floor(Math.random() * tracks.length);
-          player.playTrack(tracks[randIdx], tracks);
+          player.playTrack(tracks[randIdx], tracks, sourceId);
           if (!player.isShuffle) player.toggleShuffle();
         } else {
-          player.playTrack(tracks[0], tracks);
+          player.playTrack(tracks[0], tracks, sourceId);
           if (player.isShuffle) player.toggleShuffle();
         }
       } else {
@@ -412,12 +413,13 @@ export const App: FC = () => {
         } catch {}
       }
       if (tracks.length > 0) {
+        const sourceId = typeof pl === "string" ? pl : `playlist:${pl.id}`;
         if (shuffle) {
           const randIdx = Math.floor(Math.random() * tracks.length);
-          player.playTrack(tracks[randIdx], tracks);
+          player.playTrack(tracks[randIdx], tracks, sourceId);
           if (!player.isShuffle) player.toggleShuffle();
         } else {
-          player.playTrack(tracks[0], tracks);
+          player.playTrack(tracks[0], tracks, sourceId);
           if (player.isShuffle) player.toggleShuffle();
         }
       } else {
@@ -789,25 +791,6 @@ export const App: FC = () => {
     }
   };
 
-  // Next / Prev track queue resolver
-  const currentQueue = useMemo(() => {
-    if (currentNav.type === "playlist") {
-      if (currentNav.playlist.id === "liked") return likedSongs;
-      if (currentNav.playlist.id === "episodes") return EPISODES_TRACKS;
-      return playlistTracks;
-    }
-    if (currentNav.type === "search") {
-      return searchResults;
-    }
-    return [...player.recentTracks, ...INITIAL_RECOMMENDED];
-  }, [currentNav, likedSongs, playlistTracks, searchResults, player.recentTracks]);
-
-  // Keep queue synced to player context
-  useEffect(() => {
-    if (currentQueue.length > 0) {
-      player.setQueue(currentQueue);
-    }
-  }, [currentQueue]);
 
   // Search handlers
   const handleExecuteSearch = async (queryText: string) => {
@@ -1033,6 +1016,16 @@ export const App: FC = () => {
         if (currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM") {
           setLikedSongs((prev) => [...prev, ...page.tracks]);
         }
+
+        // Playback Context Isolation:
+        // Only append newly loaded tracks to active playback queue if current playlist is the active queue source!
+        const currentSourceId =
+          currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM"
+            ? "playlist:liked"
+            : `playlist:${currentNav.playlist.id}`;
+        if (player.queueSourceId === currentSourceId) {
+          player.setQueue([...player.queue, ...page.tracks], currentSourceId);
+        }
       }
       setContinuationToken(page.continuation || null);
     } catch (e) {
@@ -1189,17 +1182,25 @@ export const App: FC = () => {
                   if (currentNav.playlist.id) {
                     recordPlaylistPlayed(currentNav.playlist.id);
                   }
-                  player.playTrack(t, activePlaylistTracks);
+                  const sourceId =
+                    currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM"
+                      ? "playlist:liked"
+                      : `playlist:${currentNav.playlist.id}`;
+                  player.playTrack(t, activePlaylistTracks, sourceId);
                 }}
                 onPlaySuggestion={(t) => {
-                  player.playTrack(t);
+                  player.playTrack(t, [t], `suggestion:${t.id}`);
                 }}
                 onPlayAll={() => {
                   if (activePlaylistTracks.length > 0) {
                     if (currentNav.playlist.id) {
                       recordPlaylistPlayed(currentNav.playlist.id);
                     }
-                    player.playTrack(activePlaylistTracks[0], activePlaylistTracks);
+                    const sourceId =
+                      currentNav.playlist.id === "liked" || currentNav.playlist.id === "LM"
+                        ? "playlist:liked"
+                        : `playlist:${currentNav.playlist.id}`;
+                    player.playTrack(activePlaylistTracks[0], activePlaylistTracks, sourceId);
                   }
                 }}
                 onToggleShuffle={player.toggleShuffle}
@@ -1231,9 +1232,15 @@ export const App: FC = () => {
                 artistName={currentNav.artistName}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
-                onPlayTrack={(t, q) => player.playTrack(t, q || activePlaylistTracks)}
+                onPlayTrack={(t, q) => {
+                  const sourceId = `artist:${currentNav.artistId}`;
+                  player.playTrack(t, q || [t], sourceId);
+                }}
                 onPlayAll={(tracks) => {
-                  if (tracks.length > 0) player.playTrack(tracks[0], tracks);
+                  if (tracks.length > 0) {
+                    const sourceId = `artist:${currentNav.artistId}`;
+                    player.playTrack(tracks[0], tracks, sourceId);
+                  }
                 }}
                 onToggleShuffle={player.toggleShuffle}
                 isShuffle={player.isShuffle}
@@ -1255,9 +1262,15 @@ export const App: FC = () => {
                 initialThumbnail={currentNav.thumbnail}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
-                onPlayTrack={(t, q) => player.playTrack(t, q || activePlaylistTracks)}
+                onPlayTrack={(t, q) => {
+                  const sourceId = `album:${currentNav.albumId}`;
+                  player.playTrack(t, q || [t], sourceId);
+                }}
                 onPlayAll={(tracks) => {
-                  if (tracks.length > 0) player.playTrack(tracks[0], tracks);
+                  if (tracks.length > 0) {
+                    const sourceId = `album:${currentNav.albumId}`;
+                    player.playTrack(tracks[0], tracks, sourceId);
+                  }
                 }}
                 onToggleShuffle={player.toggleShuffle}
                 isShuffle={player.isShuffle}
@@ -1281,7 +1294,10 @@ export const App: FC = () => {
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
                 likedTrackIds={player.likedTrackIds}
-                onPlayTrack={(t, q) => player.playTrack(t, q || searchResults)}
+                onPlayTrack={(t, q) => {
+                  const sourceId = `search:${searchQuery}`;
+                  player.playTrack(t, q || searchResults, sourceId);
+                }}
                 onToggleLike={handleToggleLike}
                 onContextMenuTrack={handleOpenContextMenu}
                 onNavigateArtist={handleNavigateArtist}
@@ -1303,7 +1319,9 @@ export const App: FC = () => {
                 playlists={playlists}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
-                onPlayTrack={(t, list) => player.playTrack(t, list || [...player.recentTracks, ...INITIAL_RECOMMENDED])}
+                onPlayTrack={(t, list) => {
+                  player.playTrack(t, list || [...player.recentTracks, ...INITIAL_RECOMMENDED], "home");
+                }}
                 onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
                 onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
                 onNavigateArtist={handleNavigateArtist}

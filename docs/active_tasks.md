@@ -516,7 +516,18 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Çapraz fare geçişlerinde menünün kazara kapanmasını önleyen 150ms'lik hover gecikmesi eklendi.
     - **4. Max-Height ve Dahili Scrollbar Güvencesi:**
       - Context menu kapsayıcılarına `max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-none` eklendi; çok küçük pencerelerde veya uzun listelerde menünün taşmadan kendi içinde kaydırılabilmesi sağlandı.
-    - **5. Doğrulama:**
+  - [x] **Aşama 46:** Oynatma Kuyruğu Sayfa İzolasyonu (Playback Context Isolation & Queue Independence):
+    - **1. Aktif Kuyruk (Queue) ile Görüntülenen Sayfanın (Active View) Tam İzolasyonu:**
+      - [App.tsx](file:///c:/Projeler/Tubify/src/App.tsx) içerisinde sayfa gezintilerini (`currentNav`) dinleyerek her gezinmede arka plandaki oynatma kuyruğunu ezen `currentQueue` ve `useEffect([currentQueue])` tamamen kaldırıldı.
+      - Kullanıcı sol menüden başka bir çalma listesine tıkladığında, ayarlara girdiğinde veya Ana Sayfa'ya döndüğünde sadece sayfa UI durumu değişir; çalan `queue` ve `queueSourceId` asla değiştirilmez veya üzerine yazılmaz.
+    - **2. Merkezi `queueSourceId` Kaynak Takibi ([PlayerContext.tsx](file:///c:/Projeler/Tubify/src/context/PlayerContext.tsx)):**
+      - Oynatıcı global state'ine `queueSourceId` eklendi (`playlist:VL...`, `album:...`, `artist:...`, `search:...`, `home`, `radio:...`).
+      - Kuyruk listesi SADECE kullanıcı bir sayfadaki büyük "Oynat" / "Karışık Çal" butonuna bastığında veya satırdaki bir şarkıya çift tıkladığında/oynat butonuna bastığında yeni listenin şarkılarıyla güncellenir.
+      - Çalma listesi sayfalarında infinite scroll ile yeni parçalar yüklendiğinde (`handleLoadMoreTracks`), yalnızca arkada çalan aktif kuyruk bu çalma listesine aitse (`player.queueSourceId === currentPlaylistSourceId`) kuyruğa yeni şarkılar eklenir; kullanıcı başka bir listeyi inceliyorsa çalan kuyruğa dokunulmaz.
+    - **3. Kesintisiz Parça Değişimi (`nextTrack` / `prevTrack` / `onEnded`):**
+      - Şarkı bittiğinde (`onEnded`) veya "Sonraki Parça" butonuna basıldığında bir sonraki şarkı daima arka plandaki orijinal `queue` listesi üzerinden (`queue[currentIndex + 1]`) seçilerek yürütülür.
+      - Kullanıcı o esnada bambaşka bir çalma listesinde, albümde veya ana sayfada olsa bile orijinal çalma listesindeki sıra harfiyen korunur.
+    - **4. Doğrulama:**
       - `npx tsc --noEmit` ve `npm run build` ile sıfır hata/regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar

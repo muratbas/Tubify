@@ -803,7 +803,7 @@ export const HomeView: FC<HomeViewProps> = ({
             return (
               <div
                 key={`home-top-${track.id}-${i}`}
-                onClick={() => onPlayTrack(track)}
+                onClick={() => onPlayTrack(track, displayTracks)}
                 onContextMenu={(e) => {
                   if (onContextMenuTrack) {
                     onContextMenuTrack(track, e);
@@ -839,7 +839,7 @@ export const HomeView: FC<HomeViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onPlayTrack(track);
+                        onPlayTrack(track, displayTracks);
                       }}
                       className="pointer-events-auto w-10 h-10 md:w-11 md:h-11 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                       data-tooltip={isThisPlaying ? "Duraklat" : "Oynat"}

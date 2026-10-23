@@ -62,6 +62,7 @@ interface PlayerContextType {
   isRepeat: boolean;
   repeatMode: RepeatMode;
   queue: Track[];
+  queueSourceId: string;
   is16x9Aspect: boolean;
   isRightDrawerOpen: boolean;
   rightDrawerTab: RightDrawerTab;
@@ -72,7 +73,7 @@ interface PlayerContextType {
   likedTrackIds: Set<string>;
   recentTracks: Track[];
 
-  playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
+  playTrack: (track: Track, newQueue?: Track[], sourceId?: string) => Promise<void>;
   togglePlayPause: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
@@ -92,7 +93,8 @@ interface PlayerContextType {
   setActiveMood: (mood: MoodCategory) => void;
   toggleMiniPlayer: () => void;
   toggleLike: (track: Track, isAuthenticated?: boolean) => Promise<void>;
-  setQueue: (tracks: Track[]) => void;
+  setQueue: (tracks: Track[], sourceId?: string) => void;
+  setQueueSourceId: (sourceId: string) => void;
   clearPlaybackError: () => void;
   syncLikedIds: (ids: string[]) => void;
   toastMessage: string | null;
@@ -141,6 +143,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   });
   const isRepeat = repeatMode !== "off";
   const [queue, setQueueState] = useState<Track[]>([]);
+  const [queueSourceId, setQueueSourceId] = useState<string>("");
 
   // Desktop Panels & Layout State
   const [is16x9Aspect, setIs16x9Aspect] = useState(false);
@@ -177,6 +180,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const queueRef = useRef<Track[]>([]);
   queueRef.current = queue;
+
+  const queueSourceIdRef = useRef<string>("");
+  queueSourceIdRef.current = queueSourceId;
 
   const isShuffleRef = useRef(isShuffle);
   isShuffleRef.current = isShuffle;
@@ -726,10 +732,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const playTrack = async (track: Track, newQueue?: Track[]) => {
+  const playTrack = async (track: Track, newQueue?: Track[], sourceId?: string) => {
     if (newQueue && newQueue.length > 0) {
       queueRef.current = newQueue;
       setQueueState(newQueue);
+      if (sourceId !== undefined) {
+        queueSourceIdRef.current = sourceId;
+        setQueueSourceId(sourceId);
+      }
+    } else if (sourceId !== undefined) {
+      queueSourceIdRef.current = sourceId;
+      setQueueSourceId(sourceId);
     }
     await playTrackInternal(track);
   };
@@ -838,10 +851,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearQueue = useCallback(() => {
-    setQueueState(activeTrack ? [activeTrack] : []);
-    queueRef.current = activeTrack ? [activeTrack] : [];
+    const active = currentTrackRef.current;
+    const remaining = active ? [active] : [];
+    setQueueState(remaining);
+    queueRef.current = remaining;
+    queueSourceIdRef.current = "";
+    setQueueSourceId("");
+    upcomingTrackRef.current = null;
+    preloadedTrackRef.current = null;
     showToast("Sıra temizlendi");
-  }, [activeTrack, showToast]);
+  }, [showToast]);
 
   const saveQueueAsPlaylist = useCallback(() => {
     showToast("Sıra çalma listesi olarak kaydedildi");
@@ -886,8 +905,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const setQueue = (tracks: Track[]) => {
+  const setQueue = (tracks: Track[], sourceId?: string) => {
+    queueRef.current = tracks;
     setQueueState(tracks);
+    if (sourceId !== undefined) {
+      queueSourceIdRef.current = sourceId;
+      setQueueSourceId(sourceId);
+    }
   };
 
   const addToQueue = useCallback((track: Track) => {
@@ -929,12 +953,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const startRadio = useCallback(async (track: Track) => {
     showToast(`"${track.title}" radyosu başlatılıyor...`);
+    const radioSourceId = `radio:${track.id}`;
 
     // 1. Instant Playback: If this track isn't already playing, start playing it immediately!
     if (currentTrackRef.current?.id !== track.id) {
       queueRef.current = [track];
       setQueueState([track]);
+      queueSourceIdRef.current = radioSourceId;
+      setQueueSourceId(radioSourceId);
       playTrackInternal(track);
+    } else {
+      queueSourceIdRef.current = radioSourceId;
+      setQueueSourceId(radioSourceId);
     }
 
     // 2. Fetch ~50 radio tracks from YouTube Music Watch Playlist endpoint in parallel
@@ -947,6 +977,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         queueRef.current = finalQueue;
         setQueueState(finalQueue);
+        queueSourceIdRef.current = radioSourceId;
+        setQueueSourceId(radioSourceId);
 
         // Invalidate preloader and immediately trigger preload for track #2
         preloadedTrackRef.current = null;
@@ -986,6 +1018,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isRepeat,
         repeatMode,
         queue,
+        queueSourceId,
+        setQueueSourceId,
         is16x9Aspect,
         isRightDrawerOpen,
         queueViewMode,
