@@ -708,6 +708,18 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Çalma listesindeki parçaların toplam süresi saat ve dakika olarak hesaplandı (`totalDurationSeconds` & `formattedTotalDuration`); şarkı sayısının yanına ikinci bir nokta (`•`) ile dinamik süre bilgisi eklendi (Örn: `murat • 42 şarkı • 2 sa 41 dk`).
     - **5. Doğrulama:**
       - `npx tsc --noEmit` (0 hata) ile sıfır hata/regresyon sağlandı.
+  - [x] **Aşama 59:** Titlebar Ayarlar Butonunun Profil Menüsüne Taşınması & Gerçek Google Avatarı ve Profil Bilgisi Entegrasyonu:
+    - **1. Titlebar Ayarlar Butonunun Taşınması (`TitleBar.tsx`):**
+      - Titlebar sağ üstündeki bağımsız Ayarlar (çark) butonu görseldeki gibi kaldırıldı.
+      - Ayarlar işlevi, profil/hesap avatarı tıklandığında açılan dropdown menüsüne (`onOpenSettings("account")`) taşındı.
+      - Giriş yapılmamış durumlar için kullanıcı avatarı ikonu ve açılır menüsünden doğrudan Ayarlar ve Giriş Yap erişimi sağlandı.
+    - **2. Gerçek Google Avatarı ve Profil Bilgisi Çekilmesi (`auth.rs`, `tubify_session.json`):**
+      - YouTube Music InnerTube `/youtubei/v1/account/account_menu` endpoint'i üzerinden kullanıcının gerçek Google profil fotoğrafı (`activeAccountHeaderRenderer.accountPhoto.thumbnails`), kullanıcı adı (`accountName`) ve kanal kullanıcı adı (`channelHandle`) ayrıştırıldı.
+      - Eski ana sayfa arkaplan banner'ını (`=w1500-h844-`) avatar sanan mantık ve "Google Hesabım" varsayılanı temizlendi.
+      - `load_saved_session` ve `verify_and_save_cookie` fonksiyonları otomatik senkronize edilerek oturum açıldığında veya başlangıçta kullanıcının gerçek Google avatarının titlebar'da, hesap menüsünde ve ayarlar sayfasında net biçimde gösterilmesi sağlandı.
+    - **3. Doğrulama:**
+      - `cargo check` ve `npx tsc --noEmit` ile sıfır hata ve sıfır regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
+

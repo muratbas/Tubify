@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowDownToLine,
+  User,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { minimizeWindow, toggleMaximizeWindow, closeWindow } from "../services/api";
@@ -243,21 +244,7 @@ export const TitleBar: FC<TitleBarProps> = ({
           />
         </div>
 
-        {/* Settings Button */}
-        <button
-          onClick={() => onOpenSettings("account")}
-          data-tooltip={t.settings}
-          data-tooltip-side="bottom"
-          className={`p-2 rounded-full transition-colors cursor-pointer ${
-            isLight
-              ? "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
-              : "text-neutral-300 hover:text-white hover:bg-white/10"
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
-        {/* User Profile / Avatar with Dropdown */}
+        {/* User Profile / Avatar with Dropdown (Settings moved here) */}
         <div className="relative mr-2" ref={avatarMenuRef}>
           {userProfile.is_authenticated ? (
             <>
@@ -282,7 +269,7 @@ export const TitleBar: FC<TitleBarProps> = ({
 
               {isAvatarMenuOpen && (
                 <div
-                  className={`absolute right-0 top-11 w-52 rounded-xl p-2 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
+                  className={`absolute right-0 top-11 w-56 rounded-xl p-2 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
                     isLight
                       ? "bg-white border-neutral-200 text-neutral-900"
                       : "bg-[#282828] border-white/10 text-white"
@@ -304,8 +291,8 @@ export const TitleBar: FC<TitleBarProps> = ({
                       <p className="text-xs font-bold truncate leading-tight">
                         {userProfile.name || "Murat"}
                       </p>
-                      <p className={`text-[11px] ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
-                        {t.signedIn}
+                      <p className={`text-[11px] truncate ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
+                        {userProfile.email || t.signedIn}
                       </p>
                     </div>
                   </div>
@@ -328,13 +315,64 @@ export const TitleBar: FC<TitleBarProps> = ({
               )}
             </>
           ) : (
-            <button
-              onClick={onOpenLogin}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-[#ff0000] text-white hover:bg-[#e60000] hover:scale-105 transition-all cursor-pointer shadow-sm active:scale-95"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>{t.signIn}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenLogin}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-[#ff0000] text-white hover:bg-[#e60000] hover:scale-105 transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>{t.signIn}</span>
+              </button>
+
+              <button
+                onClick={() => setIsAvatarMenuOpen((p) => !p)}
+                data-tooltip={t.settings}
+                data-tooltip-side="bottom"
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                  isLight
+                    ? "bg-black/5 hover:bg-black/10 text-neutral-700"
+                    : "bg-white/10 hover:bg-white/20 text-white"
+                }`}
+              >
+                <User className="w-4 h-4" />
+              </button>
+
+              {isAvatarMenuOpen && (
+                <div
+                  className={`absolute right-0 top-11 w-48 rounded-xl p-2 shadow-2xl border z-50 animate-in fade-in zoom-in-95 duration-100 no-drag ${
+                    isLight
+                      ? "bg-white border-neutral-200 text-neutral-900"
+                      : "bg-[#282828] border-white/10 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      onOpenLogin();
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
+                    }`}
+                  >
+                    <LogIn className="w-4 h-4 text-[#ff0000]" />
+                    <span>{t.signIn}</span>
+                  </button>
+                  <div className={`my-1 border-t ${isLight ? "border-neutral-200" : "border-white/10"}`} />
+                  <button
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      onOpenSettings();
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 text-neutral-500" />
+                    <span>{t.settings}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

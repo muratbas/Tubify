@@ -117,8 +117,20 @@ pub fn load_saved_session() {
     if file.exists() {
         if let Ok(content) = fs::read_to_string(&file) {
             if let Ok(data) = serde_json::from_str::<SessionData>(&content) {
-                let mut lock = SESSION.lock().unwrap();
-                *lock = Some(data);
+                let should_refresh = match &data.profile {
+                    Some(p) => p.avatar_url.as_ref().map_or(true, |u| u.contains("=w1500-h844-") || u.is_empty()),
+                    None => true,
+                };
+                let raw_cookie = data.cookie.clone();
+                {
+                    let mut lock = SESSION.lock().unwrap();
+                    *lock = Some(data);
+                }
+                if should_refresh && !raw_cookie.is_empty() {
+                    tokio::spawn(async move {
+                        let _ = verify_and_save_cookie(&raw_cookie).await;
+                    });
+                }
             }
         }
     }
@@ -215,11 +227,8 @@ fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Client,
     Ok((client, headers))
 }
 
-pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, String> {
-    let sapisid = extract_sapisid(raw_cookie);
-    let (client, _) = build_client(raw_cookie, sapisid.as_deref())?;
-
-    let url = "https://music.youtube.com/youtubei/v1/browse";
+pub async fn fetch_account_profile(client: &reqwest::Client) -> (Option<String>, Option<String>, Option<String>) {
+    let url = "https://music.youtube.com/youtubei/v1/account/account_menu";
     let payload = serde_json::json!({
         "context": {
             "client": {
@@ -228,49 +237,77 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
                 "hl": "tr",
                 "gl": "TR"
             }
-        },
-        "browseId": "FEmusic_home"
+        }
     });
 
-    let res = client
-        .post(url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Bağlantı hatası: {}", e))?;
+    if let Ok(res) = client.post(url).json(&payload).send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            let header = json.pointer("/actions/0/openPopupAction/popup/multiPageMenuRenderer/header/activeAccountHeaderRenderer");
+            if let Some(h) = header {
+                let name = h.pointer("/accountName/runs/0/text")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-    let json: serde_json::Value = res
-        .json()
-        .await
-        .map_err(|e| format!("JSON ayrıştırma hatası: {}", e))?;
+                let avatar = h.pointer("/accountPhoto/thumbnails")
+                    .and_then(|v| v.as_array())
+                    .and_then(|arr| arr.last())
+                    .and_then(|t| t.get("url"))
+                    .and_then(|u| u.as_str())
+                    .map(|s| s.to_string());
 
-    let name = Some("Google Hesabım".to_string());
-    let mut avatar_url = None;
+                let handle = h.pointer("/channelHandle/runs/0/text")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-    if let Some(avatar) = json
-        .pointer("/background/musicThumbnailRenderer/thumbnail/thumbnails")
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.last())
-        .and_then(|t| t.get("url"))
-        .and_then(|u| u.as_str())
-    {
-        avatar_url = Some(avatar.to_string());
+                return (name, avatar, handle);
+            }
+        }
     }
+    (None, None, None)
+}
 
-    if let Some(av) = json
-        .pointer("/topbar/musicAppHeaderRenderer/avatar/thumbnails")
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.last())
-        .and_then(|t| t.get("url"))
-        .and_then(|u| u.as_str())
-    {
-        avatar_url = Some(av.to_string());
+pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, String> {
+    let sapisid = extract_sapisid(raw_cookie);
+    let (client, _) = build_client(raw_cookie, sapisid.as_deref())?;
+
+    let (acct_name, acct_avatar, acct_handle) = fetch_account_profile(&client).await;
+    let name = acct_name.or_else(|| Some("Google Hesabım".to_string()));
+    let mut avatar_url = acct_avatar;
+    let email = acct_handle;
+
+    if avatar_url.is_none() {
+        let url = "https://music.youtube.com/youtubei/v1/browse";
+        let payload = serde_json::json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": "1.20240401.01.00",
+                    "hl": "tr",
+                    "gl": "TR"
+                }
+            },
+            "browseId": "FEmusic_home"
+        });
+
+        if let Ok(res) = client.post(url).json(&payload).send().await {
+            if let Ok(json) = res.json::<serde_json::Value>().await {
+                if let Some(av) = json
+                    .pointer("/topbar/musicAppHeaderRenderer/avatar/thumbnails")
+                    .and_then(|v| v.as_array())
+                    .and_then(|arr| arr.last())
+                    .and_then(|t| t.get("url"))
+                    .and_then(|u| u.as_str())
+                {
+                    avatar_url = Some(av.to_string());
+                }
+            }
+        }
     }
 
     let profile = UserProfile {
         is_authenticated: true,
         name,
-        email: None,
+        email,
         avatar_url,
     };
 
