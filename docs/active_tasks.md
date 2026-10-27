@@ -867,6 +867,35 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **3. Doğrulama:**
       - `npx tsc --noEmit` (0 hata) ile tam tip güvenliği ve sıfır regresyon doğrulandı.
 
+  - [x] **Aşama 69:** Discord Rich Presence (RPC) Entegrasyonu:
+    - **1. Rust / Backend Mimarisi (`discord-rich-presence`, `discord.rs`, `lib.rs`):**
+      - `Cargo.toml` bağımlılıklarına `discord-rich-presence = "0.2"` eklendi.
+      - `src-tauri/src/discord.rs` modülü oluşturularak `DiscordRpcManager` kuruldu (`Mutex<Option<DiscordIpcClient>>`).
+      - Discord kapalıyken veya bağlantı koptuğunda uygulamanın kilitlenmesini veya çökmesini engelleyen sessiz hata yakalama ve otomatik yeniden bağlanma (reconnect) koruması eklendi.
+      - `update_discord_presence` ve `clear_discord_presence` Tauri IPC komutları tanımlandı ve Tauri builder'ına state olarak bağlandı; pencere kapatıldığında (`close_window`) durumun otomatik temizlenmesi sağlandı.
+      - **Zaman Çubuğu, Listening To ve Durum Mantığı:**
+        - `activity_type(activity::ActivityType::Listening)` (`type: 2`) entegre edildi: Discord üzerinde oyun kontrolcüsü yerine müzik notası ikonu ve "Listening to..." başlığı sağlandı.
+        - Oynatılırken (`is_playing: true`): Başlangıç zamanı `now - current_time_sec` ve bitiş zamanı `start + duration_sec` olarak `timestamps` ile iletilir; Discord istemcisi canlı süre sayacı ve Spotify tarzı etkileşimli ilerleme çubuğunu (`00:02 ————— 03:58`) çizer.
+        - **Durdurulduğunda Tamamen Temizleme:** Şarkı durdurulduğunda veya duraklatıldığında (`is_playing: false` veya `playbackStatus !== "playing"`), aktivite "Duraklatıldı" olarak kalmaz; hem frontend hem Rust backend tarafında derhal `clear_presence()` çağrılarak Discord'dan anında silinir.
+        - **Kapanış Temizliği:** Pencere kapatıldığında (`close_window`), sistem tepsisi menüsünden çıkış yapıldığında (`media.rs` quit) veya sayfa yenilendiğinde/kapandığında (`beforeunload`) Discord aktivitesi anında temizlenir.
+        - Albüm kapağı URL'si doğrudan `large_image` ve şarkı/sanatçı bilgisi `large_text` tooltip'i olarak atanır.
+    - **2. Frontend Global Oynatıcı Entegrasyonu (`PlayerContext.tsx`, `api.ts`):**
+      - `src/services/api.ts` içerisine `DiscordActivityData` arayüzü ile `updateDiscordPresence` ve `clearDiscordPresence` fonksiyonları eklendi.
+      - `PlayerContext.tsx` içerisine 150ms debounced `syncDiscordRpc` mimarisi kuruldu.
+      - Şarkı duraklatıldığında gecikmesiz anında `clearDiscordPresence()` fırlatılır; oynatıldığında ise taze zaman damgalarıyla Discord güncellenir.
+      - Gereksiz IPC trafiğini önlemek için saniyelik pingleme yerine sadece **şarkı değiştiğinde**, **çal/duraklat durumunda** veya **seek yapıldığında** tetiklenmesi sağlandı.
+    - **3. Ayarlar (Settings) Entegrasyonu (`SettingsView.tsx`, `LanguageContext.tsx`):**
+      - **Ayarlar > Çalma** sekmesine `Discord Durumu (Rich Presence)` açma/kapama toggle anahtarı eklendi.
+      - Tercih `localStorage` (`tubify_discord_rpc_enabled`) içinde saklanır.
+      - Kapatıldığında Discord durumu derhal temizlenir (`clearDiscordPresence`), açıldığında mevcut şarkı Discord'a aktarılır.
+      - Türkçe ve İngilizce dil çevirileri (`discordRpcTitle`, `discordRpcDesc`) entegre edildi.
+    - **4. Hata Onarımı & Güvenlik:**
+      - Discord IPC Named Pipe soket işlemleri `tokio::task::spawn_blocking` içerisine alınarak ana IPC iş parçacığının kilitlenmesi engellendi.
+      - Başarısız bağlantı denemelerinde 10 saniyelik `last_fail_instant` cooldown bariyeri eklenerek döngüsel soket denemeleri ortadan kaldırıldı.
+    - **5. Doğrulama:**
+      - Gerçek Discord masaüstü istemcisiyle canlı `DISPATCH / READY`, `ActivityType::Listening`, player countdown progress bar ve `clear_presence` başarıyla test edildi.
+      - `cargo check` (0 hata, 0 uyarı) ve `npx tsc --noEmit` (0 hata) ile tam uyumluluk ve sıfır regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
 

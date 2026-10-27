@@ -22,6 +22,8 @@ import {
   toggleYtLike,
   getRadioTracks,
   updateMediaMetadata,
+  updateDiscordPresence,
+  clearDiscordPresence,
   getDownloadedTracks,
   getDownloadedAudioBlobUrl,
   getPlaybackTracking,
@@ -212,6 +214,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const isMutedRef = useRef(isMuted);
   isMutedRef.current = isMuted;
+
+  const playbackStatusRef = useRef<PlaybackStatus>(playbackStatus);
+  playbackStatusRef.current = playbackStatus;
+
+  const durationRef = useRef<number>(duration);
+  durationRef.current = duration;
 
   // Preloading & Stream Caching Refs
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -807,6 +815,106 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     duration,
   ]);
 
+  // Discord Rich Presence (RPC) Integration
+  const discordDebounceTimerRef = useRef<number | null>(null);
+
+  const syncDiscordRpc = useCallback((overrideCurrentTime?: number, overridePlaying?: boolean) => {
+    if (discordDebounceTimerRef.current) {
+      window.clearTimeout(discordDebounceTimerRef.current);
+    }
+
+    discordDebounceTimerRef.current = window.setTimeout(() => {
+      let isEnabled = true;
+      try {
+        const saved = localStorage.getItem("tubify_discord_rpc_enabled");
+        isEnabled = saved !== null ? saved === "true" : true;
+      } catch {}
+
+      if (!isEnabled) {
+        clearDiscordPresence();
+        return;
+      }
+
+      const curTrack = currentTrackRef.current;
+      if (!curTrack) {
+        clearDiscordPresence();
+        return;
+      }
+
+      const isPlaying = overridePlaying !== undefined ? overridePlaying : playbackStatusRef.current === "playing";
+      if (!isPlaying) {
+        clearDiscordPresence();
+        return;
+      }
+
+      const audio = audioRef.current;
+      const curTime = overrideCurrentTime !== undefined ? overrideCurrentTime : (audio?.currentTime || 0);
+
+      let durationSecs = Math.round(audio?.duration || durationRef.current || 0);
+      if ((!durationSecs || durationSecs <= 0) && curTrack.duration) {
+        const parts = curTrack.duration.split(":").map(Number);
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          durationSecs = parts[0] * 60 + parts[1];
+        } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          durationSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+
+      updateDiscordPresence({
+        title: curTrack.title,
+        artist: curTrack.artist,
+        album_cover_url: curTrack.thumbnail || undefined,
+        is_playing: true,
+        current_time_sec: curTime,
+        duration_sec: durationSecs > 0 ? durationSecs : undefined,
+      });
+    }, 150);
+  }, []);
+
+  // Sync Discord RPC on track change or play/pause state change
+  useEffect(() => {
+    if (!activeTrack || playbackStatus !== "playing") {
+      if (discordDebounceTimerRef.current) {
+        window.clearTimeout(discordDebounceTimerRef.current);
+      }
+      clearDiscordPresence();
+      return;
+    }
+
+    syncDiscordRpc(undefined, true);
+  }, [activeTrack?.id, playbackStatus, syncDiscordRpc]);
+
+  // Clean up Discord RPC when app window or webview unloads
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      clearDiscordPresence();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  // Listen for Discord RPC toggle changes from Settings
+  useEffect(() => {
+    const handleDiscordToggle = (e: Event) => {
+      const isEnabled = (e as CustomEvent<boolean>).detail;
+      if (!isEnabled) {
+        if (discordDebounceTimerRef.current) {
+          window.clearTimeout(discordDebounceTimerRef.current);
+        }
+        clearDiscordPresence();
+      } else {
+        syncDiscordRpc();
+      }
+    };
+
+    window.addEventListener("tubify:discord-rpc-toggle", handleDiscordToggle);
+    return () => {
+      window.removeEventListener("tubify:discord-rpc-toggle", handleDiscordToggle);
+    };
+  }, [syncDiscordRpc]);
+
   const playTrackInternal = async (track: Track) => {
     if (!audioRef.current) return;
     setActiveTrack(track);
@@ -986,6 +1094,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!audioRef.current) return;
     audioRef.current.currentTime = time;
     setCurrentTime(time);
+    syncDiscordRpc(time);
   };
 
   const setVolume = (vol: number) => {

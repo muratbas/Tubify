@@ -142,6 +142,25 @@ export const SettingsView: FC<SettingsViewProps> = ({
   const [isScanningDevices, setIsScanningDevices] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Discord Rich Presence (RPC) State
+  const [discordRpcEnabled, setDiscordRpcEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("tubify_discord_rpc_enabled");
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleDiscordRpc = () => {
+    const nextVal = !discordRpcEnabled;
+    setDiscordRpcEnabled(nextVal);
+    try {
+      localStorage.setItem("tubify_discord_rpc_enabled", String(nextVal));
+      window.dispatchEvent(new CustomEvent("tubify:discord-rpc-toggle", { detail: nextVal }));
+    } catch {}
+  };
+
   const scanAndLoadAudioDevices = useCallback(
     async () => {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
@@ -991,6 +1010,35 @@ export const SettingsView: FC<SettingsViewProps> = ({
                     </p>
                   </div>
                   <span className="text-xs font-mono text-[#ff0000] font-semibold">1.5s</span>
+                </div>
+
+                {/* Discord Rich Presence (RPC) Row */}
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-inherit">
+                  <div className="min-w-0 pr-4">
+                    <p className={`text-xs font-semibold ${isLight ? "text-[#18181b]" : "text-white"}`}>
+                      {t.discordRpcTitle}
+                    </p>
+                    <p className={`text-[11px] mt-0.5 ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                      {t.discordRpcDesc}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={discordRpcEnabled}
+                    onClick={handleToggleDiscordRpc}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      discordRpcEnabled ? "bg-[#ff0000]" : isLight ? "bg-neutral-300" : "bg-neutral-700"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        discordRpcEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

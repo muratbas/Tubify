@@ -161,9 +161,9 @@ Tubify/
 - **Amaç:** Klavyedeki fiziksel medya tuşlarının (Play, Pause, Next, Prev), Windows ses çubuğundaki medya kutucuğunun ve kilit ekranında çalan şarkı/kapak görselinin aktif hale getirilmesi.
 - **Teknik Yol:** Rust tarafında `windows` veya `souvlaki` / `tauri-plugin-media-controls` kütüphanelerinin entegrasyonu ve ses oynatma durumuyla senkronize edilmesi.
 
-### 🎯 Sıradaki 2. Görev: Discord Rich Presence (RPC)
-- **Amaç:** Discord profilinde kullanıcının o an Tubify üzerinde ne dinlediğini (şarkı adı, sanatçı, albüm kapağı, geçen süre) canlı göstermek.
-- **Teknik Yol:** Rust tarafında `discord-rich-presence` kütüphanesi ile IPC bağlantısı kurmak.
+### ✅ Tamamlandı: Discord Rich Presence (RPC)
+- **Amaç:** Discord profilinde kullanıcının o an Tubify üzerinde ne dinlediğini (ActivityType::Listening "Listening to...", şarkı adı, sanatçı, albüm kapağı, canlı countdown playerbar) canlı göstermek; şarkı durdurulduğunda veya uygulama kapandığında aktiviteyi Discord'dan anında kaldırmak.
+- **Teknik Yol:** Rust tarafında `discord-rich-presence` kütüphanesi ile IPC bağlantısı, `ActivityType::Listening`, start/end zaman damgalı playerbar ve `PlayerContext` senkronizasyonu sağlandı.
 
 ### 🎯 Sıradaki 3. Görev: Last.fm Gerçek Scrobbler API Entegrasyonu
 - **Amaç:** SettingsView'da arayüzü ve butonları hazır olan Last.fm scrobble işlevinin gerçek Last.fm 2.0 API'sine (`track.scrobble`, `track.updateNowPlaying`) bağlanması.

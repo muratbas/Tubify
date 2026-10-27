@@ -75,6 +75,8 @@ export interface Translations {
   miniPlayerDesc: string;
   readyToUse: string;
   shortcutsSubtitle: string;
+  discordRpcTitle: string;
+  discordRpcDesc: string;
 
   // About
   about: string;
@@ -174,6 +176,8 @@ export const translations: Record<Language, Translations> = {
     miniPlayerDesc: "Compact overlay player for gaming and multitasking.",
     readyToUse: "Ready to use",
     shortcutsSubtitle: "Customize desktop keyboard controls.",
+    discordRpcTitle: "Discord Status (Rich Presence)",
+    discordRpcDesc: "Show what you are listening to on your Discord profile.",
 
     about: "About",
     aboutSubtitle: "Version, updates and links",
@@ -269,6 +273,8 @@ export const translations: Record<Language, Translations> = {
     miniPlayerDesc: "Oyun oynarken ekranda kompakt yarı saydam oynatıcı.",
     readyToUse: "Kullanıma Hazır",
     shortcutsSubtitle: "Masaüstü klavye kısayollarını özelleştirin.",
+    discordRpcTitle: "Discord Durumu (Rich Presence)",
+    discordRpcDesc: "Dinlediğiniz şarkıyı Discord profilinizde gösterin.",
 
     about: "Hakkında",
     aboutSubtitle: "Sürüm, güncellemeler ve bağlantılar",

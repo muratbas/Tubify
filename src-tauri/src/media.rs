@@ -177,6 +177,9 @@ pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn s
                 }
                 "quit" => {
                     use tauri_plugin_window_state::AppHandleExt;
+                    if let Some(discord) = app.try_state::<crate::discord::DiscordRpcManager>() {
+                        let _ = discord.clear_presence();
+                    }
                     let _ = app.save_window_state(
                         tauri_plugin_window_state::StateFlags::all()
                             & !tauri_plugin_window_state::StateFlags::VISIBLE,

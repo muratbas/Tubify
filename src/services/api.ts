@@ -483,6 +483,37 @@ export async function updatePlaybackStatus(isPlaying: boolean): Promise<void> {
   }
 }
 
+export interface DiscordActivityData {
+  title: string;
+  artist: string;
+  album_cover_url?: string | null;
+  is_playing: boolean;
+  current_time_sec?: number;
+  duration_sec?: number;
+}
+
+export async function updateDiscordPresence(activityData: DiscordActivityData): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_discord_presence", { activityData });
+    } catch (e) {
+      console.warn("Failed to update discord presence:", e);
+    }
+  }
+}
+
+export async function clearDiscordPresence(): Promise<void> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("clear_discord_presence");
+    } catch (e) {
+      console.warn("Failed to clear discord presence:", e);
+    }
+  }
+}
+
 export async function getHomeFeed(continuation?: string | null): Promise<HomeFeedResult> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");

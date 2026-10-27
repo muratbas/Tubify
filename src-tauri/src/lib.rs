@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod discord;
 pub mod downloader;
 pub mod media;
 pub mod search;
@@ -211,8 +212,30 @@ fn toggle_maximize_window(window: tauri::Window) {
 }
 
 #[tauri::command]
-fn close_window(app: AppHandle, window: tauri::Window) {
+async fn update_discord_presence(
+    discord: tauri::State<'_, discord::DiscordRpcManager>,
+    activity_data: discord::DiscordActivityData,
+) -> Result<(), String> {
+    let rpc = discord.inner().clone();
+    tokio::task::spawn_blocking(move || rpc.update_presence(activity_data))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn clear_discord_presence(
+    discord: tauri::State<'_, discord::DiscordRpcManager>,
+) -> Result<(), String> {
+    let rpc = discord.inner().clone();
+    tokio::task::spawn_blocking(move || rpc.clear_presence())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn close_window(app: AppHandle, window: tauri::Window, discord: tauri::State<discord::DiscordRpcManager>) {
     use tauri_plugin_window_state::AppHandleExt;
+    let _ = discord.clear_presence();
     let _ = app.save_window_state(
         tauri_plugin_window_state::StateFlags::all()
             & !tauri_plugin_window_state::StateFlags::VISIBLE,
@@ -226,6 +249,7 @@ pub fn run() {
     auth::load_saved_session();
 
     tauri::Builder::default()
+        .manage(discord::DiscordRpcManager::new())
         .register_asynchronous_uri_scheme_protocol("tubify-local", |ctx, req, resp| {
             let app = ctx.app_handle();
             downloader::handle_uri_scheme(app, req, resp);
@@ -271,6 +295,8 @@ pub fn run() {
             minimize_window,
             toggle_maximize_window,
             close_window,
+            update_discord_presence,
+            clear_discord_presence,
             media::update_media_metadata,
             media::update_playback_status,
             downloader::start_download,
