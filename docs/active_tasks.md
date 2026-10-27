@@ -823,7 +823,53 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **5. Doğrulama:**
       - `npx tsc --noEmit` (0 hata) ve `npm run build` (0 hata, 2.75s) ile sıfır regresyon doğrulandı.
 
+  - [x] **Aşama 67:** YouTube Hesabı ile Çift Yönlü Çalma Geçmişi ve Arama Senkronizasyonu (Playback & Search History Sync):
+    - **1. Çalma Geçmişi & Playback Tracking Mimarisi (`stream.rs`, `lib.rs`):**
+      - `StreamInfo` içerisine `PlaybackTracking` modeli (`videostats_playback_url`, `videostats_watchtime_url`, `cpn`) entegre edildi.
+      - 16 karakterlik Base64URL uyumlu kriptografik istemci oturum nonce'ı (`generate_cpn`) üretici fonksiyonu yazıldı.
+      - `resolve_audio_stream` çağrıldığında `tokio::spawn` ile arka planda paralel olarak `fetch_playback_tracking` çalıştırılır; kullanıcının mevcut Google oturum çerezleri (`Cookie` ve `SAPISIDHASH`) ile YouTube `player` endpoint'inden oturuma özel `videostatsPlaybackUrl` ve `videostatsWatchtimeUrl` URL'leri çekilerek `StreamInfo`'ya eklenir.
+      - Çevrimdışı veya önbellekteki parçalar için `get_playback_tracking` IPC komutu bağlandı.
+      - **Hafif Ping Komutları (`send_playback_ping`, `send_watchtime_ping`):**
+        - `send_playback_ping`: Parça başladığında (`play` olayı) `videostatsPlaybackUrl` adresine kullanıcının auth çerezleri ve `cpn` ile GET ping'i gönderir.
+        - `send_watchtime_ping`: Parça en az 20 saniye (15-30 saniye aralığında) başarıyla çaldığında `videostatsWatchtimeUrl` adresine geçerli oynatma süresi (`len`, `cmt`, `st=0.000`, `et=cmt`, `rt=cmt`, `state=playing`, `cpn`) parametreleriyle izleme ping'ini gönderir.
+        - Pingleme işlemleri Tokio arka plan görevlerinde (`tokio::spawn`) tamamen asenkron, sessiz ve fire-and-forget çalışır; HTTP hataları oynatıcıyı kesinlikle etkilemez.
+    - **2. Arama Geçmişi Senkronizasyonu (`search.rs`):**
+      - `search_youtube_music` fonksiyonu kullanıcının mevcut `SESSION` çerezlerini (`Cookie`, `Authorization: SAPISIDHASH`, `X-Origin`, `Referer`, `X-YouTube-Client-Name: 67`) içerecek şekilde güncellendi.
+      - Arama yapıldığında arka planda `tokio::spawn` ile hem `suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&q=...` hem de `music.youtube.com/youtubei/v1/music/get_search_suggestions` (`input: query`) endpoint'lerine oturum çerezleriyle istek atılarak kullanıcının arama geçmişine (`historySuggestionRenderer`) resmi olarak yazılması sağlandı.
+    - **3. Frontend Oynatıcı Entegrasyonu (`PlayerContext.tsx`, `api.ts`, `music.ts`):**
+      - `trackingSessionRef` ile her şarkı oturumuna özel tracking durumu ve ping bayrakları (`playbackPingSent`, `watchtimePingSent`) yönetildi.
+      - Şarkı çalmaya başladığında (`onPlay`) anında `sendPlaybackPing` tetiklenir.
+      - Şarkı süresi aktıkça (`onTimeUpdate`) `currentTime >= 20` olduğunda tek seferlik `sendWatchtimePing` gönderilerek dinlemenin kullanıcının YouTube Music hesabındaki "Son Çalınanlar" listesine düşmesi sağlandı.
+      - Önceden yüklenmiş (dual-buffer preloaded), önbellekten veya yerel indirilenden çalınan şarkılarda `ensurePlaybackTracking` ile takip bilgisi dinamik olarak tamamlanır.
+    - **4. Doğrulama:**
+      - `cargo check` (0 hata) ve `npm run build` (0 hata, 2.24s) ile sıfır regresyon doğrulandı.
+
+  - [x] **Aşama 68:** Sanatçı Kartlarından Oynat Butonlarının Kaldırılması ve Albüm Kartlarında Gerçek Oynatma:
+    - **1. Sanatçı Kartlarından Oynat Butonlarının Kaldırılması:**
+      - `SearchView.tsx`:
+        - "En iyi sonuç" (`topResult`) sanatçı olduğunda kart üzerindeki büyük kırmızı oynat butonu gizlendi.
+        - "Sanatçılar" rafı (`shelf-artist`) dairesel avatarlarının hover durumundaki oynat butonu overlay'i kaldırıldı.
+        - "Sanatçılar" kategorisi tam ızgara (`artist-grid`) kartlarının hover oynat butonu overlay'i kaldırıldı.
+        - "Son Aramalar" (`recentSearches`) sanatçı kartlarındaki oynat butonu gizlendi.
+      - `HomeView.tsx`:
+        - Ana sayfa raflarındaki (`HomeShelfSection`) sanatçı kartlarında (`item.item_type === "artist"` veya `browse_id.startsWith("UC")`) hover oynat butonu kaldırıldı.
+    - **2. Albüm Kartlarında Gerçek Oynatma (Anında Albüm Başlatma):**
+      - `App.tsx`:
+        - `handlePlayAlbum(albumId, albumTitle, artistName, thumbnail)` fonksiyonu yazıldı: Eğer aynı albüm zaten çalıyorsa `player.togglePlayPause()` yapar; çalmıyorsa `getAlbumDetails(albumId)` ile parçaları çeker, miras alan metadata (sanatçı adı, albüm adı, kapak görseli) ile kuyruğu hazırlar ve `player.playTrack(tracks[0], tracks, sourceId)` ile anında çalmayı başlatır.
+        - `onPlayAlbum={handlePlayAlbum}` prop'u `ArtistView`, `SearchView` ve `HomeView` bileşenlerine bağlandı.
+      - `SearchView.tsx`:
+        - Albümler rafı ve Albümler kategorisi ızgarasında oynat butonuna tıklandığında `e.stopPropagation()` ile sayfa yönlendirmesi engellenerek `onPlayAlbum` tetiklendi; kartın geri kalanına tıklandığında ise normal olarak albüm detay sayfasına gidilmeye devam ediyor.
+        - Son Aramalar albüm kartlarında da oynat butonu `onPlayAlbum` çağrısına bağlandı.
+      - `ArtistView.tsx`:
+        - Sanatçı detay sayfasındaki "Albümler" ve "Single ve EP'ler" kartlarının hover oynat butonuna `e.stopPropagation()` ve `onPlayAlbum` bağlandı; kart gövdesine tıklandığında albüm sayfasına yönlendirme korunarak buton tıklandığında doğrudan albümün çalınması sağlandı.
+      - `HomeView.tsx`:
+        - `handlePlayItem` içerisindeki albüm sayfasına yönlendirme davranışı düzeltilerek `onPlayAlbum` çağrısına bağlandı; kart gövdesine tıklandığında (`handleItemClick`) albüm sayfasına gitme davranışı aynen korundu.
+    - **3. Doğrulama:**
+      - `npx tsc --noEmit` (0 hata) ile tam tip güvenliği ve sıfır regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
+
+
 
 

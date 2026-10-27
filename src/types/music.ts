@@ -51,6 +51,12 @@ export interface AlbumDetails {
   tracks: Track[];
 }
 
+export interface PlaybackTracking {
+  videostats_playback_url?: string | null;
+  videostats_watchtime_url?: string | null;
+  cpn: string;
+}
+
 export interface StreamInfo {
   url: string;
   format?: string;
@@ -58,6 +64,7 @@ export interface StreamInfo {
   duration?: number | null;
   title?: string | null;
   headers?: Record<string, string>;
+  playback_tracking?: PlaybackTracking | null;
 }
 
 export type AudioQualityPreference = "high" | "normal" | "low" | "auto";

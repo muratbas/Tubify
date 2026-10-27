@@ -4,6 +4,13 @@ use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaybackTracking {
+    pub videostats_playback_url: Option<String>,
+    pub videostats_watchtime_url: Option<String>,
+    pub cpn: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamInfo {
     pub url: String,
     pub format: String,
@@ -11,6 +18,8 @@ pub struct StreamInfo {
     pub duration: Option<f64>,
     pub title: Option<String>,
     pub headers: HashMap<String, String>,
+    #[serde(default)]
+    pub playback_tracking: Option<PlaybackTracking>,
 }
 
 pub const ANDROID_USER_AGENT: &str =
@@ -183,6 +192,7 @@ pub async fn resolve_audio_stream_android(
         duration,
         title,
         headers,
+        playback_tracking: None,
     })
 }
 
@@ -377,6 +387,7 @@ pub async fn resolve_audio_stream_ytdlp(
                         duration,
                         title,
                         headers,
+                        playback_tracking: None,
                     });
                 }
             }
@@ -394,24 +405,151 @@ pub async fn resolve_audio_stream_ytdlp(
             duration,
             title,
             headers,
+            playback_tracking: None,
         });
     }
 
     Err("Could not find playable audio stream format in response".to_string())
 }
 
+pub fn generate_cpn() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let alphabet: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let mut val = now;
+    let mut cpn = String::with_capacity(16);
+    for i in 0..16 {
+        val = val
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407 + i as u128);
+        let idx = ((val >> 60) as usize) % alphabet.len();
+        cpn.push(alphabet[idx] as char);
+    }
+    cpn
+}
+
+pub async fn fetch_playback_tracking(video_id: &str) -> Option<PlaybackTracking> {
+    let (cookie, sapisid) = crate::auth::get_session_info()?;
+    let (client, _) = crate::auth::build_client(&cookie, sapisid.as_deref()).ok()?;
+
+    let payload = serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB",
+                "clientVersion": "2.20240401.01.00",
+                "hl": "tr",
+                "gl": "TR"
+            }
+        },
+        "videoId": video_id
+    });
+
+    let res = client
+        .post("https://www.youtube.com/youtubei/v1/player")
+        .header("Referer", "https://www.youtube.com/")
+        .header("Origin", "https://www.youtube.com")
+        .header("X-Origin", "https://www.youtube.com")
+        .json(&payload)
+        .send()
+        .await
+        .ok()?;
+
+    if !res.status().is_success() {
+        return None;
+    }
+
+    let json: serde_json::Value = res.json().await.ok()?;
+    let tracking = json.get("playbackTracking")?;
+
+    let playback_url = tracking
+        .pointer("/videostatsPlaybackUrl/baseUrl")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let watchtime_url = tracking
+        .pointer("/videostatsWatchtimeUrl/baseUrl")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    if playback_url.is_none() && watchtime_url.is_none() {
+        return None;
+    }
+
+    Some(PlaybackTracking {
+        videostats_playback_url: playback_url,
+        videostats_watchtime_url: watchtime_url,
+        cpn: generate_cpn(),
+    })
+}
+
+pub async fn ping_playback(playback_url: &str, cpn: &str) -> Result<(), String> {
+    let (cookie, sapisid) = crate::auth::get_session_info().ok_or_else(|| "No session".to_string())?;
+    let (client, _) = crate::auth::build_client(&cookie, sapisid.as_deref())?;
+
+    let sep = if playback_url.contains('?') { "&" } else { "?" };
+    let url = format!("{}{}cpn={}", playback_url, sep, cpn);
+
+    let _ = client
+        .get(&url)
+        .header("Referer", "https://www.youtube.com/")
+        .header("Origin", "https://www.youtube.com")
+        .send()
+        .await;
+
+    Ok(())
+}
+
+pub async fn ping_watchtime(
+    watchtime_url: &str,
+    cpn: &str,
+    len: f64,
+    cmt: f64,
+) -> Result<(), String> {
+    let (cookie, sapisid) = crate::auth::get_session_info().ok_or_else(|| "No session".to_string())?;
+    let (client, _) = crate::auth::build_client(&cookie, sapisid.as_deref())?;
+
+    let sep = if watchtime_url.contains('?') { "&" } else { "?" };
+    let url = format!(
+        "{}{}cpn={}&state=playing&len={:.0}&cmt={:.3}&st=0.000&et={:.3}&rt={:.1}",
+        watchtime_url, sep, cpn, len, cmt, cmt, cmt
+    );
+
+    let _ = client
+        .get(&url)
+        .header("Referer", "https://www.youtube.com/")
+        .header("Origin", "https://www.youtube.com")
+        .send()
+        .await;
+
+    Ok(())
+}
+
 pub async fn resolve_audio_stream(
     video_id: &str,
     quality_preference: Option<&str>,
 ) -> Result<StreamInfo, String> {
+    let tracking_task = tokio::spawn({
+        let vid = video_id.to_string();
+        async move { fetch_playback_tracking(&vid).await }
+    });
+
     // 1. Primary: Fast, direct Android Music client resolution
-    match resolve_audio_stream_android(video_id, quality_preference).await {
-        Ok(info) => return Ok(info),
+    let stream_res = match resolve_audio_stream_android(video_id, quality_preference).await {
+        Ok(info) => Ok(info),
         Err(e) => {
             eprintln!("Android stream resolver failed ({}), falling back to yt-dlp", e);
+            // 2. Secondary fallback: yt-dlp
+            resolve_audio_stream_ytdlp(video_id, quality_preference).await
         }
+    };
+
+    let mut info = stream_res?;
+    if let Ok(tracking) = tracking_task.await {
+        info.playback_tracking = tracking;
     }
 
-    // 2. Secondary fallback: yt-dlp
-    resolve_audio_stream_ytdlp(video_id, quality_preference).await
+    Ok(info)
 }

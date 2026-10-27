@@ -7,7 +7,15 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory, RepeatMode } from "../types/music";
+import type {
+  Track,
+  PlaybackStatus,
+  RightDrawerTab,
+  QueueViewMode,
+  MoodCategory,
+  RepeatMode,
+  PlaybackTracking,
+} from "../types/music";
 import {
   getStreamUrl,
   getStoredAudioQuality,
@@ -16,6 +24,9 @@ import {
   updateMediaMetadata,
   getDownloadedTracks,
   getDownloadedAudioBlobUrl,
+  getPlaybackTracking,
+  sendPlaybackPing,
+  sendWatchtimePing,
 } from "../services/api";
 
 const INITIAL_RECENT: Track[] = [
@@ -211,6 +222,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Downloaded track IDs ref for offline playback
   const downloadedIdsRef = useRef<Set<string>>(new Set());
   const retryFallbackRef = useRef<(track: Track, reason: string) => Promise<void>>(() => Promise.resolve());
+
+  // Playback & Watchtime Tracking Ref (YouTube Music Account Sync)
+  const trackingSessionRef = useRef<{
+    trackId: string;
+    tracking: PlaybackTracking | null;
+    playbackPingSent: boolean;
+    watchtimePingSent: boolean;
+  }>({
+    trackId: "",
+    tracking: null,
+    playbackPingSent: false,
+    watchtimePingSent: false,
+  });
 
   useEffect(() => {
     getDownloadedTracks()
@@ -480,11 +504,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onTimeUpdate = () => {
       enforceVolume();
       setCurrentTime(audio.currentTime);
+
+      // Playback tracking: send watchtime ping once track plays for at least 20s (15-30s range)
+      const session = trackingSessionRef.current;
+      if (
+        audio.currentTime >= 20 &&
+        !session.watchtimePingSent &&
+        session.tracking?.videostats_watchtime_url
+      ) {
+        session.watchtimePingSent = true;
+        const dur = audio.duration || 0;
+        sendWatchtimePing(
+          session.tracking.videostats_watchtime_url,
+          session.tracking.cpn,
+          dur,
+          audio.currentTime
+        ).catch(() => {});
+      }
     };
     const onDurationChange = () => setDuration(audio.duration || 0);
     const onPlay = () => {
       enforceVolume();
       setPlaybackStatus("playing");
+
+      // Playback tracking: send playback start ping
+      const session = trackingSessionRef.current;
+      if (session.tracking?.videostats_playback_url && !session.playbackPingSent) {
+        session.playbackPingSent = true;
+        sendPlaybackPing(session.tracking.videostats_playback_url, session.tracking.cpn).catch(() => {});
+      }
     };
     const onPause = () => setPlaybackStatus("paused");
     const onEnded = () => {
@@ -764,6 +812,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setActiveTrack(track);
     setPlaybackError(null);
 
+    // Initialize playback tracking session for YouTube account history sync
+    trackingSessionRef.current = {
+      trackId: track.id,
+      tracking: null,
+      playbackPingSent: false,
+      watchtimePingSent: false,
+    };
+
     // Save to recents
     setRecentTracks((prev) => {
       const filtered = prev.filter((t) => t.id !== track.id);
@@ -776,23 +832,55 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
+    const ensurePlaybackTracking = (targetTrackId: string) => {
+      if (!trackingSessionRef.current.tracking && trackingSessionRef.current.trackId === targetTrackId) {
+        getPlaybackTracking(targetTrackId)
+          .then((tracking) => {
+            if (tracking && trackingSessionRef.current.trackId === targetTrackId) {
+              trackingSessionRef.current.tracking = tracking;
+              if (audioRef.current && !audioRef.current.paused && !trackingSessionRef.current.playbackPingSent) {
+                trackingSessionRef.current.playbackPingSent = true;
+                if (tracking.videostats_playback_url) {
+                  sendPlaybackPing(tracking.videostats_playback_url, tracking.cpn).catch(() => {});
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
     const playNetworkStream = async (trackToPlay: Track, forceFresh = false) => {
       setPlaybackStatus("loading");
       setPlaybackError(null);
       try {
         let streamUrl = "";
+        let trackingData: PlaybackTracking | null = null;
         const quality = getStoredAudioQuality();
         const cacheKey = `${trackToPlay.id}_${quality}`;
         if (!forceFresh) {
           const cached = streamCacheRef.current.get(cacheKey);
           if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
             streamUrl = cached.url;
+            ensurePlaybackTracking(trackToPlay.id);
           }
         }
         if (!streamUrl) {
           const stream = await getStreamUrl(trackToPlay.id, quality);
           streamUrl = stream.url;
           streamCacheRef.current.set(cacheKey, { url: streamUrl, timestamp: Date.now() });
+          if (stream.playback_tracking) {
+            trackingData = stream.playback_tracking;
+          }
+        }
+        if (trackingData && trackingSessionRef.current.trackId === trackToPlay.id) {
+          trackingSessionRef.current.tracking = trackingData;
+          if (audioRef.current && !audioRef.current.paused && !trackingSessionRef.current.playbackPingSent) {
+            trackingSessionRef.current.playbackPingSent = true;
+            if (trackingData.videostats_playback_url) {
+              sendPlaybackPing(trackingData.videostats_playback_url, trackingData.cpn).catch(() => {});
+            }
+          }
         }
         if (audioRef.current && currentTrackRef.current?.id === trackToPlay.id) {
           audioRef.current.src = streamUrl;
@@ -837,6 +925,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           await audioRef.current.play();
           audioRef.current.volume = targetVol;
           setPlaybackStatus("playing");
+          ensurePlaybackTracking(track.id);
           return;
         }
       } catch (err) {
@@ -857,6 +946,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         await audioRef.current.play();
         audioRef.current.volume = targetVol;
         setPlaybackStatus("playing");
+        ensurePlaybackTracking(track.id);
         return;
       } catch (e) {
         console.warn("Instant playback from preloaded buffer failed, falling back to fresh fetch:", e);

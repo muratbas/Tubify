@@ -38,6 +38,7 @@ interface SearchViewProps {
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onNavigateArtist: (artistId: string, artistName: string, thumbnail?: string) => void;
   onNavigateAlbum: (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => void;
+  onPlayAlbum?: (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => void;
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectQuery: (newQuery: string) => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
@@ -157,6 +158,7 @@ export const SearchView: FC<SearchViewProps> = ({
   onContextMenuTrack,
   onNavigateArtist,
   onNavigateAlbum,
+  onPlayAlbum,
   onSelectPlaylist,
   onSelectQuery,
   onScroll,
@@ -553,23 +555,27 @@ export const SearchView: FC<SearchViewProps> = ({
                           />
                         </div>
 
-                        {/* Hover Oynat Butonu */}
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRecentItemClick(item);
-                          }}
-                          className={`absolute ${
-                            isArtist ? "right-2 bottom-1" : "right-2.5 bottom-2.5"
-                          } w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer z-10`}
-                          title={isCurrentPlaying ? "Duraklat" : "Oynat"}
-                        >
-                          {isCurrentPlaying ? (
-                            <Pause className="w-4 h-4 fill-white text-white" />
-                          ) : (
-                            <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                          )}
-                        </div>
+                        {/* Hover Oynat Butonu - Sanatçılarda gösterilmez, albümlerde albümü çalar */}
+                        {!isArtist && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (item.type === "album" && onPlayAlbum) {
+                                onPlayAlbum(item.id, item.title, item.subtitle, item.thumbnailUrl);
+                              } else {
+                                handleRecentItemClick(item);
+                              }
+                            }}
+                            className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer z-10"
+                            title={isCurrentPlaying ? "Duraklat" : "Oynat"}
+                          >
+                            {isCurrentPlaying ? (
+                              <Pause className="w-4 h-4 fill-white text-white" />
+                            ) : (
+                              <Play className="w-4 h-4 fill-white text-white ml-0.5" />
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Başlık ve Alt Başlık */}
@@ -701,25 +707,23 @@ export const SearchView: FC<SearchViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Hover Play Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (topResult.type === "artist") {
-                            handleArtistClick(topResult.id, topResult.name, topResult.thumbnail || undefined);
-                          } else {
+                      {/* Hover Play Button - Sanatçı en iyi sonuçlarında gizlenir */}
+                      {topResult.type !== "artist" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleTrackClick(topResult.track, searchResults);
-                          }
-                        }}
-                        className="w-12 h-12 rounded-full bg-[#ff0000] text-white shadow-xl shadow-red-500/30 flex items-center justify-center absolute bottom-5 right-5 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-                        title="Oynat"
-                      >
-                        {activeTrack?.id === topResult.track.id && isPlaying ? (
-                          <Pause className="w-5 h-5 fill-white text-white" />
-                        ) : (
-                          <Play className="w-5 h-5 fill-white text-white ml-0.5" />
-                        )}
-                      </button>
+                          }}
+                          className="w-12 h-12 rounded-full bg-[#ff0000] text-white shadow-xl shadow-red-500/30 flex items-center justify-center absolute bottom-5 right-5 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                          title="Oynat"
+                        >
+                          {activeTrack?.id === topResult.track.id && isPlaying ? (
+                            <Pause className="w-5 h-5 fill-white text-white" />
+                          ) : (
+                            <Play className="w-5 h-5 fill-white text-white ml-0.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -901,11 +905,6 @@ export const SearchView: FC<SearchViewProps> = ({
                             alt={artist.name}
                             iconSize="lg"
                           />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
-                              <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                            </div>
-                          </div>
                         </div>
                         <p className="font-semibold text-sm text-neutral-900 dark:text-white text-center truncate">
                           {artist.name}
@@ -941,9 +940,20 @@ export const SearchView: FC<SearchViewProps> = ({
                             iconSize="md"
                           />
                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2.5">
-                            <div className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onPlayAlbum) {
+                                  onPlayAlbum(album.id, album.title, album.artist, album.thumbnail);
+                                } else {
+                                  handleAlbumClick(album.id, album.title, album.artist, album.thumbnail);
+                                }
+                              }}
+                              className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105 active:scale-95 cursor-pointer z-10"
+                              title="Oynat"
+                            >
                               <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                            </div>
+                            </button>
                           </div>
                         </div>
                         <p className="font-semibold text-sm text-neutral-900 dark:text-white truncate">
@@ -1194,11 +1204,6 @@ export const SearchView: FC<SearchViewProps> = ({
                         alt={artist.name}
                         iconSize="lg"
                       />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
-                          <Play className="w-5 h-5 fill-white text-white ml-0.5" />
-                        </div>
-                      </div>
                     </div>
                     <p className="font-semibold text-sm text-neutral-900 dark:text-white text-center truncate w-full">
                       {artist.name}
@@ -1234,9 +1239,20 @@ export const SearchView: FC<SearchViewProps> = ({
                         iconSize="md"
                       />
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2.5">
-                        <div className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPlayAlbum) {
+                              onPlayAlbum(album.id, album.title, album.artist, album.thumbnail);
+                            } else {
+                              handleAlbumClick(album.id, album.title, album.artist, album.thumbnail);
+                            }
+                          }}
+                          className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105 active:scale-95 cursor-pointer z-10"
+                          title="Oynat"
+                        >
                           <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                        </div>
+                        </button>
                       </div>
                     </div>
                     <p className="font-semibold text-sm text-neutral-900 dark:text-white truncate">

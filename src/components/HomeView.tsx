@@ -28,6 +28,7 @@ interface HomeViewProps {
   onPlayPlaylist?: (playlist: Playlist) => void;
   onNavigateArtist?: (artistId: string, artistName: string) => void;
   onNavigateAlbum?: (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => void;
+  onPlayAlbum?: (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => void;
   onNavigateDownloads?: () => void;
   onNavigateBrowse?: () => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
@@ -288,6 +289,7 @@ const DynamicShelf: FC<{
       >
         {displayItems.map((item, idx) => {
           const isVideo = item.aspect_ratio === "16:9";
+          const isArtist = item.item_type === "artist" || item.browse_id?.startsWith("UC");
           const isItemActive = activeTrackId === (item.video_id || item.id);
           const isItemPlaying = isItemActive && isPlaying;
           const isLikedSongs =
@@ -337,23 +339,25 @@ const DynamicShelf: FC<{
                   />
                 )}
 
-                {/* Hover Play Button (Right Bottom Corner) */}
-                <div className="absolute right-2.5 bottom-2.5 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlayItem(item, section);
-                    }}
-                    className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-xl shadow-black/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                    data-tooltip={isItemPlaying ? "Duraklat" : "Oynat"}
-                  >
-                    {isItemPlaying ? (
-                      <Pause className="w-4 h-4 fill-white" />
-                    ) : (
-                      <Play className="w-4 h-4 fill-white ml-0.5" />
-                    )}
-                  </button>
-                </div>
+                {/* Hover Play Button (Right Bottom Corner) - Hidden for artists */}
+                {!isArtist && (
+                  <div className="absolute right-2.5 bottom-2.5 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayItem(item, section);
+                      }}
+                      className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-xl shadow-black/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                      data-tooltip={isItemPlaying ? "Duraklat" : "Oynat"}
+                    >
+                      {isItemPlaying ? (
+                        <Pause className="w-4 h-4 fill-white" />
+                      ) : (
+                        <Play className="w-4 h-4 fill-white ml-0.5" />
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Text Info */}
@@ -462,6 +466,7 @@ export const HomeView: FC<HomeViewProps> = ({
   onPlayPlaylist,
   onNavigateArtist,
   onNavigateAlbum,
+  onPlayAlbum,
   onNavigateDownloads,
   onNavigateBrowse,
   onContextMenuTrack,
@@ -672,16 +677,28 @@ export const HomeView: FC<HomeViewProps> = ({
   // Item Play Handler
   const handlePlayItem = (item: HomeItem, shelf: HomeSection) => {
     if (
-      (item.item_type === "album" || item.browse_id?.startsWith("MPREb_")) &&
-      onNavigateAlbum
+      item.item_type === "album" ||
+      item.browse_id?.startsWith("MPREb_") ||
+      item.browse_id?.startsWith("OLAK5uy_")
     ) {
-      onNavigateAlbum(
-        item.browse_id || item.id,
-        item.title,
-        item.subtitle || undefined,
-        item.thumbnail || undefined
-      );
-      return;
+      if (onPlayAlbum) {
+        onPlayAlbum(
+          item.browse_id || item.id,
+          item.title,
+          item.subtitle || undefined,
+          item.thumbnail || undefined
+        );
+        return;
+      }
+      if (onNavigateAlbum) {
+        onNavigateAlbum(
+          item.browse_id || item.id,
+          item.title,
+          item.subtitle || undefined,
+          item.thumbnail || undefined
+        );
+        return;
+      }
     }
 
     if (

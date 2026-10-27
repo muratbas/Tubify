@@ -29,6 +29,32 @@ async fn get_stream_url(
 }
 
 #[tauri::command]
+async fn get_playback_tracking(video_id: String) -> Result<Option<stream::PlaybackTracking>, String> {
+    Ok(stream::fetch_playback_tracking(&video_id).await)
+}
+
+#[tauri::command]
+async fn send_playback_ping(playback_url: String, cpn: String) -> Result<(), String> {
+    tokio::spawn(async move {
+        let _ = stream::ping_playback(&playback_url, &cpn).await;
+    });
+    Ok(())
+}
+
+#[tauri::command]
+async fn send_watchtime_ping(
+    watchtime_url: String,
+    cpn: String,
+    len: f64,
+    cmt: f64,
+) -> Result<(), String> {
+    tokio::spawn(async move {
+        let _ = stream::ping_watchtime(&watchtime_url, &cpn, len, cmt).await;
+    });
+    Ok(())
+}
+
+#[tauri::command]
 fn get_client_version() -> String {
     "Tubify v0.1.0 (Ultra-lightweight)".to_string()
 }
@@ -218,6 +244,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             search_music,
             get_stream_url,
+            get_playback_tracking,
+            send_playback_ping,
+            send_watchtime_ping,
             get_client_version,
             get_user_profile,
             save_google_cookie,

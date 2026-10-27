@@ -28,10 +28,69 @@ pub struct SearchResult {
 
 /// Search YouTube Music using reverse-engineered InnerTube API (WEB_REMIX client)
 pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let session_opt = crate::auth::get_session_info();
+    let (client, is_authenticated) = if let Some((ref cookie, ref sapisid)) = session_opt {
+        match crate::auth::build_client(cookie, sapisid.as_deref()) {
+            Ok((c, _)) => (c, true),
+            Err(_) => {
+                let c = reqwest::Client::builder()
+                    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                    .build()
+                    .map_err(|e| e.to_string())?;
+                (c, false)
+            }
+        }
+    } else {
+        let c = reqwest::Client::builder()
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .build()
+            .map_err(|e| e.to_string())?;
+        (c, false)
+    };
+
+    // If authenticated, fire background search history / suggest sync
+    if is_authenticated {
+        let client_clone = client.clone();
+        let query_str = trimmed.to_string();
+        tokio::spawn(async move {
+            // 1. Ping YouTube suggest completion endpoint
+            let encoded: String = url::form_urlencoded::byte_serialize(query_str.as_bytes()).collect();
+            let suggest_url = format!(
+                "https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&q={}",
+                encoded
+            );
+            let _ = client_clone
+                .get(&suggest_url)
+                .header("Referer", "https://music.youtube.com/")
+                .header("Origin", "https://music.youtube.com")
+                .send()
+                .await;
+
+            // 2. Ping YouTube Music search suggestions endpoint
+            let suggest_post_url = "https://music.youtube.com/youtubei/v1/music/get_search_suggestions";
+            let suggest_payload = serde_json::json!({
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": "1.20240401.01.00",
+                        "hl": "tr",
+                        "gl": "TR"
+                    }
+                },
+                "input": query_str
+            });
+            let _ = client_clone
+                .post(suggest_post_url)
+                .json(&suggest_payload)
+                .send()
+                .await;
+        });
+    }
 
     let search_url = "https://music.youtube.com/youtubei/v1/search";
     let payload = serde_json::json!({
@@ -39,11 +98,11 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             "client": {
                 "clientName": "WEB_REMIX",
                 "clientVersion": "1.20240401.01.00",
-                "hl": "en",
-                "gl": "US"
+                "hl": "tr",
+                "gl": "TR"
             }
         },
-        "query": query
+        "query": trimmed
     });
 
     let res = client

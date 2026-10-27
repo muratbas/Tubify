@@ -33,6 +33,7 @@ import {
   editYtPlaylist,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
+  getAlbumDetails,
 } from "./services/api";
 import { CustomTooltip } from "./components/CustomTooltip";
 import { EditPlaylistModal, type PrivacyStatus } from "./components/EditPlaylistModal";
@@ -506,6 +507,49 @@ export const App: FC = () => {
     } catch (e) {
       console.error("Failed to play playlist:", e);
       player.showToast("Çalma listesi oynatılamadı");
+    }
+  };
+
+  const handlePlayAlbum = async (
+    albumId: string,
+    albumTitle?: string,
+    artistName?: string,
+    thumbnail?: string
+  ) => {
+    const sourceId = `album:${albumId}`;
+    if (player.queueSourceId === sourceId && player.activeTrack) {
+      player.togglePlayPause();
+      return;
+    }
+
+    try {
+      player.showToast("Albüm yükleniyor...");
+      const details = await getAlbumDetails(albumId);
+      const resolvedArtist =
+        (details.artist && details.artist !== "Unknown Artist" ? details.artist : artistName) ||
+        "Unknown Artist";
+      const resolvedTitle =
+        (details.title && details.title !== "Albüm" ? details.title : albumTitle) || "Albüm";
+      const resolvedThumbnail = details.thumbnail || thumbnail || undefined;
+
+      const tracks: Track[] = (details.tracks || []).map((t) => ({
+        ...t,
+        artist: (t.artist && t.artist !== "Unknown Artist" ? t.artist : resolvedArtist) || "Unknown Artist",
+        artist_id: t.artist_id || details.artist_id || undefined,
+        album: t.album && t.album !== "Albüm" ? t.album : resolvedTitle,
+        album_id: t.album_id || albumId,
+        thumbnail: t.thumbnail || resolvedThumbnail || undefined,
+        plays: t.plays || undefined,
+      }));
+
+      if (tracks.length > 0) {
+        player.playTrack(tracks[0], tracks, sourceId);
+      } else {
+        player.showToast("Bu albümde çalınabilir şarkı bulunamadı");
+      }
+    } catch (err) {
+      console.error("Failed to play album:", err);
+      player.showToast("Albüm oynatılamadı");
     }
   };
 
@@ -1323,6 +1367,7 @@ export const App: FC = () => {
                 onToggleLike={handleToggleLike}
                 likedTrackIds={player.likedTrackIds}
                 onNavigateAlbum={handleNavigateAlbum}
+                onPlayAlbum={handlePlayAlbum}
                 onContextMenuTrack={handleOpenContextMenu}
                 onBackToHome={() => navigateTo({ type: "home" })}
                 onScroll={handleViewScroll}
@@ -1378,6 +1423,7 @@ export const App: FC = () => {
                 onContextMenuTrack={handleOpenContextMenu}
                 onNavigateArtist={handleNavigateArtist}
                 onNavigateAlbum={handleNavigateAlbum}
+                onPlayAlbum={handlePlayAlbum}
                 onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
                 onSelectQuery={(q) => {
                   setSearchQuery(q);
@@ -1400,6 +1446,7 @@ export const App: FC = () => {
                 }}
                 onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
                 onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
+                onPlayAlbum={handlePlayAlbum}
                 onNavigateArtist={handleNavigateArtist}
                 onNavigateAlbum={handleNavigateAlbum}
                 onNavigateDownloads={() => navigateTo({ type: "downloads" })}

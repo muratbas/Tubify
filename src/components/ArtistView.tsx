@@ -36,6 +36,12 @@ interface ArtistViewProps {
     artistName?: string,
     thumbnail?: string
   ) => void;
+  onPlayAlbum?: (
+    albumId: string,
+    albumTitle?: string,
+    artistName?: string,
+    thumbnail?: string
+  ) => void;
   onContextMenuTrack?: (track: Track, e: React.MouseEvent) => void;
   onBackToHome?: () => void;
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
@@ -53,6 +59,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
   onToggleLike,
   likedTrackIds,
   onNavigateAlbum,
+  onPlayAlbum,
   onContextMenuTrack,
   onScroll,
 }) => {
@@ -509,9 +516,20 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         <Disc3 className="w-10 h-10 text-neutral-500" />
                       </div>
                     )}
-                    <div className="absolute right-2 bottom-2 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-xl transition-all transform translate-y-2 group-hover:translate-y-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onPlayAlbum) {
+                          onPlayAlbum(album.id, album.title, artistData.name, album.thumbnail || undefined);
+                        } else {
+                          onNavigateAlbum(album.id, album.title, artistData.name, album.thumbnail || undefined);
+                        }
+                      }}
+                      className="absolute right-2 bottom-2 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-xl transition-all transform translate-y-2 group-hover:translate-y-0 hover:scale-105 active:scale-95 cursor-pointer z-10"
+                      title="Oynat"
+                    >
                       <Play className="w-5 h-5 fill-white ml-0.5" />
-                    </div>
+                    </button>
                   </div>
                   <h3 className="text-sm font-bold truncate">{album.title}</h3>
                   {album.subtitle && (
@@ -554,9 +572,20 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         <Disc3 className="w-10 h-10 text-neutral-500" />
                       </div>
                     )}
-                    <div className="absolute right-2 bottom-2 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-xl transition-all transform translate-y-2 group-hover:translate-y-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onPlayAlbum) {
+                          onPlayAlbum(single.id, single.title, artistData.name, single.thumbnail || undefined);
+                        } else {
+                          onNavigateAlbum(single.id, single.title, artistData.name, single.thumbnail || undefined);
+                        }
+                      }}
+                      className="absolute right-2 bottom-2 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-xl transition-all transform translate-y-2 group-hover:translate-y-0 hover:scale-105 active:scale-95 cursor-pointer z-10"
+                      title="Oynat"
+                    >
                       <Play className="w-5 h-5 fill-white ml-0.5" />
-                    </div>
+                    </button>
                   </div>
                   <h3 className="text-sm font-bold truncate">{single.title}</h3>
                   {single.subtitle && (

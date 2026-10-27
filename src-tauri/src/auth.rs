@@ -152,6 +152,15 @@ pub fn clear_session_file() {
     *lock = None;
 }
 
+pub fn get_session_info() -> Option<(String, Option<String>)> {
+    let lock = SESSION.lock().ok()?;
+    let session = lock.as_ref()?;
+    if session.cookie.trim().is_empty() {
+        return None;
+    }
+    Some((session.cookie.clone(), session.sapisid.clone()))
+}
+
 pub fn extract_sapisid(cookies: &str) -> Option<String> {
     for part in cookies.split(';') {
         let trimmed = part.trim();
@@ -177,7 +186,7 @@ pub fn generate_sapisid_hash(sapisid: &str, origin: &str) -> String {
     format!("SAPISIDHASH {}_{}", timestamp, hash)
 }
 
-fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Client, reqwest::header::HeaderMap), String> {
+pub fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Client, reqwest::header::HeaderMap), String> {
     let origin = "https://music.youtube.com";
     let mut headers = reqwest::header::HeaderMap::new();
 

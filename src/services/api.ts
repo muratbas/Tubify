@@ -1,6 +1,7 @@
 import type {
   Track,
   StreamInfo,
+  PlaybackTracking,
   AudioQualityPreference,
   UserProfile,
   Playlist,
@@ -71,6 +72,66 @@ export async function getStreamUrl(
     throw new Error(`Stream resolution failed (${res.status}): ${errorText}`);
   }
   return await res.json();
+}
+
+export async function getPlaybackTracking(videoId: string): Promise<PlaybackTracking | null> {
+  if (!videoId) return null;
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<PlaybackTracking | null>("get_playback_tracking", { videoId });
+    } catch (e) {
+      console.debug("Failed to get playback tracking via Tauri:", e);
+    }
+  }
+  return null;
+}
+
+export async function sendPlaybackPing(playbackUrl: string, cpn: string): Promise<void> {
+  if (!playbackUrl || !cpn) return;
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("send_playback_ping", { playbackUrl, cpn });
+      return;
+    } catch (e) {
+      console.debug("Failed to send playback ping via Tauri:", e);
+    }
+  }
+  try {
+    const sep = playbackUrl.includes("?") ? "&" : "?";
+    fetch(`${playbackUrl}${sep}cpn=${cpn}`, { mode: "no-cors" }).catch(() => {});
+  } catch {}
+}
+
+export async function sendWatchtimePing(
+  watchtimeUrl: string,
+  cpn: string,
+  len: number,
+  cmt: number
+): Promise<void> {
+  if (!watchtimeUrl || !cpn) return;
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("send_watchtime_ping", {
+        watchtimeUrl,
+        cpn,
+        len: Math.round(len),
+        cmt: Number(cmt.toFixed(3)),
+      });
+      return;
+    } catch (e) {
+      console.debug("Failed to send watchtime ping via Tauri:", e);
+    }
+  }
+  try {
+    const sep = watchtimeUrl.includes("?") ? "&" : "?";
+    const url = `${watchtimeUrl}${sep}cpn=${cpn}&state=playing&len=${Math.round(
+      len
+    )}&cmt=${cmt.toFixed(3)}&st=0.000&et=${cmt.toFixed(3)}&rt=${cmt.toFixed(1)}`;
+    fetch(url, { mode: "no-cors" }).catch(() => {});
+  } catch {}
 }
 
 export async function getClientVersion(): Promise<string> {
