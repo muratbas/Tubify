@@ -7,7 +7,6 @@ import {
   Clock3,
   Music2,
   Calendar,
-  Disc,
   Loader2,
   AlertCircle,
   MoreHorizontal,
@@ -18,6 +17,28 @@ import { useTheme } from "../context/ThemeContext";
 import { useDownload } from "../context/DownloadContext";
 import { getAlbumDetails } from "../services/api";
 import type { AlbumDetails, Track } from "../types/music";
+
+function formatPlays(plays?: string | number | null): string {
+  if (plays === undefined || plays === null) return "";
+  const raw = String(plays).replace(/\u00a0/g, " ").trim();
+  if (!raw) return "";
+
+  // If pure integer number string, e.g. "142500123" or 142500123
+  const cleanDigits = raw.replace(/\s+/g, "");
+  if (/^\d+$/.test(cleanDigits)) {
+    const num = Number(cleanDigits);
+    if (!isNaN(num)) {
+      return num.toLocaleString("tr-TR");
+    }
+  }
+
+  // Remove metric text suffixes like "dinlenme", "plays", "views", etc.
+  const stripped = raw
+    .replace(/\s*(dinlenme|plays?|views?|görüntüleme|wiedergaben|écoutes?|vues?|reproducciones)/gi, "")
+    .trim();
+
+  return stripped;
+}
 
 interface AlbumViewProps {
   albumId: string;
@@ -115,6 +136,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
       album: t.album && t.album !== "Albüm" ? t.album : displayTitle,
       album_id: t.album_id || albumId,
       thumbnail: t.thumbnail || displayThumbnail || undefined,
+      plays: t.plays || undefined,
     }));
   }, [albumData, displayArtist, displayArtistId, displayTitle, albumId, displayThumbnail]);
 
@@ -130,6 +152,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
 
   return (
     <div
+      id="main-scroll-container"
       onScroll={onScroll}
       className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-0 pb-28 transition-colors bg-transparent relative z-10 ${
         isLight ? "text-neutral-900" : "text-white"
@@ -155,14 +178,6 @@ export const AlbumView: FC<AlbumViewProps> = ({
 
           {/* Details */}
           <div className="flex flex-col gap-1.5 min-w-0 pb-1">
-            <span
-              className={`text-xs font-bold tracking-wider uppercase flex items-center gap-1.5 ${
-                isLight ? "text-neutral-600" : "text-white/80"
-              }`}
-            >
-              <Disc className="w-3.5 h-3.5 text-[#ff0000]" />
-              <span>Albüm</span>
-            </span>
             <h1
               className={`text-5xl lg:text-6xl font-extrabold tracking-tight leading-snug pb-1 pt-0.5 line-clamp-2 ${
                 isLight ? "text-neutral-900" : "text-white"
@@ -242,12 +257,15 @@ export const AlbumView: FC<AlbumViewProps> = ({
       <div className="px-8 pt-4 pb-16">
         <div className="w-full">
           <div
-            className={`grid grid-cols-[40px_1fr_84px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
+            className={`grid grid-cols-[40px_minmax(180px,2fr)_minmax(100px,1fr)_84px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
               isLight ? "text-neutral-700 border-black/10" : "text-neutral-300 border-white/10"
             }`}
           >
             <span>#</span>
-            <span>BAŞLIK</span>
+            <span className="min-w-0">BAŞLIK</span>
+            <span className="text-right pr-2 text-xs font-semibold text-neutral-400 tracking-wider">
+              DİNLENME SAYISI
+            </span>
             <span className="text-center"></span>
             <span className="text-right flex items-center justify-end">
               <Clock3 className="w-4 h-4" />
@@ -277,7 +295,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                         onContextMenuTrack(track, e);
                       }
                     }}
-                    className={`grid grid-cols-[40px_1fr_84px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
+                    className={`grid grid-cols-[40px_minmax(180px,2fr)_minmax(100px,1fr)_84px_60px] gap-4 items-center px-4 py-2 rounded-lg transition-all group cursor-pointer ${
                       isActive
                         ? isLight
                           ? "bg-black/[0.07] text-neutral-950 font-medium"
@@ -363,6 +381,15 @@ export const AlbumView: FC<AlbumViewProps> = ({
                           {track.artist}
                         </p>
                       </div>
+                    </div>
+
+                    {/* Play Count (Dinlenme Sayısı) */}
+                    <div
+                      className={`text-xs text-right font-mono pr-2 truncate ${
+                        isLight ? "text-neutral-500" : "text-neutral-400"
+                      }`}
+                    >
+                      {formatPlays(track.plays)}
                     </div>
 
                     {/* ACTIONS: LIKE + DOWNLOAD + MORE */}

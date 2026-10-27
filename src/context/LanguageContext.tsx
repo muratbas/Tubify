@@ -53,15 +53,41 @@ export interface Translations {
   darkThemeDesc: string;
   lightTheme: string;
   lightThemeDesc: string;
+  systemTheme: string;
+  systemThemeDesc: string;
   languageSelection: string;
   accentColor: string;
   
   // Playback & Window
   playbackSubtitle: string;
+  streamingQuality: string;
+  streamingQualityDesc: string;
+  qualityHigh: string;
+  qualityNormal: string;
+  qualityLow: string;
+  outputDevice: string;
+  outputDeviceDesc: string;
+  defaultOutputDevice: string;
+  scanDevices: string;
+  scanningDevices: string;
+  selectFromSystem: string;
   miniPlayerMode: string;
   miniPlayerDesc: string;
   readyToUse: string;
   shortcutsSubtitle: string;
+
+  // About
+  about: string;
+  aboutSubtitle: string;
+  version: string;
+  checkForUpdates: string;
+  checkingForUpdates: string;
+  upToDate: string;
+  updateAvailable: string;
+  updateCheckFailed: string;
+  downloadUpdate: string;
+  sourceCodeGithub: string;
+  sourceCodeGithubDesc: string;
 
   // Hybrid Desktop UI Additions
   queue: string;
@@ -98,7 +124,7 @@ export const translations: Record<Language, Translations> = {
     recentlyPlayed: "Recently played",
     moreRecommendations: "More recommendations",
     listenAgain: "Listen again",
-    searchPlaceholder: "Search artists, songs, playlists, and albums (Ctrl+K)",
+    searchPlaceholder: "Search artists, songs, playlists, and albums",
     searchResultsFor: "Results for",
     noResultsFound: "No results found.",
     backToHome: "Back to Home",
@@ -127,14 +153,39 @@ export const translations: Record<Language, Translations> = {
     darkThemeDesc: "Deep black & YouTube red accents",
     lightTheme: "Light Mode",
     lightThemeDesc: "Clean #f0f0f0 canvas with white cards",
+    systemTheme: "System",
+    systemThemeDesc: "Follow system theme settings",
     languageSelection: "Language",
     accentColor: "Accent Color",
     
     playbackSubtitle: "Playback transition and audio session settings.",
+    streamingQuality: "Streaming Quality",
+    streamingQualityDesc: "Choose the audio quality for online music streaming.",
+    qualityHigh: "High (Recommended - ~160 kbps)",
+    qualityNormal: "Normal (~70 kbps)",
+    qualityLow: "Low / Data Saver (~50 kbps)",
+    outputDevice: "Output Device",
+    outputDeviceDesc: "Select the audio device used for playback (speakers, headphones).",
+    defaultOutputDevice: "Default (System Default)",
+    scanDevices: "Scan Audio Devices",
+    scanningDevices: "Scanning...",
+    selectFromSystem: "Select from System...",
     miniPlayerMode: "Mini HUD Player Mode",
     miniPlayerDesc: "Compact overlay player for gaming and multitasking.",
     readyToUse: "Ready to use",
     shortcutsSubtitle: "Customize desktop keyboard controls.",
+
+    about: "About",
+    aboutSubtitle: "Version, updates and links",
+    version: "Version",
+    checkForUpdates: "Check for Updates",
+    checkingForUpdates: "Checking for updates...",
+    upToDate: "You are using the latest version",
+    updateAvailable: "New version available",
+    updateCheckFailed: "Failed to check for updates",
+    downloadUpdate: "View Release & Download",
+    sourceCodeGithub: "Source Code (GitHub)",
+    sourceCodeGithubDesc: "Visit open source repository, star or contribute.",
 
     queue: "Queue",
     nowPlaying: "Now Playing",
@@ -168,7 +219,7 @@ export const translations: Record<Language, Translations> = {
     recentlyPlayed: "Recently played",
     moreRecommendations: "More recommendations",
     listenAgain: "Listen again",
-    searchPlaceholder: "Sanatçı, şarkı, çalma listesi veya albüm arayın (Ctrl+K)",
+    searchPlaceholder: "Sanatçı, şarkı, çalma listesi veya albüm arayın",
     searchResultsFor: "Sonuçlar:",
     noResultsFound: "Sonuç bulunamadı.",
     backToHome: "Ana Sayfaya Dön",
@@ -181,7 +232,7 @@ export const translations: Record<Language, Translations> = {
     settingsSubtitle: "Hesabınızı, kitaplığınızı, görünümünüzü ve pencere davranışlarını yönetin.",
     starOnGithub: "Star on GitHub",
     reportAnIssue: "Sorun Bildir",
-    accountSettings: "Hesap ayarları",
+    accountSettings: "Ayarlar",
     signedInToYt: "YouTube Music oturumu açık",
     sessionConfirmed: "Oturum az önce doğrulandı.",
     addAccount: "Hesap ekle",
@@ -197,14 +248,39 @@ export const translations: Record<Language, Translations> = {
     darkThemeDesc: "Derin siyah & YouTube kırmızısı",
     lightTheme: "Açık Tema (Light)",
     lightThemeDesc: "Ferah #f0f0f0 zemin ve beyaz kartlar",
+    systemTheme: "Sistem",
+    systemThemeDesc: "İşletim sistemi temasını takip et",
     languageSelection: "Dil",
     accentColor: "Vurgu Rengi",
     
     playbackSubtitle: "Ses oturumu ve geçiş tercihleri.",
+    streamingQuality: "Ses Kalitesi",
+    streamingQualityDesc: "Şarkıların çevrimiçi çalınırken kullanılacak ses kalitesini belirleyin.",
+    qualityHigh: "Yüksek (Önerilen - ~160 kbps)",
+    qualityNormal: "Normal (~70 kbps)",
+    qualityLow: "Düşük / Veri Tasarrufu (~50 kbps)",
+    outputDevice: "Çıkış Cihazı",
+    outputDeviceDesc: "Müziğin çalınacağı ses aygıtını (hoparlör, kulaklık vb.) seçin.",
+    defaultOutputDevice: "Varsayılan (Sistem Varsayılanı)",
+    scanDevices: "Ses Aygıtlarını Tara",
+    scanningDevices: "Aygıtlar Taranıyor...",
+    selectFromSystem: "Sistemden Ses Çıkışı Seç...",
     miniPlayerMode: "Mini HUD Oyuncu Modu",
     miniPlayerDesc: "Oyun oynarken ekranda kompakt yarı saydam oynatıcı.",
     readyToUse: "Kullanıma Hazır",
     shortcutsSubtitle: "Masaüstü klavye kısayollarını özelleştirin.",
+
+    about: "Hakkında",
+    aboutSubtitle: "Sürüm, güncellemeler ve bağlantılar",
+    version: "Sürüm",
+    checkForUpdates: "Güncellemeleri Denetle",
+    checkingForUpdates: "Güncellemeler denetleniyor...",
+    upToDate: "En son sürümü kullanıyorsunuz",
+    updateAvailable: "Yeni bir sürüm mevcut",
+    updateCheckFailed: "Güncelleme denetlenemedi",
+    downloadUpdate: "Sürümü İncele ve İndir",
+    sourceCodeGithub: "Kaynak Kodu (GitHub)",
+    sourceCodeGithubDesc: "Açık kaynak depoyu ziyaret edin, yıldız verin veya katkıda bulunun.",
 
     queue: "Sıradaki Şarkılar",
     nowPlaying: "Şu An Çalan",

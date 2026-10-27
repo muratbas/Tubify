@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, type FC } from "react";
+import { useState, useEffect, useCallback, useRef, type FC } from "react";
+import {
+  generateHistoryKey,
+  saveScrollPosition,
+  getScrollPosition,
+  restoreScroll,
+} from "./utils/scrollRestoration";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar, isLikedSongsPlaylist, recordPlaylistPlayed } from "./components/Sidebar";
 import { HomeView } from "./components/HomeView";
@@ -30,7 +36,7 @@ import {
 } from "./services/api";
 import { CustomTooltip } from "./components/CustomTooltip";
 import { EditPlaylistModal, type PrivacyStatus } from "./components/EditPlaylistModal";
-import type { Track, UserProfile, Playlist } from "./types/music";
+import type { Track, UserProfile, Playlist, SettingsTab } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { AlertCircle, Check } from "lucide-react";
 
@@ -111,37 +117,53 @@ export const App: FC = () => {
   const isLight = theme === "light";
 
   // Navigation Entry Definition & History Stack
-  const [history, setHistory] = useState<
-    (
-      | { type: "home" }
-      | { type: "search"; query: string }
-      | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null } }
-      | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
-      | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
-      | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
-      | { type: "lyrics" }
-      | { type: "downloads" }
-    )[]
-  >([{ type: "home" }]);
+  type NavEntry =
+    | { type: "home"; key: string }
+    | { type: "search"; query: string; key: string }
+    | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null }; key: string }
+    | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string; key: string }
+    | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string; key: string }
+    | { type: "settings"; tab?: SettingsTab; key: string }
+    | { type: "lyrics"; key: string }
+    | { type: "downloads"; key: string };
+
+  const [history, setHistory] = useState<NavEntry[]>([
+    { type: "home", key: generateHistoryKey("home") },
+  ]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  const currentNav = history[historyIndex] || { type: "home" };
+  const currentNav = history[historyIndex] || history[0];
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
 
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  // Helper to persist current page scroll offset before navigating away
+  const saveCurrentScroll = useCallback(() => {
+    const curKey = history[historyIndex]?.key;
+    if (!curKey) return;
+    const container = mainContentRef.current?.querySelector<HTMLElement>(
+      "#main-scroll-container, .overflow-y-auto"
+    );
+    if (container) {
+      saveScrollPosition(curKey, container.scrollTop);
+    }
+  }, [history, historyIndex]);
+
   const navigateTo = (
     entry:
-      | { type: "home" }
-      | { type: "search"; query: string }
-      | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null } }
-      | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string }
-      | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string }
-      | { type: "settings"; tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" }
-      | { type: "lyrics" }
-      | { type: "downloads" }
+      | { type: "home"; key?: string }
+      | { type: "search"; query: string; key?: string }
+      | { type: "playlist"; playlist: Playlist | { id: string; title: string; description?: string; thumbnail?: string | null }; key?: string }
+      | { type: "artist"; artistId: string; artistName?: string; thumbnail?: string; key?: string }
+      | { type: "album"; albumId: string; albumTitle?: string; artistName?: string; thumbnail?: string; key?: string }
+      | { type: "settings"; tab?: SettingsTab; key?: string }
+      | { type: "lyrics"; key?: string }
+      | { type: "downloads"; key?: string }
   ) => {
     const cur = history[historyIndex];
     if (
+      cur &&
       cur.type === entry.type &&
       (entry.type === "home" ||
         entry.type === "lyrics" ||
@@ -154,33 +176,66 @@ export const App: FC = () => {
     ) {
       return;
     }
-    const newHistory = history.slice(0, historyIndex + 1).concat(entry);
+
+    // Save current scroll position before pushing a fresh entry
+    saveCurrentScroll();
+
+    const entryWithKey: NavEntry = {
+      ...entry,
+      key: entry.key || generateHistoryKey(entry.type),
+    } as NavEntry;
+
+    const newHistory = history.slice(0, historyIndex + 1).concat(entryWithKey);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-    setIsScrolled(false);
   };
 
   const handleGoBack = () => {
     if (canGoBack) {
+      saveCurrentScroll();
       setHistoryIndex((prev) => prev - 1);
-      setIsScrolled(false);
     }
   };
 
   const handleGoForward = () => {
     if (canGoForward) {
+      saveCurrentScroll();
       setHistoryIndex((prev) => prev + 1);
-      setIsScrolled(false);
     }
   };
 
-  // Dynamic Sticky TitleBar scroll state (Durum B: scrollTop > 10)
+  // Dynamic Sticky TitleBar scroll state & real-time scroll position tracking
   const [isScrolled, setIsScrolled] = useState(false);
-  const handleViewScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
-    setIsScrolled(e.currentTarget.scrollTop > 10);
-  }, []);
+  const handleViewScroll = useCallback(
+    (e: React.UIEvent<HTMLElement>) => {
+      const top = e.currentTarget.scrollTop;
+      setIsScrolled(top > 10);
+      const curKey = history[historyIndex]?.key;
+      if (curKey) {
+        saveScrollPosition(curKey, top);
+      }
+    },
+    [history, historyIndex]
+  );
 
+  // Scroll Restoration when active history entry changes
+  useEffect(() => {
+    const curKey = currentNav.key;
+    if (!curKey) return;
+    const savedPos = getScrollPosition(curKey);
 
+    const container = mainContentRef.current?.querySelector<HTMLElement>(
+      "#main-scroll-container, .overflow-y-auto"
+    );
+
+    if (!container) return;
+
+    const cleanup = restoreScroll(container, savedPos, (scrolled) => {
+      setIsScrolled(scrolled);
+    });
+
+    return cleanup;
+  }, [historyIndex, currentNav.key]);
 
   // Mouse 4 / 5 (Browser Back & Forward) Hardware Navigation
   useEffect(() => {
@@ -190,6 +245,7 @@ export const App: FC = () => {
         e.preventDefault();
         e.stopPropagation();
         if (canGoBack) {
+          saveCurrentScroll();
           setHistoryIndex((prev) => Math.max(0, prev - 1));
         }
       } else if (e.button === 4) {
@@ -197,6 +253,7 @@ export const App: FC = () => {
         e.preventDefault();
         e.stopPropagation();
         if (canGoForward) {
+          saveCurrentScroll();
           setHistoryIndex((prev) => Math.min(history.length - 1, prev + 1));
         }
       }
@@ -278,9 +335,7 @@ export const App: FC = () => {
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<
-    "account" | "appearance" | "playback" | "library" | "window" | "shortcuts"
-  >("account");
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>("account");
   const [likedSongs, setLikedSongs] = useState<Track[]>([]);
   const [likedSongsTotalCount, setLikedSongsTotalCount] = useState<string | null>(() => {
     try {
@@ -794,7 +849,7 @@ export const App: FC = () => {
   };
 
   const handleOpenSettings = (
-    tab: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts" = "account"
+    tab: SettingsTab = "account"
   ) => {
     setSettingsInitialTab(tab);
     navigateTo({ type: "settings", tab });
@@ -1155,7 +1210,10 @@ export const App: FC = () => {
 
           {/* Module 2 İçerik: Ana İçerik Paneli ve Sağ Panel */}
           <div className="flex-1 flex overflow-hidden min-h-0 relative z-10 bg-transparent">
-            <main className="relative z-10 flex-1 flex flex-col h-full overflow-hidden bg-transparent">
+            <main
+              ref={mainContentRef}
+              className="relative z-10 flex-1 flex flex-col h-full overflow-hidden bg-transparent"
+            >
 
             {/* Audio error banner */}
             {player.playbackError && (

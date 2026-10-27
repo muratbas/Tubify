@@ -10,6 +10,7 @@ import {
 import type { Track, PlaybackStatus, RightDrawerTab, QueueViewMode, MoodCategory, RepeatMode } from "../types/music";
 import {
   getStreamUrl,
+  getStoredAudioQuality,
   toggleYtLike,
   getRadioTracks,
   updateMediaMetadata,
@@ -306,13 +307,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           streamUrl = `http://tubify-local.localhost/track/${candidate.id}`;
         }
       } else {
-        const cached = streamCacheRef.current.get(candidate.id);
+        const quality = getStoredAudioQuality();
+        const cacheKey = `${candidate.id}_${quality}`;
+        const cached = streamCacheRef.current.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
           streamUrl = cached.url;
         } else {
-          const stream = await getStreamUrl(candidate.id);
+          const stream = await getStreamUrl(candidate.id, quality);
           streamUrl = stream.url;
-          streamCacheRef.current.set(candidate.id, { url: streamUrl, timestamp: Date.now() });
+          streamCacheRef.current.set(cacheKey, { url: streamUrl, timestamp: Date.now() });
         }
       }
 
@@ -323,6 +326,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         pAudio.preload = "auto";
         pAudio.volume = targetVol;
         pAudio.muted = true;
+        const savedSink = localStorage.getItem("tubify_output_device");
+        if (savedSink && typeof (pAudio as any).setSinkId === "function") {
+          (pAudio as any).setSinkId(savedSink).catch(() => {});
+        }
         preloadAudioRef.current = pAudio;
       } else {
         preloadAudioRef.current.volume = targetVol;
@@ -335,6 +342,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.warn("Silent preload failed for next track:", candidate.title, e);
     }
   }, [getUpcomingTrack]);
+
+  // Handle quality preference changes dynamically
+  useEffect(() => {
+    const handleQualityChange = () => {
+      streamCacheRef.current.clear();
+      if (preloadAudioRef.current) {
+        preloadAudioRef.current.pause();
+        preloadAudioRef.current.src = "";
+      }
+      preloadUpcoming();
+    };
+    window.addEventListener("tubify:quality-change", handleQualityChange);
+    return () => {
+      window.removeEventListener("tubify:quality-change", handleQualityChange);
+    };
+  }, [preloadUpcoming]);
+
+  // Handle audio output device changes dynamically
+  useEffect(() => {
+    const handleDeviceChange = (e: Event) => {
+      const deviceId = (e as CustomEvent<string>).detail;
+      if (typeof (audioRef.current as any)?.setSinkId === "function") {
+        (audioRef.current as any).setSinkId(deviceId).catch((err: any) => {
+          console.warn("Failed to setSinkId on audioRef:", err);
+        });
+      }
+      if (typeof (preloadAudioRef.current as any)?.setSinkId === "function") {
+        (preloadAudioRef.current as any).setSinkId(deviceId).catch(() => {});
+      }
+    };
+    window.addEventListener("tubify:output-device-change", handleDeviceChange);
+    return () => {
+      window.removeEventListener("tubify:output-device-change", handleDeviceChange);
+    };
+  }, []);
 
   const lastNextTimeRef = useRef(0);
   const lastPrevTimeRef = useRef(0);
@@ -422,6 +464,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audio = new Audio();
     const initVol = isMuted ? 0 : Math.max(0, Math.min(1, volume));
     audio.volume = !isNaN(initVol) ? initVol : 0.85;
+    const savedSink = localStorage.getItem("tubify_output_device");
+    if (savedSink && typeof (audio as any).setSinkId === "function") {
+      (audio as any).setSinkId(savedSink).catch(() => {});
+    }
     audioRef.current = audio;
 
     const enforceVolume = () => {
@@ -735,16 +781,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setPlaybackError(null);
       try {
         let streamUrl = "";
+        const quality = getStoredAudioQuality();
+        const cacheKey = `${trackToPlay.id}_${quality}`;
         if (!forceFresh) {
-          const cached = streamCacheRef.current.get(trackToPlay.id);
+          const cached = streamCacheRef.current.get(cacheKey);
           if (cached && Date.now() - cached.timestamp < 3 * 60 * 60 * 1000) {
             streamUrl = cached.url;
           }
         }
         if (!streamUrl) {
-          const stream = await getStreamUrl(trackToPlay.id);
+          const stream = await getStreamUrl(trackToPlay.id, quality);
           streamUrl = stream.url;
-          streamCacheRef.current.set(trackToPlay.id, { url: streamUrl, timestamp: Date.now() });
+          streamCacheRef.current.set(cacheKey, { url: streamUrl, timestamp: Date.now() });
         }
         if (audioRef.current && currentTrackRef.current?.id === trackToPlay.id) {
           audioRef.current.src = streamUrl;

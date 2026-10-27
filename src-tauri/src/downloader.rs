@@ -317,7 +317,7 @@ pub async fn start_download(
     let (stream_url, custom_headers) = match audio_url.filter(|s| !s.trim().is_empty()) {
         Some(u) => (u, None),
         None => {
-            let info = crate::stream::resolve_audio_stream(&track_id).await?;
+            let info = crate::stream::resolve_audio_stream(&track_id, Some("high")).await?;
             (info.url, Some(info.headers))
         }
     };

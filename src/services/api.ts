@@ -1,6 +1,7 @@
 import type {
   Track,
   StreamInfo,
+  AudioQualityPreference,
   UserProfile,
   Playlist,
   PlaylistTracksResult,
@@ -12,6 +13,16 @@ import type {
 } from "../types/music";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+export function getStoredAudioQuality(): AudioQualityPreference {
+  try {
+    const saved = localStorage.getItem("tubify_audio_quality");
+    if (saved === "high" || saved === "normal" || saved === "low" || saved === "auto") {
+      return saved;
+    }
+  } catch {}
+  return "high";
+}
 
 export async function searchMusic(query: string): Promise<Track[]> {
   const trimmed = query.trim();
@@ -34,19 +45,27 @@ export async function searchMusic(query: string): Promise<Track[]> {
   return await res.json();
 }
 
-export async function getStreamUrl(id: string): Promise<StreamInfo> {
+export async function getStreamUrl(
+  id: string,
+  qualityPreference?: AudioQualityPreference
+): Promise<StreamInfo> {
   if (!id) throw new Error("Video ID is required");
+  const quality = qualityPreference || getStoredAudioQuality();
 
   if (isTauri) {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      return await invoke<StreamInfo>("get_stream_url", { id });
+      return await invoke<StreamInfo>("get_stream_url", {
+        videoId: id,
+        id,
+        qualityPreference: quality,
+      });
     } catch (err) {
       console.warn("Tauri invoke failed, falling back to HTTP API:", err);
     }
   }
 
-  const res = await fetch(`/api/stream?id=${encodeURIComponent(id)}`);
+  const res = await fetch(`/api/stream?id=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`);
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(`Stream resolution failed (${res.status}): ${errorText}`);

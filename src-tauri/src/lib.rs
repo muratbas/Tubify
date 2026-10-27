@@ -19,8 +19,13 @@ async fn search_music(query: String) -> Result<Vec<Track>, String> {
 }
 
 #[tauri::command]
-async fn get_stream_url(id: String) -> Result<StreamInfo, String> {
-    stream::resolve_audio_stream(&id).await
+async fn get_stream_url(
+    video_id: Option<String>,
+    id: Option<String>,
+    quality_preference: Option<String>,
+) -> Result<StreamInfo, String> {
+    let vid = video_id.or(id).ok_or_else(|| "Video ID is required".to_string())?;
+    stream::resolve_audio_stream(&vid, quality_preference.as_deref()).await
 }
 
 #[tauri::command]

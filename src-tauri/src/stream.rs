@@ -16,7 +16,27 @@ pub struct StreamInfo {
 pub const ANDROID_USER_AGENT: &str =
     "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 14; tr_TR; Pixel 7 Pro)";
 
-pub async fn resolve_audio_stream_android(video_id: &str) -> Result<StreamInfo, String> {
+fn get_format_itag(fmt: &serde_json::Value) -> Option<u64> {
+    fmt.get("itag")
+        .and_then(|i| i.as_u64())
+        .or_else(|| fmt.get("itag").and_then(|i| i.as_str()).and_then(|s| s.parse::<u64>().ok()))
+}
+
+fn get_format_bitrate(fmt: &serde_json::Value) -> u64 {
+    fmt.get("bitrate")
+        .and_then(|b| b.as_u64())
+        .or_else(|| fmt.get("averageBitrate").and_then(|b| b.as_u64()))
+        .unwrap_or(0)
+}
+
+fn find_audio_by_itag<'a>(formats: &'a [&'a serde_json::Value], itag: u64) -> Option<&'a serde_json::Value> {
+    formats.iter().copied().find(|f| get_format_itag(f) == Some(itag))
+}
+
+pub async fn resolve_audio_stream_android(
+    video_id: &str,
+    quality_preference: Option<&str>,
+) -> Result<StreamInfo, String> {
     let client = reqwest::Client::builder()
         .user_agent(ANDROID_USER_AGENT)
         .build()
@@ -74,59 +94,59 @@ pub async fn resolve_audio_stream_android(video_id: &str) -> Result<StreamInfo, 
         .and_then(|af| af.as_array())
         .ok_or_else(|| "No streamingData.adaptiveFormats found in player response".to_string())?;
 
-    // Priority 1: audio/webm; codecs="opus" (ITAG 251 ~160kbps)
-    // Priority 2: audio/mp4; codecs="mp4a.40.2" (ITAG 140 ~128kbps)
-    // Fallback: any audio format with direct url
-
-    let mut candidate_p1: Option<&serde_json::Value> = None;
-    let mut candidate_p2: Option<&serde_json::Value> = None;
-    let mut candidate_fallback: Option<&serde_json::Value> = None;
-
-    for fmt in adaptive_formats {
-        let has_url = fmt
-            .get("url")
-            .and_then(|u| u.as_str())
-            .map(|s| !s.is_empty())
-            .unwrap_or(false);
-        if !has_url {
-            continue;
-        }
-
-        let mime = fmt.get("mimeType").and_then(|m| m.as_str()).unwrap_or("");
-        if !mime.starts_with("audio/") {
-            continue;
-        }
-
-        let is_opus = mime.contains("audio/webm") && mime.contains("opus");
-        let is_mp4a = mime.contains("audio/mp4") && mime.contains("mp4a");
-
-        if is_opus {
-            let br = fmt.get("bitrate").and_then(|b| b.as_u64()).unwrap_or(0);
-            let prev_br = candidate_p1
-                .and_then(|c| c.get("bitrate"))
-                .and_then(|b| b.as_u64())
-                .unwrap_or(0);
-            if candidate_p1.is_none() || br > prev_br {
-                candidate_p1 = Some(fmt);
+    // Filter audio formats with non-empty direct url
+    let audio_formats: Vec<&serde_json::Value> = adaptive_formats
+        .iter()
+        .filter(|fmt| {
+            let has_url = fmt
+                .get("url")
+                .and_then(|u| u.as_str())
+                .map(|s| !s.trim().is_empty())
+                .unwrap_or(false);
+            if !has_url {
+                return false;
             }
-        } else if is_mp4a {
-            let br = fmt.get("bitrate").and_then(|b| b.as_u64()).unwrap_or(0);
-            let prev_br = candidate_p2
-                .and_then(|c| c.get("bitrate"))
-                .and_then(|b| b.as_u64())
-                .unwrap_or(0);
-            if candidate_p2.is_none() || br > prev_br {
-                candidate_p2 = Some(fmt);
-            }
-        } else if candidate_fallback.is_none() {
-            candidate_fallback = Some(fmt);
-        }
+            let mime = fmt.get("mimeType").and_then(|m| m.as_str()).unwrap_or("");
+            mime.starts_with("audio/")
+        })
+        .collect();
+
+    if audio_formats.is_empty() {
+        return Err("No suitable audio format with direct URL found".to_string());
     }
 
-    let selected_format = candidate_p1
-        .or(candidate_p2)
-        .or(candidate_fallback)
-        .ok_or_else(|| "No suitable audio format with direct URL found".to_string())?;
+    let pref = quality_preference.unwrap_or("auto").to_lowercase();
+    let selected_format: &serde_json::Value = match pref.as_str() {
+        "high" => {
+            // High: Primary itag 251 (Opus ~160kbps), fallback itag 140 (AAC ~128kbps)
+            find_audio_by_itag(&audio_formats, 251)
+                .or_else(|| find_audio_by_itag(&audio_formats, 140))
+                .or_else(|| audio_formats.iter().copied().max_by_key(|f| get_format_bitrate(f)))
+                .unwrap_or(audio_formats[0])
+        }
+        "normal" => {
+            // Normal: itag 250 (Opus ~70kbps)
+            find_audio_by_itag(&audio_formats, 250)
+                .or_else(|| find_audio_by_itag(&audio_formats, 251))
+                .or_else(|| find_audio_by_itag(&audio_formats, 140))
+                .or_else(|| audio_formats.iter().copied().max_by_key(|f| get_format_bitrate(f)))
+                .unwrap_or(audio_formats[0])
+        }
+        "low" => {
+            // Low / Data Saver: itag 249 (Opus ~50kbps)
+            find_audio_by_itag(&audio_formats, 249)
+                .or_else(|| find_audio_by_itag(&audio_formats, 250))
+                .or_else(|| audio_formats.iter().copied().min_by_key(|f| get_format_bitrate(f)))
+                .unwrap_or(audio_formats[0])
+        }
+        _ => {
+            // Auto (Default): Highest available audio format
+            find_audio_by_itag(&audio_formats, 251)
+                .or_else(|| find_audio_by_itag(&audio_formats, 140))
+                .or_else(|| audio_formats.iter().copied().max_by_key(|f| get_format_bitrate(f)))
+                .unwrap_or(audio_formats[0])
+        }
+    };
 
     let stream_url = selected_format
         .get("url")
@@ -134,9 +154,7 @@ pub async fn resolve_audio_stream_android(video_id: &str) -> Result<StreamInfo, 
         .ok_or_else(|| "Selected format has no url".to_string())?
         .to_string();
 
-    let format_id = selected_format
-        .get("itag")
-        .and_then(|i| i.as_u64())
+    let format_id = get_format_itag(selected_format)
         .map(|i| i.to_string())
         .or_else(|| {
             selected_format
@@ -235,9 +253,20 @@ fn find_ytdlp_path() -> Option<PathBuf> {
     None
 }
 
-pub async fn resolve_audio_stream_ytdlp(video_id: &str) -> Result<StreamInfo, String> {
+pub async fn resolve_audio_stream_ytdlp(
+    video_id: &str,
+    quality_preference: Option<&str>,
+) -> Result<StreamInfo, String> {
     let ytdlp = find_ytdlp_path()
         .ok_or_else(|| "yt-dlp binary not found in bin/ or PATH".to_string())?;
+
+    let pref = quality_preference.unwrap_or("auto").to_lowercase();
+    let format_selector = match pref.as_str() {
+        "high" => "251/140/ba/b",
+        "normal" => "250/251/140/ba/b",
+        "low" => "249/250/ba/b",
+        _ => "251/140/ba/b",
+    };
 
     let url = format!("https://www.youtube.com/watch?v={}", video_id);
     let mut cmd = Command::new(&ytdlp);
@@ -245,7 +274,7 @@ pub async fn resolve_audio_stream_ytdlp(video_id: &str) -> Result<StreamInfo, St
         "-j",
         "--no-playlist",
         "-f",
-        "ba/b",
+        format_selector,
         "--no-warnings",
         "--no-check-certificates",
         "--prefer-free-formats",
@@ -286,26 +315,58 @@ pub async fn resolve_audio_stream_ytdlp(video_id: &str) -> Result<StreamInfo, St
         }
     }
 
-    // Check direct url in root
-    if let Some(stream_url) = json.get("url").and_then(|v| v.as_str()) {
-        let format = json.get("format_id").and_then(|v| v.as_str()).unwrap_or("audio").to_string();
-        let bitrate = json.get("abr").and_then(|v| v.as_u64());
-        return Ok(StreamInfo {
-            url: stream_url.to_string(),
-            format,
-            bitrate,
-            duration,
-            title,
-            headers,
-        });
-    }
-
-    // Try finding best audio format in formats array
+    // Try finding matching audio format in formats array according to quality preference
     if let Some(formats) = json.get("formats").and_then(|v| v.as_array()) {
-        for f in formats.iter().rev() {
-            let is_audio = f.get("vcodec").and_then(|v| v.as_str()) == Some("none")
-                || f.get("resolution").and_then(|v| v.as_str()) == Some("audio only");
-            if is_audio {
+        let audio_formats: Vec<&serde_json::Value> = formats
+            .iter()
+            .filter(|f| {
+                let is_audio = f.get("vcodec").and_then(|v| v.as_str()) == Some("none")
+                    || f.get("resolution").and_then(|v| v.as_str()) == Some("audio only");
+                let has_url = f.get("url").and_then(|u| u.as_str()).map(|s| !s.is_empty()).unwrap_or(false);
+                is_audio && has_url
+            })
+            .collect();
+
+        if !audio_formats.is_empty() {
+            let matched_fmt = match pref.as_str() {
+                "high" => audio_formats
+                    .iter()
+                    .copied()
+                    .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("251"))
+                    .or_else(|| {
+                        audio_formats
+                            .iter()
+                            .copied()
+                            .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("140"))
+                    }),
+                "normal" => audio_formats
+                    .iter()
+                    .copied()
+                    .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("250"))
+                    .or_else(|| {
+                        audio_formats
+                            .iter()
+                            .copied()
+                            .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("251"))
+                    }),
+                "low" => audio_formats
+                    .iter()
+                    .copied()
+                    .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("249"))
+                    .or_else(|| {
+                        audio_formats
+                            .iter()
+                            .copied()
+                            .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("250"))
+                    }),
+                _ => audio_formats
+                    .iter()
+                    .copied()
+                    .find(|f| f.get("format_id").and_then(|v| v.as_str()) == Some("251")),
+            }
+            .or_else(|| audio_formats.last().copied());
+
+            if let Some(f) = matched_fmt {
                 if let Some(stream_url) = f.get("url").and_then(|v| v.as_str()) {
                     let format = f.get("format_id").and_then(|v| v.as_str()).unwrap_or("audio").to_string();
                     let bitrate = f.get("abr").and_then(|v| v.as_u64());
@@ -322,18 +383,35 @@ pub async fn resolve_audio_stream_ytdlp(video_id: &str) -> Result<StreamInfo, St
         }
     }
 
+    // Check direct url in root
+    if let Some(stream_url) = json.get("url").and_then(|v| v.as_str()) {
+        let format = json.get("format_id").and_then(|v| v.as_str()).unwrap_or("audio").to_string();
+        let bitrate = json.get("abr").and_then(|v| v.as_u64());
+        return Ok(StreamInfo {
+            url: stream_url.to_string(),
+            format,
+            bitrate,
+            duration,
+            title,
+            headers,
+        });
+    }
+
     Err("Could not find playable audio stream format in response".to_string())
 }
 
-pub async fn resolve_audio_stream(video_id: &str) -> Result<StreamInfo, String> {
+pub async fn resolve_audio_stream(
+    video_id: &str,
+    quality_preference: Option<&str>,
+) -> Result<StreamInfo, String> {
     // 1. Primary: Fast, direct Android Music client resolution
-    match resolve_audio_stream_android(video_id).await {
+    match resolve_audio_stream_android(video_id, quality_preference).await {
         Ok(info) => return Ok(info),
-        Err(_) => {
-            // Android Music endpoint may require auth/PO token, proceed smoothly to robust yt-dlp extractor
+        Err(e) => {
+            eprintln!("Android stream resolver failed ({}), falling back to yt-dlp", e);
         }
     }
 
     // 2. Secondary fallback: yt-dlp
-    resolve_audio_stream_ytdlp(video_id).await
+    resolve_audio_stream_ytdlp(video_id, quality_preference).await
 }

@@ -235,34 +235,13 @@ export const LyricsView: FC<LyricsViewProps> = ({
             {activeTrack?.artist || "—"}
           </p>
         </div>
-
-        {/* Alt Footer (Sol Alt Köşe) */}
-        <div className="pt-4 border-t border-neutral-200/50 dark:border-white/5">
-          <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
-            <span
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                lyricsData?.isSynced
-                  ? "bg-emerald-500 shadow-xs shadow-emerald-500/50"
-                  : lyricsData?.plainLyrics
-                  ? "bg-amber-500"
-                  : "bg-neutral-400"
-              }`}
-            />
-            <span>
-              {lyricsData?.isSynced
-                ? "Synced • via LRCLIB"
-                : lyricsData?.plainLyrics
-                ? "Plain • via LRCLIB"
-                : "via LRCLIB"}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
       {/* B. SAĞ SÜTUN (Kaydırılabilir Şarkı Sözleri Akışı)             */}
       {/* ------------------------------------------------------------- */}
       <div
+        id="main-scroll-container"
         ref={lyricsContainerRef}
         onWheel={handleWheel}
         onScroll={onScroll}

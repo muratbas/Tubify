@@ -84,6 +84,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
 
   return (
     <div
+      id="main-scroll-container"
       onScroll={onScroll}
       className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar select-none pt-0 pb-28 transition-colors bg-transparent relative z-10 ${
         isLight ? "text-neutral-900" : "text-white"

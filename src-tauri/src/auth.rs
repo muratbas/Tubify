@@ -339,6 +339,29 @@ pub fn get_current_user_profile() -> UserProfile {
     }
 }
 
+fn is_play_count_metric(text: &str, accessibility: &str) -> bool {
+    let lower_t = text.to_lowercase();
+    let lower_a = accessibility.to_lowercase();
+
+    lower_t.contains("dinlenme")
+        || lower_t.contains("plays")
+        || lower_t.contains("play")
+        || lower_t.contains("görüntüleme")
+        || lower_t.contains("views")
+        || lower_t.contains("view")
+        || lower_t.contains("wiedergaben")
+        || lower_t.contains("écoutes")
+        || lower_t.contains("vues")
+        || lower_t.contains("reproducciones")
+        || lower_t.contains("visualizzazioni")
+        || lower_a.contains("dinlenme")
+        || lower_a.contains("plays")
+        || lower_a.contains("play")
+        || lower_a.contains("görüntüleme")
+        || lower_a.contains("views")
+        || lower_a.contains("view")
+}
+
 pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
     let video_id = mrlir
         .pointer("/playlistItemData/videoId")
@@ -362,6 +385,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
     let mut album: Option<String> = None;
     let mut album_id: Option<String> = None;
     let mut duration: Option<String> = None;
+    let mut plays: Option<String> = None;
 
     if let Some(runs) = mrlir
         .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
@@ -404,19 +428,105 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         }
     }
 
-    if let Some(runs) = mrlir
-        .pointer("/flexColumns/2/musicResponsiveListItemFlexColumnRenderer/text/runs")
-        .and_then(|v| v.as_array())
-    {
-        if let Some(first) = runs.first() {
-            if let Some(al) = first.get("text").and_then(|t| t.as_str()) {
-                if !al.is_empty() {
-                    album = Some(al.to_string());
+    if let Some(flex_cols) = mrlir.get("flexColumns").and_then(|v| v.as_array()) {
+        for (idx, col) in flex_cols.iter().enumerate() {
+            if idx <= 1 {
+                continue;
+            }
+
+            let label = col
+                .pointer("/musicResponsiveListItemFlexColumnRenderer/text/accessibility/accessibilityData/label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            let runs = col
+                .pointer("/musicResponsiveListItemFlexColumnRenderer/text/runs")
+                .and_then(|v| v.as_array());
+
+            let col_text = if let Some(runs) = runs {
+                runs.iter()
+                    .filter_map(|r| r.get("text").and_then(|t| t.as_str()))
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .replace('\u{00a0}', " ")
+                    .trim()
+                    .to_string()
+            } else {
+                col.pointer("/musicResponsiveListItemFlexColumnRenderer/text/simpleText")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .replace('\u{00a0}', " ")
+                    .trim()
+                    .to_string()
+            };
+
+            if col_text.is_empty() {
+                continue;
+            }
+
+            let b_id = runs.and_then(|r| r.first()).and_then(|r| {
+                r.pointer("/navigationEndpoint/browseEndpoint/browseId")
+                    .and_then(|v| v.as_str())
+            });
+
+            if is_play_count_metric(&col_text, label) {
+                if plays.is_none() {
+                    plays = Some(col_text);
                 }
+            } else if let Some(bid) = b_id {
+                if bid.starts_with("MPREb_")
+                    || bid.starts_with("FEmusic_library_privately_owned_release")
+                    || bid.starts_with("OLAK5uy_")
+                    || bid.starts_with("MP")
+                {
+                    album_id = Some(bid.to_string());
+                    if album.is_none() {
+                        album = Some(col_text);
+                    }
+                }
+            } else if album.is_none() {
+                album = Some(col_text);
             }
-            if let Some(bid) = first.pointer("/navigationEndpoint/browseEndpoint/browseId").and_then(|v| v.as_str()) {
-                album_id = Some(bid.to_string());
+        }
+    }
+
+    if let Some(fixed_cols) = mrlir.get("fixedColumns").and_then(|v| v.as_array()) {
+        for col in fixed_cols {
+            let label = col
+                .pointer("/musicResponsiveListItemFixedColumnRenderer/text/accessibility/accessibilityData/label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let text = col
+                .pointer("/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
+                .or_else(|| col.pointer("/musicResponsiveListItemFixedColumnRenderer/text/simpleText"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .replace('\u{00a0}', " ")
+                .trim()
+                .to_string();
+
+            if text.is_empty() {
+                continue;
             }
+
+            if text.contains(':') && duration.is_none() {
+                duration = Some(text);
+            } else if is_play_count_metric(&text, label) && plays.is_none() {
+                plays = Some(text);
+            }
+        }
+    }
+
+    if plays.is_none() {
+        if let Some(p) = mrlir.pointer("/playCount/simpleText")
+            .or_else(|| mrlir.pointer("/playCount/runs/0/text"))
+            .or_else(|| mrlir.pointer("/views/simpleText"))
+            .or_else(|| mrlir.pointer("/views/runs/0/text"))
+            .or_else(|| mrlir.pointer("/shortViewCount/simpleText"))
+            .or_else(|| mrlir.pointer("/shortViewCount/runs/0/text"))
+            .and_then(|v| v.as_str())
+        {
+            plays = Some(p.replace('\u{00a0}', " ").trim().to_string());
         }
     }
 
@@ -465,6 +575,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         thumbnail,
         is_explicit,
         set_video_id,
+        plays,
     })
 }
 
@@ -505,6 +616,7 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
     let mut artist_id: Option<String> = None;
     let mut album: Option<String> = None;
     let mut album_id: Option<String> = None;
+    let mut plays: Option<String> = None;
     let mut artist_parts: Vec<&str> = Vec::new();
 
     let runs_opt = ppvr
@@ -553,9 +665,16 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
                     || text.contains("view")
                     || text.contains("beğeni")
                     || text.contains("likes")
-                    || text.contains("like");
+                    || text.contains("like")
+                    || text.contains("dinlenme")
+                    || text.contains("plays")
+                    || text.contains("play");
 
-                if !is_metric {
+                if is_metric {
+                    if (text.contains("dinlenme") || text.contains("plays") || text.contains("görüntüleme") || text.contains("views")) && plays.is_none() {
+                        plays = Some(text.to_string());
+                    }
+                } else {
                     if artist_parts.is_empty() {
                         artist_parts.push(text);
                     } else if album.is_none() && !artist_parts.contains(&text) {
@@ -583,6 +702,7 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
         thumbnail,
         is_explicit,
         set_video_id: None,
+        plays,
     })
 }
 

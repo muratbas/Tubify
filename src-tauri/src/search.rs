@@ -16,6 +16,8 @@ pub struct Track {
     pub is_explicit: Option<bool>,
     #[serde(default)]
     pub set_video_id: Option<String>,
+    #[serde(default)]
+    pub plays: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +187,7 @@ pub async fn search_youtube_music(query: &str) -> Result<Vec<Track>, String> {
             thumbnail,
             is_explicit,
             set_video_id: None,
+            plays: None,
         })
     };
 

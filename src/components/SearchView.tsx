@@ -454,6 +454,7 @@ export const SearchView: FC<SearchViewProps> = ({
 
   return (
     <div
+      id="main-scroll-container"
       onScroll={onScroll}
       className={`flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar pt-4 px-6 md:px-8 pb-32 relative z-10 bg-transparent ${
         isLight ? "text-neutral-900" : "text-white"

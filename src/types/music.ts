@@ -10,6 +10,7 @@ export interface Track {
   is_explicit?: boolean | null;
   added_at?: string | null;
   set_video_id?: string | null;
+  plays?: string | null;
 }
 
 export interface PlaylistTracksResult {
@@ -58,6 +59,8 @@ export interface StreamInfo {
   title?: string | null;
   headers?: Record<string, string>;
 }
+
+export type AudioQualityPreference = "high" | "normal" | "low" | "auto";
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
@@ -163,4 +166,7 @@ export interface RecentSearchItem {
   thumbnailUrl: string;
   timestamp: number;
 }
+
+export type SettingsTab = "account" | "appearance" | "playback" | "library" | "about";
+
 

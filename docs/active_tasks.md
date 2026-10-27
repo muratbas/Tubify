@@ -743,6 +743,87 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
     - **3. Doğrulama:**
       - `npx tsc --noEmit` ve `npm run build` ile sıfır hata ve sıfır regresyon doğrulandı.
 
+  - [x] **Aşama 62:** Albüm Detay Sayfasında Dinlenme Sayısı (Play Count) Sütunu & Parser Entegrasyonu:
+    - **1. InnerTube API Dinlenme Sayısı Parser'ı (`auth.rs`, `search.rs`):**
+      - `struct Track` (Rust) ve `Track` (TypeScript) modellerine `plays: Option<String>` / `plays?: string | null` alanı eklendi.
+      - `auth.rs` içerisindeki `parse_mrlir_item` fonksiyonuna `is_play_count_metric` çözümleyicisi entegre edildi.
+      - YouTube Music'in albüm yanıtlarında `flexColumns[2]` veya `fixedColumns` altında döndürdüğü ham dinlenme metni (`"117 Mn dinlenme"`, `"55M plays"` vb.) ve erişilebilirlik etiketleri yakalanıp `plays` alanına atandı.
+      - Dinlenme sayısı metninin yanlışlıkla albüm adı sanılması engellendi; browseId kontrolü ile albüm adı ve dinlenme sayısı sütunları ayrıştırıldı.
+    - **2. Albüm Tablo Başlığı ve Sütun Yapısı (`AlbumView.tsx`):**
+      - Tablo düzeni 5 sütunlu Spotify masaüstü standardına uyarlandı: `grid-cols-[40px_minmax(180px,2fr)_minmax(100px,1fr)_84px_60px]`.
+      - Orta sütuna sağa hizalı `DİNLENME SAYISI` (`text-xs font-semibold text-neutral-400 tracking-wider`) başlığı eklendi.
+    - **3. Sayı Formatı & Tipografi:**
+      - Okunabilir Spotify masaüstü formatlayıcısı (`formatPlays`) geliştirildi: Kompakt sayılardan (`"117 Mn dinlenme"`) "dinlenme" / "plays" eki temizlenerek kompakt `117 Mn` formatı sağlandı; tam sayı girdilerinde noktalı format (`142.500.123`) desteklendi.
+      - Dinlenme verisi olmayan şarkılarda boş bırakılarak arayüz hizalamasının kayması önlendi.
+    - **4. Doğrulama:**
+      - `cargo check`, `npx tsc --noEmit` ve `npm run build` ile sıfır hata ve sıfır regresyon doğrulandı.
+
+  - [x] **Aşama 63:** Ayarlar (Settings) Sayfasının Sadeleştirilmesi ve "Hakkında" (About) Bölümü Eklenmesi:
+    - **1. Titlebar Profil Menüsü Güncellemesi (`TitleBar.tsx`):**
+      - Sağ üstteki profil menüsünde yer alan `"Hesap ayarları"` seçeneği doğrudan `"Ayarlar"` olarak güncellendi ve `Settings` ikonu ile standart hale getirildi.
+    - **2. Ayarlar Sol Menü Sekmelerinin Düzenlenmesi (`SettingsView.tsx`, `music.ts`, `App.tsx`):**
+      - Gereksiz `"Pencere"` (Chrome and mini player) ve `"Kısayollar"` (Keyboard bindings) sekmeleri sol menüden ve görünümden tamamen kaldırıldı.
+      - En alta `"Hakkında"` (Sürüm, güncellemeler ve bağlantılar - İkon: `Info`) sekmesi eklendi.
+      - `SettingsTab` tipi `"account" | "appearance" | "playback" | "library" | "about"` olarak merkezi modele taşındı.
+    - **3. Sekme İçeriklerinin Sadeleştirilmesi:**
+      - **Hesap (Account) Sekmesi:** Karmaşık alt bölümler (`HESAPLAR` ve `KANAL`) tamamen temizlendi. Yalnızca üstteki aktif profil kartı (Avatar, Kullanıcı Adı, oturum doğrulama durumu ve "Hesaptan çıkış yap" butonu) korundu; çıkış yapılmışsa sade "Google ile Giriş Yap" butonu sağlandı.
+      - **Görünüm (Appearance) Sekmesi:** Tema kartları kompakt boyutlara çekildi. Mevcut `Light` ve `Dark` seçeneklerinin yanına işletim sistemini gerçek zamanlı takip eden `Sistem (System)` teması (`Monitor` ikonu, `themeMode` desteği) eklendi. Vurgu rengi (Accent Color) seçici/palet bölümü tamamen kaldırıldı.
+    - **4. Yeni "Hakkında" (About) Bölümü:**
+      - **Uygulama Bilgisi:** Tubify marka ikonu, adı ve `@tauri-apps/api/app` üzerinden dinamik okunan mevcut sürüm numarası (`v0.1.0`).
+      - **Güncelleme Kontrolü:** `"Güncellemeleri Denetle"` butonu eklendi. GitHub Releases API (`api.github.com/repos/muratbas/Tubify/releases/latest`) entegrasyonu yapıldı; sürüm kontrolü sonucunda *"En son sürümü kullanıyorsunuz"*, yeni sürüm mevcutsa sürüm etiketi, sürüm notları (changelog) ve harici indirme butonu gösterildi.
+      - **Kaynak Kodu (GitHub):** `"Kaynak Kodu (GitHub)"` kartı eklendi; tıklandığında varsayılan tarayıcıda GitHub deposu açılır (`openExternalUrl`).
+  - [x] **Aşama 64:** Ses Kalitesi Seçimi (Audio Quality Selector - High/Normal/Low):
+    - **1. Rust / Akış Seçici (Stream Selector) & ITAG Mantığı (`stream.rs`, `lib.rs`):**
+      - `get_stream_url(video_id, quality_preference)` komutuna kullanıcının kalite tercihi (`high` | `normal` | `low` | `auto`) bağlandı (`id` ve `video_id` parametrelerinin her ikisi de desteklendi).
+      - `streamingData.adaptiveFormats` dizisi üzerinde ITAG tabanlı filtreleme algoritması kuruldu:
+        - **`high` (Yüksek):** Öncelikli olarak `itag: 251` (Opus ~160kbps), bulunamazsa `itag: 140` (AAC ~128kbps), yedek olarak en yüksek bitrate audio formatı.
+        - **`normal` (Normal):** `itag: 250` (Opus ~70kbps), bulunamazsa 251/140/en yüksek format.
+        - **`low` (Düşük / Veri Tasarrufu):** `itag: 249` (Opus ~50kbps), bulunamazsa 250 veya en düşük bitrate audio formatı.
+        - **`auto` (Varsayılan):** Mevcut en yüksek kullanılabilir ses formatı.
+      - İkincil yt-dlp akış çözücüsü (`resolve_audio_stream_ytdlp`) ve vite dev mock proxy'sine (`/api/stream`) kalite parametresi ve format filtrelemesi entegre edildi.
+      - Çevrimdışı parça indirme mekanizmasına (`downloader.rs`) varsayılan olarak her zaman en yüksek kalite (`Some("high")`) sağlandı.
+    - **2. Ayarlar (Settings) > Çalma Sekmesi Arayüzü (`SettingsView.tsx`, `LanguageContext.tsx`):**
+      - Çalma (Playback) sekmesindeki statik yer tutucu satırı kaldırıldı.
+      - Yerine Spotify/Tubify tasarım standartlarına uygun, açılır seçim menüsü (custom animated dropdown selector) eklendi:
+        - **Başlık:** `"Ses Kalitesi"` (`Streaming Quality`)
+        - **Açıklama:** `"Şarkıların çevrimiçi çalınırken kullanılacak ses kalitesini belirleyin."`
+        - **Seçenekler:**
+          - `Yüksek (Önerilen - ~160 kbps)` (`High (Recommended - ~160 kbps)`)
+          - `Normal (~70 kbps)` (`Normal (~70 kbps)`)
+          - `Düşük / Veri Tasarrufu (~50 kbps)` (`Low / Data Saver (~50 kbps)`)
+      - Dışarı tıklama (click outside) ve `Escape` tuşu ile kapanma dinleyicileri eklendi; açık/koyu mod uyumlu renkler ve onay tiki (`Check`) uygulandı.
+    - **3. Kalıcılık (Storage) & Global Oynatıcı Entegrasyonu (`api.ts`, `PlayerContext.tsx`):**
+      - Seçilen kalite tercihi anında `localStorage` (`tubify_audio_quality`) içine kaydedilir; `getStoredAudioQuality` yardımcı fonksiyonu oluşturuldu.
+      - Kalite değiştiğinde `window.dispatchEvent("tubify:quality-change")` tetiklenerek önbelleğe alınan URL'ler temizlenir ve sıradaki şarkı yeni kalite tercihine göre yeniden ön yüklenir.
+      - Şarkı çalınırken (`playNetworkStream`) ve çift tamponlu sıradaki şarkı ön yüklenirken (`preloadUpcoming`), kalite tercihi backend `get_stream_url` komutuna otomatik parametre olarak aktarılır.
+  - [x] **Aşama 65:** Ses Çıkış Cihazı Seçimi (Audio Output Device Selector - Hoparlör, Kulaklık & Gerçek Donanım Çıkışları):
+    - **1. Web MediaDevices & Sink ID Entegrasyonu (`PlayerContext.tsx`):**
+      - Chromium/WebView2 `HTMLAudioElement.prototype.setSinkId(deviceId)` desteği hem ana oynatıcı (`audioRef`) hem de arka plan ön yükleyicisine (`preloadAudioRef`) entegre edildi.
+      - Başlangıçta kayıtlı cihaz tercihi (`tubify_output_device`) okunarak ses elementine uygulanır.
+      - Dinamik `tubify:output-device-change` olay dinleyicisi eklenerek şarkı durdurulmadan/kesilmeden anlık cihaz yönlendirmesi sağlandı.
+    - **2. Donanım Taraması & Mikrofon İzninin Tamamen Kaldırılması (`SettingsView.tsx`, `LanguageContext.tsx`):**
+      - Web standartlarındaki eski unmasking yöntemlerinden kaynaklanan ve gereksiz mikrofon izni isteme riski oluşturan tüm `getUserMedia` çağrıları kod tabanından tamamen temizlendi ve yasaklandı. Uygulama asla mikrofon erişimi istemez.
+      - Ses çıkış cihazları yalnızca güvenli `navigator.mediaDevices.enumerateDevices()` ve modern W3C `navigator.mediaDevices.selectAudioOutput()` üzerinden taranır; sistemdeki hoparlör ve kulaklık donanımları temiz bir şekilde listelenir.
+      - Açılır menü içerisine doğrudan ses çıkış donanımı seçimi sağlayan `"Sistemden Ses Çıkışı Seç..."` (`selectFromSystem`) ve dinamik `RefreshCw` yeniden tarama butonu eklendi.
+      - Sistem varsayılanı (`Varsayılan (Sistem Varsayılanı)` / `Default (System Default)`) ve tüm donanım çıkışları `Volume2` ikonu, onay tiki (`Check`), dışarı tıklama (`click outside`) ve `Escape` desteğiyle donatıldı.
+  - [x] **Aşama 66:** UI Temizliği, Arayüz Sadeleştirmeleri ve Sayfa Kaydırma Konumu Hafızası (Scroll Restoration):
+    - **1. Searchbar `Ctrl K` Kısayolunun ve Rozetinin Kaldırılması:**
+      - `TitleBar.tsx` içerisindeki `Ctrl K` klavye rozeti (`<kbd>`) ve global `handleGlobalKeyDown` dinleyicisi tamamen temizlendi; arama kutusu sağ iç boşluğu `pr-12`'den dengeli `pr-4`'e çekildi.
+      - `LanguageContext.tsx` içerisindeki İngilizce ve Türkçe arama yer tutucu metinlerinden `(Ctrl+K)` ibaresi kaldırıldı.
+    - **2. Şarkı Sözleri Ekranından "Synced via LRCLIB" Rozetinin Kaldırılması:**
+      - `LyricsView.tsx` sol alt köşesindeki durum noktası ve `Synced • via LRCLIB` / `Plain • via LRCLIB` durum metin bloğu tamamen kaldırılarak sol sütun sadeleştirildi.
+    - **3. Albüm Detay Sayfasındaki "Albüm" Üst Başlığının Kaldırılması:**
+      - `AlbumView.tsx` içerisinde büyük albüm başlığının hemen üzerinde yer alan `ALBÜM` (ve `Disc` ikonu) etiketi kaldırıldı; kullanılmayan `Disc` import'u temizlendi.
+    - **4. Sayfalar Arası Kaydırma Konumunun Korunması (Scroll Restoration):**
+      - `src/utils/scrollRestoration.ts` modülü oluşturularak global `scrollMap = new Map<string, number>()` hafızası kuruldu.
+      - `App.tsx` navigasyon stack'inde her sayfa geçişine benzersiz `historyKey` bağlandı; `navigateTo`, `handleGoBack`, `handleGoForward` ve donanımsal Mouse 4/Mouse 5 tuşlarıyla ayrılmadan hemen önce aktif sayfanın dikey kaydırma konumu (`scrollTop`) hafızaya kaydediliyor.
+      - Tüm görünüm konteynerlerine (`HomeView`, `PlaylistView`, `AlbumView`, `ArtistView`, `SearchView`, `SettingsView`, `DownloadsView`, `LyricsView`) `id="main-scroll-container"` tanımlandı.
+      - Sayfaya geri dönüldüğünde (`historyIndex` / `currentNav.key` değiştiğinde) `restoreScroll` fonksiyonu ile kayıtlı konum anında geri yüklendi; asenkron yüklemeler ve layout gecikmelerine karşı `requestAnimationFrame` stabilizasyonu ve kullanıcı dokunduğunda (`wheel`, `touch`, `pointerdown`) anında iptal eden koruma sağlandı.
+      - Yeni açılan sayfalar en tepeden (`0`), geçmişten geri gelinen sayfalar ise tam olarak kalınan konumdan açılması sağlandı; TitleBar'ın `isScrolled` buzlu cam durumu da eş zamanlı senkronize edildi.
+    - **5. Doğrulama:**
+      - `npx tsc --noEmit` (0 hata) ve `npm run build` (0 hata, 2.75s) ile sıfır regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
+
 

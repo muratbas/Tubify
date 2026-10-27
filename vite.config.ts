@@ -155,6 +155,7 @@ function tubifyDevApiPlugin(): Plugin {
         // 2. Stream Resolution API
         if (url.pathname === "/api/stream") {
           const id = url.searchParams.get("id");
+          const quality = (url.searchParams.get("quality") || "auto").toLowerCase();
           if (!id) {
             res.statusCode = 400;
             res.setHeader("Content-Type", "application/json");
@@ -169,9 +170,16 @@ function tubifyDevApiPlugin(): Plugin {
           ];
           const ytdlp = candidates.find((c) => fs.existsSync(c)) || "yt-dlp";
 
+          let formatSelector = "251/140/ba/b";
+          if (quality === "normal") {
+            formatSelector = "250/251/140/ba/b";
+          } else if (quality === "low") {
+            formatSelector = "249/250/ba/b";
+          }
+
           execFile(
             ytdlp,
-            ["-j", "--no-playlist", "-f", "ba/b", `https://www.youtube.com/watch?v=${id}`],
+            ["-j", "--no-playlist", "-f", formatSelector, `https://www.youtube.com/watch?v=${id}`],
             { maxBuffer: 10 * 1024 * 1024 },
             (err, stdout) => {
               if (err) {
@@ -183,23 +191,51 @@ function tubifyDevApiPlugin(): Plugin {
               try {
                 const info = JSON.parse(stdout);
                 let streamUrl = info.url;
-                if (!streamUrl && info.formats) {
-                  const a = info.formats
-                    .slice()
-                    .reverse()
-                    .find(
-                      (f: { vcodec?: string; resolution?: string; url?: string }) =>
-                        f.vcodec === "none" || f.resolution === "audio only"
-                    );
-                  if (a) streamUrl = a.url;
+                let selectedFormat = info.format_id;
+                let selectedBitrate = info.abr;
+
+                if (info.formats && Array.isArray(info.formats)) {
+                  const audioFormats = info.formats.filter(
+                    (f: any) =>
+                      (f.vcodec === "none" || f.resolution === "audio only") && Boolean(f.url)
+                  );
+                  let matched: any = null;
+                  if (quality === "high") {
+                    matched =
+                      audioFormats.find((f: any) => f.format_id === "251") ||
+                      audioFormats.find((f: any) => f.format_id === "140");
+                  } else if (quality === "normal") {
+                    matched =
+                      audioFormats.find((f: any) => f.format_id === "250") ||
+                      audioFormats.find((f: any) => f.format_id === "251");
+                  } else if (quality === "low") {
+                    matched =
+                      audioFormats.find((f: any) => f.format_id === "249") ||
+                      audioFormats.find((f: any) => f.format_id === "250");
+                  } else {
+                    matched = audioFormats.find((f: any) => f.format_id === "251");
+                  }
+
+                  if (matched) {
+                    streamUrl = matched.url;
+                    selectedFormat = matched.format_id;
+                    selectedBitrate = matched.abr;
+                  } else if (!streamUrl && audioFormats.length > 0) {
+                    const fallback = audioFormats[audioFormats.length - 1];
+                    streamUrl = fallback.url;
+                    selectedFormat = fallback.format_id;
+                    selectedBitrate = fallback.abr;
+                  }
                 }
+
                 res.setHeader("Content-Type", "application/json");
                 res.end(
                   JSON.stringify({
                     url: streamUrl,
                     title: info.title,
                     duration: info.duration,
-                    format: info.format_id,
+                    format: selectedFormat,
+                    bitrate: selectedBitrate,
                     headers: info.http_headers,
                   })
                 );

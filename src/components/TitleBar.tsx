@@ -17,7 +17,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useDownload } from "../context/DownloadContext";
 import { DownloadsPopover } from "./DownloadsPopover";
-import type { UserProfile } from "../types/music";
+import type { UserProfile, SettingsTab } from "../types/music";
 
 interface TitleBarProps {
   searchQuery: string;
@@ -27,7 +27,7 @@ interface TitleBarProps {
   currentView: "home" | "playlist" | "search" | "settings" | "artist" | "album" | "lyrics" | "downloads";
   currentTabTitle?: string;
   onOpenLogin: () => void;
-  onOpenSettings: (tab?: "account" | "appearance" | "playback" | "library" | "window" | "shortcuts") => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   onNavigateHome: () => void;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;
@@ -68,18 +68,6 @@ export const TitleBar: FC<TitleBarProps> = ({
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Global Ctrl+K / Cmd+K listener
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }
-    };
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
 
   // Close avatar dropdown on outside click
   useEffect(() => {
@@ -185,21 +173,12 @@ export const TitleBar: FC<TitleBarProps> = ({
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ne çalmak istersiniz?"
-            className={`w-full h-8 pl-9 pr-12 rounded-full text-sm font-medium transition-all outline-none border shadow-sm ${
+            className={`w-full h-8 pl-9 pr-4 rounded-full text-sm font-medium transition-all outline-none border shadow-sm ${
               isLight
                 ? "bg-white text-neutral-900 placeholder-neutral-500 border-neutral-200/80 focus:border-neutral-400"
                 : "bg-[#242424] text-white placeholder-neutral-400 border-transparent focus:border-white/20"
             }`}
           />
-          <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center pointer-events-none">
-            <kbd
-              className={`px-1.5 py-0.2 text-[10px] font-mono font-medium rounded ${
-                isLight ? "bg-neutral-100 text-neutral-500" : "bg-white/10 text-white/40"
-              }`}
-            >
-              Ctrl K
-            </kbd>
-          </div>
         </div>
       </div>
 
@@ -302,14 +281,14 @@ export const TitleBar: FC<TitleBarProps> = ({
                   <button
                     onClick={() => {
                       setIsAvatarMenuOpen(false);
-                      onOpenSettings("account");
+                      onOpenSettings();
                     }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
                     }`}
                   >
                     <Settings className="w-4 h-4 text-neutral-500" />
-                    <span>{t.accountSettings}</span>
+                    <span>{t.settings}</span>
                   </button>
                 </div>
               )}
