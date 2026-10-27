@@ -155,3 +155,12 @@ export interface ActiveDownload {
   status: "downloading" | "cancelling" | "completed" | "error";
 }
 
+export interface RecentSearchItem {
+  id: string; // videoId, browseId, playlistId vb.
+  type: "song" | "artist" | "album" | "playlist";
+  title: string;
+  subtitle?: string; // Sanatçı adı veya "Sanatçı", "Albüm" etiketi
+  thumbnailUrl: string;
+  timestamp: number;
+}
+

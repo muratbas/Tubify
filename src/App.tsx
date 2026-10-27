@@ -827,14 +827,6 @@ export const App: FC = () => {
     setSearchError(null);
     navigateTo({ type: "search", query: q });
 
-    // Save to recent searches
-    try {
-      const saved = localStorage.getItem("tubify_recent_searches");
-      const list: string[] = saved ? JSON.parse(saved) : [];
-      const updated = [q, ...list.filter((s) => s.toLowerCase() !== q.toLowerCase())].slice(0, 10);
-      localStorage.setItem("tubify_recent_searches", JSON.stringify(updated));
-    } catch {}
-
     try {
       const results = await searchMusic(q);
       setSearchResults(results);

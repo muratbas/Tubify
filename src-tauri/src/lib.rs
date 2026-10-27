@@ -180,7 +180,12 @@ fn toggle_maximize_window(window: tauri::Window) {
 }
 
 #[tauri::command]
-fn close_window(window: tauri::Window) {
+fn close_window(app: AppHandle, window: tauri::Window) {
+    use tauri_plugin_window_state::AppHandleExt;
+    let _ = app.save_window_state(
+        tauri_plugin_window_state::StateFlags::all()
+            & !tauri_plugin_window_state::StateFlags::VISIBLE,
+    );
     let _ = window.close();
 }
 
@@ -195,6 +200,15 @@ pub fn run() {
             downloader::handle_uri_scheme(app, req, resp);
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .with_filter(|label| label == "main")
+                .build(),
+        )
         .setup(media::setup_system_tray_and_media)
         .invoke_handler(tauri::generate_handler![
             search_music,

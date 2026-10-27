@@ -176,6 +176,11 @@ pub fn setup_system_tray_and_media(app: &mut tauri::App) -> Result<(), Box<dyn s
                     }
                 }
                 "quit" => {
+                    use tauri_plugin_window_state::AppHandleExt;
+                    let _ = app.save_window_state(
+                        tauri_plugin_window_state::StateFlags::all()
+                            & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                    );
                     app.exit(0);
                 }
                 _ => {}

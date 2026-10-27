@@ -6,7 +6,6 @@ import {
   Heart,
   MoreHorizontal,
   Loader2,
-  Search,
   X,
   Disc,
   Mic2,
@@ -20,7 +19,8 @@ import { useLanguage } from "../context/LanguageContext";
 import { useDownload } from "../context/DownloadContext";
 import { MicroVisualizer } from "./MicroVisualizer";
 import { getOptimizedThumbnail } from "./HomeView";
-import type { Track, Playlist } from "../types/music";
+import type { Track, Playlist, RecentSearchItem } from "../types/music";
+export type { RecentSearchItem };
 
 export type SearchCategory = "all" | "songs" | "artists" | "albums" | "playlists" | "podcasts";
 
@@ -167,10 +167,18 @@ export const SearchView: FC<SearchViewProps> = ({
   const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
   const [activeCategory, setActiveCategory] = useState<SearchCategory>("all");
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(() => {
     try {
       const saved = localStorage.getItem("tubify_recent_searches");
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (x): x is RecentSearchItem =>
+            typeof x === "object" && x !== null && "id" in x && "type" in x && "title" in x
+        );
+      }
+      return [];
     } catch {
       return [];
     }
@@ -180,7 +188,21 @@ export const SearchView: FC<SearchViewProps> = ({
   const refreshRecentSearches = () => {
     try {
       const saved = localStorage.getItem("tubify_recent_searches");
-      setRecentSearches(saved ? JSON.parse(saved) : []);
+      if (!saved) {
+        setRecentSearches([]);
+        return;
+      }
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setRecentSearches(
+          parsed.filter(
+            (x): x is RecentSearchItem =>
+              typeof x === "object" && x !== null && "id" in x && "type" in x && "title" in x
+          )
+        );
+      } else {
+        setRecentSearches([]);
+      }
     } catch {
       setRecentSearches([]);
     }
@@ -190,6 +212,33 @@ export const SearchView: FC<SearchViewProps> = ({
     refreshRecentSearches();
   }, [query]);
 
+  const recordRecentItem = (item: Omit<RecentSearchItem, "timestamp">) => {
+    try {
+      const saved = localStorage.getItem("tubify_recent_searches");
+      let list: RecentSearchItem[] = [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          list = parsed.filter(
+            (x): x is RecentSearchItem =>
+              typeof x === "object" && x !== null && "id" in x && "type" in x && "title" in x
+          );
+        }
+      }
+      const newItem: RecentSearchItem = {
+        ...item,
+        timestamp: Date.now(),
+      };
+      // Eğer aynı öğe (id) listede zaten varsa, önceki kopyası silinip en başa taşınsın (tekrar eden öğe olmasın).
+      // Liste en fazla 10-12 öğe ile sınırlandırılsın (slice(0, 12)).
+      const updated = [newItem, ...list.filter((x) => x.id !== item.id)].slice(0, 12);
+      localStorage.setItem("tubify_recent_searches", JSON.stringify(updated));
+      setRecentSearches(updated);
+    } catch (err) {
+      console.error("Failed to update recent searches:", err);
+    }
+  };
+
   const handleClearRecentSearches = () => {
     try {
       localStorage.removeItem("tubify_recent_searches");
@@ -197,13 +246,97 @@ export const SearchView: FC<SearchViewProps> = ({
     } catch {}
   };
 
-  const handleRemoveRecentSearch = (e: React.MouseEvent, item: string) => {
+  const handleRemoveRecentSearch = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      const updated = recentSearches.filter((s) => s !== item);
+      const updated = recentSearches.filter((s) => s.id !== id);
       localStorage.setItem("tubify_recent_searches", JSON.stringify(updated));
       setRecentSearches(updated);
     } catch {}
+  };
+
+  const handleTrackClick = (track: Track, queue?: Track[]) => {
+    recordRecentItem({
+      id: track.id,
+      type: "song",
+      title: track.title,
+      subtitle: track.artist,
+      thumbnailUrl: track.thumbnail || "",
+    });
+    onPlayTrack(track, queue);
+  };
+
+  const handleArtistClick = (artistId: string, artistName: string, thumbnail?: string) => {
+    recordRecentItem({
+      id: artistId,
+      type: "artist",
+      title: artistName,
+      subtitle: "Sanatçı",
+      thumbnailUrl: thumbnail || "",
+    });
+    onNavigateArtist(artistId, artistName, thumbnail);
+  };
+
+  const handleAlbumClick = (albumId: string, albumTitle?: string, artistName?: string, thumbnail?: string) => {
+    recordRecentItem({
+      id: albumId,
+      type: "album",
+      title: albumTitle || "Albüm",
+      subtitle: artistName || "Albüm",
+      thumbnailUrl: thumbnail || "",
+    });
+    onNavigateAlbum(albumId, albumTitle, artistName, thumbnail);
+  };
+
+  const handlePlaylistClick = (playlist: Playlist) => {
+    recordRecentItem({
+      id: playlist.id,
+      type: "playlist",
+      title: playlist.title,
+      subtitle: playlist.track_count || "Çalma listesi",
+      thumbnailUrl: playlist.thumbnail || "",
+    });
+    onSelectPlaylist(playlist);
+  };
+
+  const handleRecentItemClick = (item: RecentSearchItem) => {
+    recordRecentItem({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      subtitle: item.subtitle,
+      thumbnailUrl: item.thumbnailUrl,
+    });
+
+    switch (item.type) {
+      case "song": {
+        const track: Track = {
+          id: item.id,
+          title: item.title,
+          artist: item.subtitle || "",
+          thumbnail: item.thumbnailUrl || null,
+        };
+        onPlayTrack(track);
+        break;
+      }
+      case "artist": {
+        onNavigateArtist(item.id, item.title, item.thumbnailUrl);
+        break;
+      }
+      case "album": {
+        onNavigateAlbum(item.id, item.title, item.subtitle, item.thumbnailUrl);
+        break;
+      }
+      case "playlist": {
+        onSelectPlaylist({
+          id: item.id,
+          title: item.title,
+          thumbnail: item.thumbnailUrl,
+          description: item.subtitle,
+        });
+        break;
+      }
+    }
   };
 
   // Derive unique artists from search results
@@ -367,39 +500,102 @@ export const SearchView: FC<SearchViewProps> = ({
       {/* EMPTY SEARCH STATE (User hasn't searched yet or query is empty) */}
       {!isSearching && !hasQuery && (
         <div className="space-y-8 animate-in fade-in duration-300">
-          {/* Son Aramalar (Recent Searches) */}
+          {/* Son Aramalar (Recent Searches - Entity Cards) */}
           {recentSearches.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
                   Son aramalar
                 </h3>
                 <button
                   onClick={handleClearRecentSearches}
                   className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
                 >
-                  Tümünü temizle
+                  Hepsini temizle
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {recentSearches.map((item, idx) => (
-                  <div
-                    key={`recent-${idx}`}
-                    onClick={() => onSelectQuery(item)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 text-xs font-medium cursor-pointer group transition-colors"
-                  >
-                    <Search className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200" />
-                    <span>{item}</span>
-                    <button
-                      onClick={(e) => handleRemoveRecentSearch(e, item)}
-                      className="p-0.5 rounded-full hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors ml-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-white"
-                      title="Kaldır"
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {recentSearches.map((item) => {
+                  const isArtist = item.type === "artist";
+                  const isSong = item.type === "song";
+                  const isActive = isSong && activeTrack?.id === item.id;
+                  const isCurrentPlaying = isActive && isPlaying;
+
+                  return (
+                    <div
+                      key={`recent-card-${item.id}`}
+                      onClick={() => handleRecentItemClick(item)}
+                      className="group relative p-3.5 rounded-2xl bg-neutral-100/70 hover:bg-neutral-200/60 dark:bg-neutral-800/40 dark:hover:bg-neutral-800/80 transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-sm select-none"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                      {/* Silme (X) Butonu: Sağ üst köşede, hover:opacity-100 */}
+                      <button
+                        onClick={(e) => handleRemoveRecentSearch(e, item.id)}
+                        className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md cursor-pointer"
+                        title="Kaldır"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Görsel Alanı */}
+                      <div className="relative mb-3">
+                        <div
+                          className={`w-full aspect-square overflow-hidden bg-neutral-200 dark:bg-neutral-800 shadow-sm ${
+                            isArtist ? "rounded-full mx-auto" : "rounded-xl"
+                          }`}
+                        >
+                          <SearchImage
+                            src={item.thumbnailUrl}
+                            alt={item.title}
+                            iconSize="md"
+                            isPlaylist={item.type === "playlist"}
+                          />
+                        </div>
+
+                        {/* Hover Oynat Butonu */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRecentItemClick(item);
+                          }}
+                          className={`absolute ${
+                            isArtist ? "right-2 bottom-1" : "right-2.5 bottom-2.5"
+                          } w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer z-10`}
+                          title={isCurrentPlaying ? "Duraklat" : "Oynat"}
+                        >
+                          {isCurrentPlaying ? (
+                            <Pause className="w-4 h-4 fill-white text-white" />
+                          ) : (
+                            <Play className="w-4 h-4 fill-white text-white ml-0.5" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Başlık ve Alt Başlık */}
+                      <div className={isArtist ? "text-center" : "text-left"}>
+                        <p
+                          className={`font-semibold text-sm truncate ${
+                            isActive
+                              ? "text-[#ff0000]"
+                              : "text-neutral-900 dark:text-white"
+                          }`}
+                        >
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                          {isArtist
+                            ? "Sanatçı"
+                            : item.subtitle ||
+                              (item.type === "album"
+                                ? "Albüm"
+                                : item.type === "playlist"
+                                ? "Çalma listesi"
+                                : "Şarkı")}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -466,9 +662,9 @@ export const SearchView: FC<SearchViewProps> = ({
                     <div
                       onClick={() => {
                         if (topResult.type === "artist") {
-                          onNavigateArtist(topResult.id, topResult.name, topResult.thumbnail || undefined);
+                          handleArtistClick(topResult.id, topResult.name, topResult.thumbnail || undefined);
                         } else {
-                          onPlayTrack(topResult.track, searchResults);
+                          handleTrackClick(topResult.track, searchResults);
                         }
                       }}
                       className="flex-1 bg-neutral-100/70 hover:bg-neutral-200/60 dark:bg-neutral-800/50 p-5 rounded-2xl cursor-pointer group relative transition-all duration-200 flex flex-col justify-between shadow-sm"
@@ -509,9 +705,9 @@ export const SearchView: FC<SearchViewProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           if (topResult.type === "artist") {
-                            onNavigateArtist(topResult.id, topResult.name, topResult.thumbnail || undefined);
+                            handleArtistClick(topResult.id, topResult.name, topResult.thumbnail || undefined);
                           } else {
-                            onPlayTrack(topResult.track, searchResults);
+                            handleTrackClick(topResult.track, searchResults);
                           }
                         }}
                         className="w-12 h-12 rounded-full bg-[#ff0000] text-white shadow-xl shadow-red-500/30 flex items-center justify-center absolute bottom-5 right-5 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
@@ -540,7 +736,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       return (
                         <div
                           key={`top-song-${track.id}`}
-                          onClick={() => onPlayTrack(track, searchResults)}
+                          onClick={() => handleTrackClick(track, searchResults)}
                           onContextMenu={(e) => onContextMenuTrack?.(track, e)}
                           className={`flex items-center justify-between p-2 rounded-xl group cursor-pointer transition-colors ${
                             isActive
@@ -592,7 +788,7 @@ export const SearchView: FC<SearchViewProps> = ({
                               <p
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onNavigateArtist(
+                                  handleArtistClick(
                                     track.artist_id || track.artist,
                                     track.artist,
                                     track.thumbnail || undefined
@@ -694,7 +890,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       <div
                         key={`shelf-artist-${artist.id}`}
                         onClick={() =>
-                          onNavigateArtist(artist.id, artist.name, artist.thumbnail)
+                          handleArtistClick(artist.id, artist.name, artist.thumbnail)
                         }
                         className="w-36 shrink-0 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all"
                       >
@@ -733,7 +929,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       <div
                         key={`shelf-album-${album.id}`}
                         onClick={() =>
-                          onNavigateAlbum(album.id, album.title, album.artist, album.thumbnail)
+                          handleAlbumClick(album.id, album.title, album.artist, album.thumbnail)
                         }
                         className="w-40 shrink-0 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all"
                       >
@@ -771,7 +967,7 @@ export const SearchView: FC<SearchViewProps> = ({
                     {matchingPlaylists.map((playlist) => (
                       <div
                         key={`shelf-playlist-${playlist.id}`}
-                        onClick={() => onSelectPlaylist(playlist)}
+                        onClick={() => handlePlaylistClick(playlist)}
                         className="w-40 shrink-0 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all"
                       >
                         <div className="relative aspect-square w-36 rounded-xl overflow-hidden shadow-md bg-neutral-200 dark:bg-neutral-800 mb-3">
@@ -814,7 +1010,7 @@ export const SearchView: FC<SearchViewProps> = ({
                 return (
                   <div
                     key={`song-full-${track.id}-${idx}`}
-                    onClick={() => onPlayTrack(track, searchResults)}
+                    onClick={() => handleTrackClick(track, searchResults)}
                     onContextMenu={(e) => onContextMenuTrack?.(track, e)}
                     className={`flex items-center justify-between p-2.5 rounded-xl group cursor-pointer transition-colors ${
                       isActive
@@ -869,7 +1065,7 @@ export const SearchView: FC<SearchViewProps> = ({
                         <p
                           onClick={(e) => {
                             e.stopPropagation();
-                            onNavigateArtist(
+                            handleArtistClick(
                               track.artist_id || track.artist,
                               track.artist,
                               track.thumbnail || undefined
@@ -887,7 +1083,7 @@ export const SearchView: FC<SearchViewProps> = ({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            onNavigateAlbum(
+                            handleAlbumClick(
                               track.album_id || `album-${track.album}`,
                               track.album || undefined,
                               track.artist,
@@ -987,7 +1183,7 @@ export const SearchView: FC<SearchViewProps> = ({
                   <div
                     key={`artist-grid-${artist.id}`}
                     onClick={() =>
-                      onNavigateArtist(artist.id, artist.name, artist.thumbnail)
+                      handleArtistClick(artist.id, artist.name, artist.thumbnail)
                     }
                     className="p-4 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all flex flex-col items-center"
                   >
@@ -1026,7 +1222,7 @@ export const SearchView: FC<SearchViewProps> = ({
                   <div
                     key={`album-grid-${album.id}`}
                     onClick={() =>
-                      onNavigateAlbum(album.id, album.title, album.artist, album.thumbnail)
+                      handleAlbumClick(album.id, album.title, album.artist, album.thumbnail)
                     }
                     className="p-3.5 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all"
                   >
@@ -1064,7 +1260,7 @@ export const SearchView: FC<SearchViewProps> = ({
                 {matchingPlaylists.map((playlist) => (
                   <div
                     key={`playlist-grid-${playlist.id}`}
-                    onClick={() => onSelectPlaylist(playlist)}
+                    onClick={() => handlePlaylistClick(playlist)}
                     className="p-3.5 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800/50 cursor-pointer group transition-all"
                   >
                     <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-md bg-neutral-200 dark:bg-neutral-800 mb-3">

@@ -717,8 +717,31 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - YouTube Music InnerTube `/youtubei/v1/account/account_menu` endpoint'i üzerinden kullanıcının gerçek Google profil fotoğrafı (`activeAccountHeaderRenderer.accountPhoto.thumbnails`), kullanıcı adı (`accountName`) ve kanal kullanıcı adı (`channelHandle`) ayrıştırıldı.
       - Eski ana sayfa arkaplan banner'ını (`=w1500-h844-`) avatar sanan mantık ve "Google Hesabım" varsayılanı temizlendi.
       - `load_saved_session` ve `verify_and_save_cookie` fonksiyonları otomatik senkronize edilerek oturum açıldığında veya başlangıçta kullanıcının gerçek Google avatarının titlebar'da, hesap menüsünde ve ayarlar sayfasında net biçimde gösterilmesi sağlandı.
+  - [x] **Aşama 60:** Pencere Durumunu Hafızada Tutma (Window State Persistence):
+    - **1. Resmi `tauri-plugin-window-state` (v2.5.0) Entegrasyonu:**
+      - `src-tauri/Cargo.toml` içerisine `tauri-plugin-window-state = "2.5.0"` eklendi.
+      - `src-tauri/capabilities/default.json` içerisine `"window-state:default"` yetkisi tanımlandı.
+    - **2. Otomatik Kaydetme ve Geri Yükleme Yapılandırması (`src-tauri/src/lib.rs`):**
+      - `tauri::Builder` zincirine `tauri_plugin_window_state::Builder::default()` kaydedildi.
+      - `.with_filter(|label| label == "main")` filtresi ile yalnızca ana uygulamanın durumunun kaydedilmesi, geçici login webview'lerinin (`google_login_window`) filtrelenmesi sağlandı.
+      - `.with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)` kullanılarak pencere genişliği (width), yüksekliği (height), konumu (X, Y), büyütülmüş (isMaximized) ve tam ekran durumları kayıt altına alındı; uygulamanın simge durumunda kapatılması halinde bir sonraki açılışta görünmez başlamasını önlemek amacıyla `VISIBLE` bayrağı devre dışı bırakıldı.
+    - **3. Manuel Kapatma ve Tray Çıkış Güvencesi (`lib.rs`, `media.rs`):**
+      - Özel TitleBar kapatma butonunda (`close_window`) ve sistem tepsisi menüsündeki "Kapat" eyleminde (`media.rs` quit event), uygulama sonlandırılmadan hemen önce `app.save_window_state` çağrılarak anlık koordinat ve boyut verilerinin diske yazılması garanti altına alındı.
+  - [x] **Aşama 61:** Son Aramalar (Recent Searches) Sistemini Metin Yerine Tıklanan Kartlara (Entity Cards) Dönüştürme:
+    - **1. Veri Yapısı & Yerel Saklama (`RecentSearchItem`):**
+      - `src/types/music.ts` içerisine `RecentSearchItem` (`id`, `type: 'song' | 'artist' | 'album' | 'playlist'`, `title`, `subtitle?`, `thumbnailUrl`, `timestamp`) arayüzü tanımlandı.
+      - `App.tsx` içerisindeki düz metin tabanlı arama sorgusu kaydetme mantığı kaldırıldı.
+      - Arama sonuçlarında bir şarkıya tıklandığında/oynatıldığında, bir sanatçı profiline girildiğinde, albüme veya çalma listesine tıklandığında ilgili varlık `recentSearches` dizisinin en başına (`unshift`) eklenir; tekrar eden ID varsa önceki kopyası silinip en başa taşınır; liste maksimum 12 öğe ile sınırlandırılır (`slice(0, 12)`).
+      - Eski oturumlardan kalan düz string geçmişi tespit edilerek `localStorage`'dan güvenle filtreleyen koruma mekanizması eklendi.
+    - **2. Boş Durum (Empty State) Zengin Varlık Kartları Izgarası (`SearchView.tsx`):**
+      - Arama kutusu boşken (`searchQuery.trim() === ''`) metin hapları yerine Spotify masaüstü tarzı responsive kart ızgarası (`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4`) listelenir.
+      - Başlık alanında sol tarafta "Son aramalar" (`text-xl font-bold`), sağ tarafta "Hepsini temizle" (`text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer`) butonu konumlandırıldı.
+      - Sanatçı kartları: Yuvarlak avatar (`rounded-full`), ortalanmış başlık, altında "Sanatçı" etiketi.
+      - Şarkı / Albüm / Çalma listesi kartları: Yuvarlatılmış kare kapak (`rounded-xl`), başlık ve altında sanatçı adı / alt başlık.
+      - Silme (X) Butonu: Her kartın sağ üst köşesinde hover ile beliren (`opacity-0 group-hover:opacity-100 transition-opacity`), tıklamayı durduran (`e.stopPropagation()`) ve yalnızca o öğeyi geçmişten çıkaran dairesel buton eklendi.
+      - Hover Oynat Butonu: Kartın üzerine gelindiğinde beliren dairesel kırmızı Play/Pause butonu; tıklandığında şarkıyı anında oynatır veya profiline/sayfasına yönlendirir.
     - **3. Doğrulama:**
-      - `cargo check` ve `npx tsc --noEmit` ile sıfır hata ve sıfır regresyon doğrulandı.
+      - `npx tsc --noEmit` ve `npm run build` ile sıfır hata ve sıfır regresyon doğrulandı.
 
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
