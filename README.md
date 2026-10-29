@@ -17,9 +17,7 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/img/zuno-d1-1.2.PNG" />
-    <source media="(prefers-color-scheme: light)" srcset="assets/img/zuno-l4-1.2.PNG" />
-    <img src="assets/img/zuno-d1-1.2.PNG" alt="Tubify home view" width="900" />
+    <img src="public/img/anamenu.png" alt="Tubify home view" width="900" />
   </picture>
 </p>
 
@@ -45,8 +43,8 @@ If you find it useful, **starring the repo** genuinely helps.
     <td width="50%"><b>Artist & Album Pages</b></td>
   </tr>
   <tr>
-    <td><img src="assets/img/zuno-d-1.2.PNG" alt="Library with smart caching" /></td>
-    <td><img src="assets/img/zuno-d4-1.2.PNG" alt="An artist page showing popular songs and releases" /></td>
+    <td><img src="public/img/search.png" alt="Library with smart caching" /></td>
+    <td><img src="public/img/artispage.png" alt="An artist page showing popular songs and releases" /></td>
   </tr>
   <tr>
     <td><sub>Playlists load instantly via stale-while-revalidate background caching.</sub></td>
@@ -60,8 +58,8 @@ If you find it useful, **starring the repo** genuinely helps.
     <td width="50%"><b>Entity-Based Search History</b></td>
   </tr>
   <tr>
-    <td><img src="assets/img/zuno-d3-1.2.PNG" alt="The queue panel open beside the home view" /></td>
-    <td><img src="assets/img/zuno-l5-1.2.PNG" alt="Entity based recent searches" /></td>
+    <td><img src="public/img/liked.png" alt="The queue panel open beside the home view" /></td>
+    <td><img src="public/img/search.png" alt="Entity based recent searches" /></td>
   </tr>
   <tr>
     <td><sub>Seamless track transitions with custom audio quality selectors.</sub></td>
@@ -70,9 +68,9 @@ If you find it useful, **starring the repo** genuinely helps.
 </table>
 
 <p align="center">
-  <img src="assets/img/zuno-set-1.2.PNG" alt="Tubify settings" width="860" />
+  <img src="public/img/lyrics.png" alt="Tubify settings" width="860" />
   <br />
-  <sub>Settings — Discord RPC, audio quality, offline cache paths, and auto-updater.</sub>
+  <sub>Lyrics</sub>
 </p>
 
 <br />
