@@ -11,6 +11,18 @@ build/
 !.env.example
 *.key
 src-tauri/*.key
+src-tauri/tubify_session.json
+*session*.json
+
+# Documentation, Agent Memories & Status
+docs/
+AGENTS.md
+STATUS.md
+.agents/
+skills-lock.json
+
+# Build Caches
+*.tsbuildinfo
 
 # Logs
 logs/

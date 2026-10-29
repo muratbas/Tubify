@@ -9,6 +9,7 @@ import { Music2, Mic, RotateCw, X, Sparkles } from "lucide-react";
 import type { Track, LyricsData, LyricLine } from "../types/music";
 import { fetchLyrics } from "../services/lyrics";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { getOptimizedThumbnail } from "./HomeView";
 
 interface LyricsViewProps {
@@ -29,6 +30,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
   const [lyricsData, setLyricsData] = useState<LyricsData | null>(null);
@@ -222,9 +224,9 @@ export const LyricsView: FC<LyricsViewProps> = ({
           {/* Şarkı Adı */}
           <h2
             className="font-bold text-lg text-neutral-950 dark:text-white leading-snug line-clamp-2"
-            title={activeTrack?.title || "Bilinmeyen Şarkı"}
+            title={activeTrack?.title || t.unknownTrack}
           >
-            {activeTrack?.title || "Çalan Şarkı Yok"}
+            {activeTrack?.title || t.noPlayingTrack}
           </h2>
 
           {/* Sanatçı Adı */}
@@ -252,10 +254,10 @@ export const LyricsView: FC<LyricsViewProps> = ({
           <div className="flex-1 flex flex-col items-center justify-center text-center my-auto">
             <Music2 className="w-14 h-14 text-neutral-300 dark:text-neutral-700 mb-4 stroke-[1.25]" />
             <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mb-1">
-              Çalan Şarkı Yok
+              {t.noPlayingTrack}
             </h3>
             <p className="text-sm text-neutral-400 max-w-xs">
-              Şarkı sözlerini görüntülemek için bir parça başlatın.
+              {t.playTrackToSeeLyrics}
             </p>
           </div>
         )}
@@ -265,7 +267,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
           <div className="flex-1 flex flex-col items-center justify-center my-auto">
             <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-3" />
             <span className="text-xs font-medium text-neutral-400">
-              Sözler aranıyor...
+              {t.searchingLyrics}
             </span>
           </div>
         )}
@@ -277,7 +279,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
               <Mic className="w-7 h-7 stroke-[1.5]" />
             </div>
             <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mb-4">
-              Şarkı sözü bulunamadı
+              {t.lyricsNotAvailable}
             </h3>
             <button
               onClick={loadLyrics}
@@ -288,7 +290,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
               }`}
             >
               <RotateCw className="w-3.5 h-3.5" />
-              Tekrar Dene
+              {t.tryAgain}
             </button>
           </div>
         )}
@@ -344,7 +346,7 @@ export const LyricsView: FC<LyricsViewProps> = ({
           <div className="flex flex-col max-w-2xl pb-32 animate-in fade-in duration-300">
             <div className="flex items-center gap-2 mb-6 text-xs text-neutral-400">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Zaman damgalı sözler bulunamadı, düz metin gösteriliyor</span>
+              <span>{t.plainLyricsFallback}</span>
             </div>
             <div className="text-xl md:text-2xl font-medium leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-line select-text">
               {lyricsData.plainLyrics}

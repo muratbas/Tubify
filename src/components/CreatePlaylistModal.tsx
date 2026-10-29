@@ -1,6 +1,7 @@
 import { useState, useEffect, type FC, type FormEvent } from "react";
 import { X, Globe, Lock, EyeOff, ListPlus, Loader2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export type PrivacyStatus = "PUBLIC" | "UNLISTED" | "PRIVATE";
 
@@ -20,6 +21,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
   onCreate,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
   const [title, setTitle] = useState("");
@@ -62,7 +64,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
       await onCreate(cleanTitle, description.trim() || undefined, privacyStatus);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Çalma listesi oluşturulamadı");
+      setError(err instanceof Error ? err.message : t.playlistCreateFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -90,7 +92,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
               <ListPlus className="w-4 h-4" />
             </div>
             <h3 className="text-base font-bold tracking-tight">
-              Yeni Çalma Listesi Oluştur
+              {t.createNewPlaylist}
             </h3>
           </div>
           <button
@@ -117,7 +119,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold mb-1 text-neutral-500 dark:text-neutral-400">
-              Başlık <span className="text-[#ff0000]">*</span>
+              {t.titleLabel} <span className="text-[#ff0000]">*</span>
             </label>
             <input
               type="text"
@@ -126,7 +128,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
               disabled={isSubmitting}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Çalma listenize bir isim verin"
+              placeholder={t.playlistNamePlaceholder}
               className={`w-full px-3.5 py-2.5 text-xs rounded-xl font-medium outline-none transition-all ${
                 isLight
                   ? "bg-neutral-50 border border-neutral-300 focus:border-[#ff0000] focus:bg-white text-neutral-900"
@@ -137,14 +139,14 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold mb-1 text-neutral-500 dark:text-neutral-400">
-              Açıklama (İsteğe bağlı)
+              {t.descriptionLabel}
             </label>
             <textarea
               rows={2}
               disabled={isSubmitting}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Çalma listeniz hakkında bir şeyler yazın"
+              placeholder={t.descriptionPlaceholder}
               className={`w-full px-3.5 py-2.5 text-xs rounded-xl font-medium outline-none resize-none transition-all ${
                 isLight
                   ? "bg-neutral-50 border border-neutral-300 focus:border-[#ff0000] focus:bg-white text-neutral-900"
@@ -155,7 +157,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold mb-1.5 text-neutral-500 dark:text-neutral-400">
-              Gizlilik
+              {t.privacyLabel}
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -173,7 +175,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
                 }`}
               >
                 <Globe className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Herkese Açık</span>
+                <span className="text-[11px]">{t.privacyPublic}</span>
               </button>
 
               <button
@@ -191,7 +193,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
                 }`}
               >
                 <EyeOff className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Liste Dışı</span>
+                <span className="text-[11px]">{t.privacyUnlisted}</span>
               </button>
 
               <button
@@ -209,13 +211,13 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
                 }`}
               >
                 <Lock className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Özel</span>
+                <span className="text-[11px]">{t.privacyPrivate}</span>
               </button>
             </div>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1.5 px-0.5">
-              {privacyStatus === "PUBLIC" && "Herkes arayabilir ve görüntüleyebilir."}
-              {privacyStatus === "UNLISTED" && "Yalnızca bağlantıya sahip olanlar görüntüleyebilir."}
-              {privacyStatus === "PRIVATE" && "Yalnızca siz görüntüleyebilirsiniz."}
+              {privacyStatus === "PUBLIC" && t.privacyPublicDesc}
+              {privacyStatus === "UNLISTED" && t.privacyUnlistedDesc}
+              {privacyStatus === "PRIVATE" && t.privacyPrivateDesc}
             </p>
           </div>
 
@@ -231,7 +233,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
                   : "bg-white/10 hover:bg-white/15 text-neutral-200"
               }`}
             >
-              İptal
+              {t.cancel}
             </button>
             <button
               type="submit"
@@ -239,7 +241,7 @@ export const CreatePlaylistModal: FC<CreatePlaylistModalProps> = ({
               className="px-5 py-2 text-xs font-bold rounded-full bg-[#ff0000] text-white hover:bg-[#e60000] disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
             >
               {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>{isSubmitting ? "Oluşturuluyor..." : "Oluştur"}</span>
+              <span>{isSubmitting ? t.creating : t.create}</span>
             </button>
           </div>
         </form>

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Track, PlaybackStatus, RepeatMode } from "../types/music";
 import { MarqueeText } from "./MarqueeText";
 
@@ -65,6 +66,7 @@ function formatTime(seconds: number): string {
 export const PlayerBar: FC<PlayerBarProps> = (props) => {
   const player = usePlayer();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
   const track = props.track !== undefined ? props.track : player.activeTrack;
@@ -202,7 +204,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               className={`p-1.5 transition-transform active:scale-125 cursor-pointer ml-1 shrink-0 ${
                 isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
               }`}
-              data-tooltip={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
+              data-tooltip={isLiked ? t.unlike : t.like}
               data-tooltip-side="top"
             >
               <Heart
@@ -220,7 +222,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               className={`p-1.5 transition-transform active:scale-125 cursor-pointer shrink-0 ${
                 isLight ? "text-neutral-400 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
               }`}
-              data-tooltip="Daha fazla seçenek"
+              data-tooltip={t.moreOptions}
               data-tooltip-side="top"
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -235,7 +237,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         <div className="flex items-center gap-5">
           <button
             onClick={onToggleShuffle}
-            data-tooltip={isShuffle ? "Karışık Açık" : "Karışık Kapalı"}
+            data-tooltip={isShuffle ? t.shuffleOn : t.shuffleOff}
             data-tooltip-side="top"
             className={`transition-colors cursor-pointer ${
               isShuffle
@@ -251,7 +253,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <button
             onClick={onPrev}
             disabled={!track}
-            data-tooltip="Önceki"
+            data-tooltip={t.previous}
             data-tooltip-side="top"
             className={`transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
@@ -264,7 +266,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <button
             onClick={onPlayPause}
             disabled={!track && !isLoading}
-            data-tooltip={isPlaying ? "Duraklat" : "Oynat"}
+            data-tooltip={isPlaying ? t.pause : t.play}
             data-tooltip-side="top"
             className={`w-9 h-9 rounded-full hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer shadow-md disabled:opacity-40 ${
               isLight ? "bg-black text-white" : "bg-white text-black"
@@ -282,7 +284,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           <button
             onClick={onNext}
             disabled={!track}
-            data-tooltip="Sonraki"
+            data-tooltip={t.next}
             data-tooltip-side="top"
             className={`transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               isLight ? "text-neutral-600 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
@@ -295,10 +297,10 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
             onClick={onToggleRepeat}
             data-tooltip={
               repeatMode === "all"
-                ? "Tümünü Tekrarla"
+                ? t.repeatAll
                 : repeatMode === "one"
-                ? "Tek Parçayı Tekrarla"
-                : "Tekrar Kapalı"
+                ? t.repeatOne
+                : t.repeatOff
             }
             data-tooltip-side="top"
             className={`transition-colors cursor-pointer ${
@@ -406,7 +408,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               player.toggleRightDrawer("lyrics");
             }
           }}
-          data-tooltip="Şarkı Sözleri"
+          data-tooltip={t.lyrics}
           data-tooltip-side="top"
           className={`p-1.5 transition-colors cursor-pointer ${
             isLyricsActive
@@ -422,7 +424,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
         {/* Queue */}
         <button
           onClick={() => player.toggleQueue()}
-          data-tooltip="Sıradaki Şarkılar"
+          data-tooltip={t.queue}
           data-tooltip-side="top"
           className={`p-1.5 transition-colors cursor-pointer ${
             player.queueViewMode !== "closed"
@@ -446,7 +448,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
             className={`p-1 transition-colors cursor-pointer ${
               isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
             }`}
-            data-tooltip={isMuted ? "Sesi Aç" : "Sesi Kapat"}
+            data-tooltip={isMuted ? t.unmute : t.mute}
             data-tooltip-side="top"
           >
             <VolumeIcon className="w-4 h-4" />
@@ -526,7 +528,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
                     onVolumeChange(val);
                   }
                 }}
-                aria-label="Ses seviyesi"
+                aria-label={t.volumeLevel}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
             </div>

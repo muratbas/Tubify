@@ -18,12 +18,13 @@ import { DownloadsView } from "./components/DownloadsView";
 import { PlayerBar } from "./components/PlayerBar";
 import { RightDrawer } from "./components/RightDrawer";
 import { MiniPlayerHUD } from "./components/MiniPlayerHUD";
-import { LoginModal } from "./components/LoginModal";
 import { useTheme } from "./context/ThemeContext";
+import { useLanguage } from "./context/LanguageContext";
 import { usePlayer } from "./context/PlayerContext";
 import {
   searchMusic,
   getUserProfile,
+  openGoogleLogin,
   logoutGoogle,
   getYtLikedSongs,
   getYtPlaylists,
@@ -114,6 +115,7 @@ const EPISODES_TRACKS: Track[] = [
 
 export const App: FC = () => {
   const { theme } = useTheme();
+  const { t, language } = useLanguage();
   const player = usePlayer();
   const isLight = theme === "light";
 
@@ -335,9 +337,14 @@ export const App: FC = () => {
 
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>("account");
-  const [likedSongs, setLikedSongs] = useState<Track[]>([]);
+  const [likedSongs, setLikedSongs] = useState<Track[]>(() => {
+    try {
+      const cached = localStorage.getItem("tubify_liked_tracks_cache");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [likedSongsTotalCount, setLikedSongsTotalCount] = useState<string | null>(() => {
     try {
       return localStorage.getItem("tubify_liked_total_count");
@@ -345,7 +352,13 @@ export const App: FC = () => {
       return null;
     }
   });
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
+    try {
+      const cached = localStorage.getItem("tubify_user_playlists_cache");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [playlistSuggestions, setPlaylistSuggestions] = useState<Track[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
@@ -391,6 +404,9 @@ export const App: FC = () => {
       if (liked.status === "fulfilled" && liked.value.length > 0) {
         setLikedSongs(liked.value);
         player.syncLikedIds(liked.value.map((t) => t.id));
+        try {
+          localStorage.setItem("tubify_liked_tracks_cache", JSON.stringify(liked.value));
+        } catch {}
       }
       if (pls.status === "fulfilled" && pls.value.length > 0) {
         let deletedIds = new Set<string>();
@@ -423,6 +439,9 @@ export const App: FC = () => {
           });
 
         setPlaylists(cleanPlaylists);
+        try {
+          localStorage.setItem("tubify_user_playlists_cache", JSON.stringify(cleanPlaylists));
+        } catch {}
 
         const lmPl = pls.value.find((p) => p.id === "LM" || p.id === "liked" || p.id === "VLLM");
         if (lmPl?.track_count) {
@@ -431,6 +450,20 @@ export const App: FC = () => {
             localStorage.setItem("tubify_liked_total_count", lmPl.track_count);
           } catch {}
         }
+      }
+
+      // If user was supposed to be authenticated, but requests failed due to auth:
+      const authFailed =
+        (liked.status === "rejected" && String(liked.reason).includes("Giriş yapılmamış")) ||
+        (pls.status === "rejected" && String(pls.reason).includes("Giriş yapılmamış"));
+
+      if (authFailed) {
+        setUserProfile({ is_authenticated: false });
+        player.showToast(
+          language === "tr"
+            ? "Google oturumunuzun süresi doldu. Lütfen tekrar giriş yapın."
+            : "Google session has expired. Please sign in again."
+        );
       }
 
       // Fetch Liked Songs page to ensure exact track count is retrieved without full scrolling
@@ -445,6 +478,9 @@ export const App: FC = () => {
           if (page.tracks.length > 0) {
             setLikedSongs(page.tracks);
             player.syncLikedIds(page.tracks.map((t) => t.id));
+            try {
+              localStorage.setItem("tubify_liked_tracks_cache", JSON.stringify(page.tracks));
+            } catch {}
           }
         })
         .catch(() => {});
@@ -474,7 +510,7 @@ export const App: FC = () => {
           if (player.isShuffle) player.toggleShuffle();
         }
       } else {
-        player.showToast("Beğenilen şarkı bulunamadı");
+        player.showToast(t.toastNoLikedTracks);
       }
       return;
     }
@@ -502,11 +538,11 @@ export const App: FC = () => {
           if (player.isShuffle) player.toggleShuffle();
         }
       } else {
-        player.showToast("Bu çalma listesinde henüz şarkı yok");
+        player.showToast(t.toastEmptyPlaylist);
       }
     } catch (e) {
       console.error("Failed to play playlist:", e);
-      player.showToast("Çalma listesi oynatılamadı");
+      player.showToast(t.toastPlaylistPlayError);
     }
   };
 
@@ -523,33 +559,34 @@ export const App: FC = () => {
     }
 
     try {
-      player.showToast("Albüm yükleniyor...");
+      player.showToast(t.toastAlbumLoading);
       const details = await getAlbumDetails(albumId);
       const resolvedArtist =
         (details.artist && details.artist !== "Unknown Artist" ? details.artist : artistName) ||
         "Unknown Artist";
       const resolvedTitle =
-        (details.title && details.title !== "Albüm" ? details.title : albumTitle) || "Albüm";
+        (details.title && details.title !== "Albüm" && details.title !== "Album" ? details.title : albumTitle) ||
+        (language === "tr" ? "Albüm" : "Album");
       const resolvedThumbnail = details.thumbnail || thumbnail || undefined;
 
-      const tracks: Track[] = (details.tracks || []).map((t) => ({
-        ...t,
-        artist: (t.artist && t.artist !== "Unknown Artist" ? t.artist : resolvedArtist) || "Unknown Artist",
-        artist_id: t.artist_id || details.artist_id || undefined,
-        album: t.album && t.album !== "Albüm" ? t.album : resolvedTitle,
-        album_id: t.album_id || albumId,
-        thumbnail: t.thumbnail || resolvedThumbnail || undefined,
-        plays: t.plays || undefined,
+      const tracks: Track[] = (details.tracks || []).map((trk) => ({
+        ...trk,
+        artist: (trk.artist && trk.artist !== "Unknown Artist" ? trk.artist : resolvedArtist) || "Unknown Artist",
+        artist_id: trk.artist_id || details.artist_id || undefined,
+        album: trk.album && trk.album !== "Albüm" && trk.album !== "Album" ? trk.album : resolvedTitle,
+        album_id: trk.album_id || albumId,
+        thumbnail: trk.thumbnail || resolvedThumbnail || undefined,
+        plays: trk.plays || undefined,
       }));
 
       if (tracks.length > 0) {
         player.playTrack(tracks[0], tracks, sourceId);
       } else {
-        player.showToast("Bu albümde çalınabilir şarkı bulunamadı");
+        player.showToast(t.toastAlbumNoTracks);
       }
     } catch (err) {
       console.error("Failed to play album:", err);
-      player.showToast("Albüm oynatılamadı");
+      player.showToast(t.toastAlbumPlayError);
     }
   };
 
@@ -564,10 +601,10 @@ export const App: FC = () => {
       title,
       description: description || undefined,
       thumbnail: null,
-      track_count: "0 şarkı",
+      track_count: `0 ${t.songCountMultiple}`,
     };
     setPlaylists((prev) => [newPlaylist, ...prev]);
-    player.showToast(`"${title}" çalma listesi oluşturuldu`);
+    player.showToast(language === "tr" ? `"${title}" çalma listesi oluşturuldu` : `Playlist "${title}" created`);
     navigateTo({ type: "playlist", playlist: newPlaylist });
   };
 
@@ -677,14 +714,14 @@ export const App: FC = () => {
     // 4. InnerTube API call
     try {
       await editYtPlaylist(cleanId, title, description, privacyStatus);
-      player.showToast("Çalma listesi güncellendi");
+      player.showToast(t.toastPlaylistUpdated);
     } catch (err: unknown) {
       console.error("YouTube Music playlist edit error:", err);
       // Rollback on failure
       setPlaylists(prevPlaylists);
       setHistory(prevHistory);
       const errMsg = err instanceof Error ? err.message : String(err);
-      player.showToast(`Çalma listesi güncellenemedi: ${errMsg}`);
+      player.showToast(language === "tr" ? `Çalma listesi güncellenemedi: ${errMsg}` : `Could not update playlist: ${errMsg}`);
       throw err;
     }
   };
@@ -737,7 +774,7 @@ export const App: FC = () => {
       localStorage.setItem("tubify_custom_playlist_covers", JSON.stringify(coversMap));
     } catch {}
 
-    player.showToast("Çalma listesi kapağı güncellendi");
+    player.showToast(t.toastPlaylistCoverUpdated);
   };
 
   const handleToggleLike = async (track: Track) => {
@@ -757,20 +794,20 @@ export const App: FC = () => {
       setLikedSongsTotalCount((prev) => {
         if (!prev) {
           const newLen = Math.max(0, prevLikedSongs.length - 1);
-          return `${newLen} şarkı`;
+          return `${newLen} ${newLen === 1 ? t.songCountSingle : t.songCountMultiple}`;
         }
         const digits = prev.replace(/[^\d]/g, "");
         if (!digits) return prev;
         const currentNum = parseInt(digits, 10);
         const newNum = Math.max(0, currentNum - 1);
-        const formatted = `${newNum.toLocaleString("tr-TR")} şarkı`;
+        const formatted = `${newNum.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} ${newNum === 1 ? t.songCountSingle : t.songCountMultiple}`;
         try {
           localStorage.setItem("tubify_liked_total_count", formatted);
         } catch {}
         return formatted;
       });
 
-      player.showToast(`"${track.title}" Beğenilenler'den kaldırıldı`);
+      player.showToast(language === "tr" ? `"${track.title}" Beğenilenler'den kaldırıldı` : `Removed "${track.title}" from Liked Songs`);
     } else {
       // Liking: immediately prepend to liked songs
       setLikedSongs((prev) => {
@@ -781,20 +818,20 @@ export const App: FC = () => {
       setLikedSongsTotalCount((prev) => {
         if (!prev) {
           const newLen = prevLikedSongs.length + 1;
-          return `${newLen} şarkı`;
+          return `${newLen} ${newLen === 1 ? t.songCountSingle : t.songCountMultiple}`;
         }
         const digits = prev.replace(/[^\d]/g, "");
         if (!digits) return prev;
         const currentNum = parseInt(digits, 10);
         const newNum = currentNum + 1;
-        const formatted = `${newNum.toLocaleString("tr-TR")} şarkı`;
+        const formatted = `${newNum.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} ${newNum === 1 ? t.songCountSingle : t.songCountMultiple}`;
         try {
           localStorage.setItem("tubify_liked_total_count", formatted);
         } catch {}
         return formatted;
       });
 
-      player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+      player.showToast(language === "tr" ? `"${track.title}" Beğenilenler'e eklendi` : `Added "${track.title}" to Liked Songs`);
     }
 
     // 2. Perform backend toggle
@@ -811,7 +848,7 @@ export const App: FC = () => {
         }
       } catch {}
       player.syncLikedIds(Array.from(prevLikedTrackIds));
-      player.showToast("İşlem başarısız oldu, değişiklik geri alındı");
+      player.showToast(t.toastActionFailedReverted);
     }
   };
 
@@ -860,7 +897,7 @@ export const App: FC = () => {
             const match = raw.match(/\d+/);
             const currentCount = match ? parseInt(match[0], 10) : 0;
             const newCount = currentCount + 1;
-            return { ...item, track_count: `${newCount} şarkı` };
+            return { ...item, track_count: `${newCount} ${newCount === 1 ? t.songCountSingle : t.songCountMultiple}` };
           }
           return item;
         })
@@ -880,17 +917,45 @@ export const App: FC = () => {
         });
       }
 
-      player.showToast(`"${track.title}", "${pl.title}" listesine eklendi`);
+      player.showToast(language === "tr" ? `"${track.title}", "${pl.title}" listesine eklendi` : `Added "${track.title}" to "${pl.title}"`);
     } catch (e: any) {
       console.error("Failed to add track to playlist:", e);
-      player.showToast(`Listeye eklenemedi: ${e?.message || e}`);
+      player.showToast(language === "tr" ? `Listeye eklenemedi: ${e?.message || e}` : `Could not add to playlist: ${e?.message || e}`);
     }
   };
 
   const handleLoginSuccess = (profile: UserProfile) => {
     setUserProfile(profile);
     loadUserData();
+    player.showToast(t.toastGoogleConnected);
   };
+
+  const handleOpenLogin = async () => {
+    try {
+      await openGoogleLogin();
+    } catch (e: unknown) {
+      console.error("Giriş penceresi açılamadı:", e);
+      player.showToast(t.toastLoginWindowError);
+    }
+  };
+
+  // Global listener for background Google authentication success
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (isTauri) {
+      import("@tauri-apps/api/event").then(({ listen }) => {
+        listen<UserProfile>("auth-success", (event) => {
+          handleLoginSuccess(event.payload);
+        }).then((un) => {
+          unlisten = un;
+        });
+      });
+    }
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   const handleOpenSettings = (
     tab: SettingsTab = "account"
@@ -908,6 +973,11 @@ export const App: FC = () => {
     setUserProfile({ is_authenticated: false });
     setLikedSongs([]);
     setPlaylists([]);
+    try {
+      localStorage.removeItem("tubify_user_playlists_cache");
+      localStorage.removeItem("tubify_liked_tracks_cache");
+      localStorage.removeItem("tubify_liked_total_count");
+    } catch {}
     if (currentNav.type === "playlist" && currentNav.playlist.id === "liked") {
       navigateTo({ type: "home" });
     }
@@ -1043,7 +1113,8 @@ export const App: FC = () => {
           const raw = item.track_count || "";
           const match = raw.match(/\d+/);
           const currentCount = match ? parseInt(match[0], 10) : 0;
-          return { ...item, track_count: `${currentCount + 1} şarkı` };
+          const nextCount = currentCount + 1;
+          return { ...item, track_count: `${nextCount} ${nextCount === 1 ? t.songCountSingle : t.songCountMultiple}` };
         }
         return item;
       })
@@ -1064,13 +1135,13 @@ export const App: FC = () => {
         }
       } catch {}
 
-      player.showToast(`"${track.title}" çalma listesine eklendi`);
+      player.showToast(language === "tr" ? `"${track.title}" çalma listesine eklendi` : `Added "${track.title}" to playlist`);
     } catch (err: unknown) {
       console.error("Failed to add suggestion to playlist:", err);
       // Rollback on failure
       setPlaylistSuggestions(prevSuggestions);
       setPlaylistTracks(prevTracks);
-      player.showToast("Şarkı çalma listesine eklenemedi");
+      player.showToast(t.toastSongAddFailed);
     }
   };
 
@@ -1092,7 +1163,8 @@ export const App: FC = () => {
           const raw = item.track_count || "";
           const match = raw.match(/\d+/);
           const currentCount = match ? parseInt(match[0], 10) : 0;
-          return { ...item, track_count: `${Math.max(0, currentCount - 1)} şarkı` };
+          const nextCount = Math.max(0, currentCount - 1);
+          return { ...item, track_count: `${nextCount} ${nextCount === 1 ? t.songCountSingle : t.songCountMultiple}` };
         }
         return item;
       })
@@ -1111,12 +1183,12 @@ export const App: FC = () => {
         localStorage.setItem(key, JSON.stringify(updated));
       } catch {}
 
-      player.showToast(`"${track.title}" çalma listesinden kaldırıldı`);
+      player.showToast(language === "tr" ? `"${track.title}" çalma listesinden kaldırıldı` : `Removed "${track.title}" from playlist`);
     } catch (err: unknown) {
       console.error("Failed to remove track from playlist:", err);
       // Rollback on failure
       setPlaylistTracks(prevTracks);
-      player.showToast("Şarkı çalma listesinden kaldırılamadı");
+      player.showToast(t.toastSongRemoveFailed);
     }
   };
 
@@ -1200,7 +1272,7 @@ export const App: FC = () => {
           likedSongsCount={likedSongsTotalCount || likedSongs.length}
           playlists={playlists}
           userProfile={userProfile}
-          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onOpenLogin={handleOpenLogin}
           currentView={
             currentNav.type === "playlist" || currentNav.type === "search" || currentNav.type === "settings"
               ? currentNav.type
@@ -1231,16 +1303,16 @@ export const App: FC = () => {
               currentView={currentNav.type}
               currentTabTitle={
                 currentNav.type === "playlist"
-                  ? currentNav.playlist.title
+                  ? (isLikedSongsPlaylist(currentNav.playlist) ? t.likedSongs : currentNav.playlist.title)
                   : currentNav.type === "artist"
                   ? currentNav.artistName
                   : currentNav.type === "album"
                   ? currentNav.albumTitle
                   : currentNav.type === "lyrics"
-                  ? "Şarkı Sözleri"
+                  ? t.lyrics
                   : player.activeTrack?.title
               }
-              onOpenLogin={() => setIsLoginModalOpen(true)}
+              onOpenLogin={handleOpenLogin}
               onOpenSettings={handleOpenSettings}
               onNavigateHome={() => navigateTo({ type: "home" })}
               onNavigateBack={handleGoBack}
@@ -1283,7 +1355,7 @@ export const App: FC = () => {
                 likedSongsCount={likedSongs.length}
                 playlistsCount={playlists.length}
                 onLogout={handleLogout}
-                onOpenLogin={() => setIsLoginModalOpen(true)}
+                onOpenLogin={handleOpenLogin}
                 onScroll={handleViewScroll}
               />
             )}
@@ -1510,13 +1582,6 @@ export const App: FC = () => {
           onClose={player.toggleMiniPlayer}
         />
       )}
-
-      {/* Google Login Modal */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
-      />
 
       {/* Global Edit Playlist Modal */}
       <EditPlaylistModal

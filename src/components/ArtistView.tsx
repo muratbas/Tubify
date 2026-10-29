@@ -15,6 +15,7 @@ import {
   ArrowDownToLine,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useDownload } from "../context/DownloadContext";
 import { getArtistDetails, searchMusic } from "../services/api";
 import type { ArtistDetails, Track } from "../types/music";
@@ -64,6 +65,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
   const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
@@ -109,7 +111,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
       } catch (e: unknown) {
         if (!isCancelled) {
           console.error("Artist load error:", e);
-          setError(e instanceof Error ? e.message : "Sanatçı bilgileri yüklenemedi");
+          setError(e instanceof Error ? e.message : t.artistLoadError);
         }
       } finally {
         if (!isCancelled) {
@@ -123,7 +125,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [artistId, artistName]);
+  }, [artistId, artistName, t.artistLoadError]);
 
   if (isLoading) {
     return (
@@ -141,7 +143,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full p-8 text-center gap-3">
         <AlertCircle className="w-10 h-10 text-rose-500" />
-        <h2 className="text-lg font-bold">Sanatçı Sayfası Yüklenemedi</h2>
+        <h2 className="text-lg font-bold">{t.artistPageLoadError}</h2>
         <p className="text-xs text-neutral-400 max-w-sm">{error || "Bilinmeyen hata"}</p>
       </div>
     );
@@ -186,7 +188,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                 isLight ? "text-neutral-600" : "text-white/80"
               }`}
             >
-              <span>Onaylı Sanatçı</span>
+              <span>{t.verifiedArtist}</span>
             </span>
             <h1
               className={`text-6xl font-extrabold tracking-tight leading-snug pb-1 pt-0.5 ${
@@ -202,7 +204,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>{artistData.subscribers} abone / dinleyici</span>
+                <span>{artistData.subscribers} {t.subscribers}</span>
               </p>
             )}
             {artistData.description && (
@@ -223,9 +225,9 @@ export const ArtistView: FC<ArtistViewProps> = ({
             onClick={() => onPlayAll(topSongs)}
             disabled={topSongs.length === 0}
             className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#cc0000] active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-            title="Tümünü Oynat"
+            title={t.playAll}
           >
-            {isPlaying && activeTrack && topSongs.some((t) => t.id === activeTrack.id) ? (
+            {isPlaying && activeTrack && topSongs.some((trk) => trk.id === activeTrack.id) ? (
               <Pause className="w-6 h-6 fill-white stroke-white" />
             ) : (
               <Play className="w-6 h-6 fill-white stroke-white ml-1" />
@@ -242,7 +244,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                   ? "text-neutral-500 hover:text-neutral-900"
                   : "text-neutral-400 hover:text-white"
               }`}
-              title="Karışık Çal"
+              title={t.shuffle}
             >
               <Shuffle className="w-6 h-6" />
             </button>
@@ -255,7 +257,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
         {/* Section 1: En Popüler Şarkılar (Top Tracks) */}
         {topSongs.length > 0 && (
           <div>
-            <h2 className="text-xl font-bold tracking-tight mb-4">Popüler</h2>
+            <h2 className="text-xl font-bold tracking-tight mb-4">{t.popular}</h2>
 
             <div
               className={`grid grid-cols-[40px_1fr_1fr_70px_60px] gap-4 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b ${
@@ -263,8 +265,8 @@ export const ArtistView: FC<ArtistViewProps> = ({
               }`}
             >
               <span>#</span>
-              <span>BAŞLIK</span>
-              <span>ALBÜM</span>
+              <span>{t.tableHeaderTitle}</span>
+              <span>{t.tableHeaderAlbum}</span>
               <span className="text-center"></span>
               <span className="text-right flex items-center justify-end">
                 <Clock3 className="w-4 h-4" />
@@ -299,7 +301,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                     <div className="text-sm font-medium flex items-center">
                       <span className={`group-hover:hidden ${isActive ? "text-[#ff0000] font-bold" : ""}`}>
                         {isActive && isPlaying ? (
-                          <span className="flex items-center gap-1 h-3.5 px-0.5" title="Oynatılıyor">
+                          <span className="flex items-center gap-1 h-3.5 px-0.5" title={t.playing}>
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-1" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-2" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-3" />
@@ -316,7 +318,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                         className={`hidden group-hover:flex w-6 h-6 items-center justify-center hover:scale-110 transition-transform cursor-pointer ${
                           isLight ? "text-black" : "text-white"
                         }`}
-                        title="Oynat"
+                        title={t.play}
                       >
                         {isActive && isPlaying ? (
                           <Pause className="w-4 h-4 fill-current stroke-current" />
@@ -400,7 +402,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                           onToggleLike(track);
                         }}
                         className="p-1 transition-transform active:scale-125 cursor-pointer"
-                        title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
+                        title={isLiked ? t.unlike : t.like}
                       >
                         <Heart
                           className={`w-4 h-4 ${
@@ -435,10 +437,10 @@ export const ArtistView: FC<ArtistViewProps> = ({
                             }`}
                             title={
                               downloaded
-                                ? "İndirildi (Silmek için tıkla)"
+                                ? t.downloadedClickToDelete
                                 : downloading
-                                ? "İndiriliyor..."
-                                : "İndir"
+                                ? t.downloading
+                                : t.download
                             }
                           >
                             {downloading ? (
@@ -466,7 +468,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
                           }
                         }}
                         className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-opacity cursor-pointer"
-                        title="Diğer seçenekler"
+                        title={t.moreOptions}
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
@@ -490,7 +492,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
         {/* Section 2: Albümler (Discography) */}
         {artistData.albums.length > 0 && (
           <div>
-            <h2 className="text-xl font-bold tracking-tight mb-4">Albümler</h2>
+            <h2 className="text-xl font-bold tracking-tight mb-4">{t.searchCategoryAlbums}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {artistData.albums.map((album) => (
                 <div
@@ -546,7 +548,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
         {/* Section 3: Single ve EP'ler */}
         {artistData.singles.length > 0 && (
           <div>
-            <h2 className="text-xl font-bold tracking-tight mb-4">Single ve EP'ler</h2>
+            <h2 className="text-xl font-bold tracking-tight mb-4">{t.singlesAndEPs}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {artistData.singles.map((single) => (
                 <div

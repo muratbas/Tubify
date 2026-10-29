@@ -126,7 +126,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         <button
           onClick={onNavigateBack || onNavigateHome}
           disabled={!canGoBack}
-          {...(canGoBack ? { "data-tooltip": "Geri", "data-tooltip-side": "bottom" } : {})}
+          {...(canGoBack ? { "data-tooltip": t.navBack, "data-tooltip-side": "bottom" } : {})}
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
             canGoBack
               ? isLight
@@ -143,7 +143,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         <button
           onClick={onNavigateForward}
           disabled={!canGoForward}
-          {...(canGoForward ? { "data-tooltip": "İleri", "data-tooltip-side": "bottom" } : {})}
+          {...(canGoForward ? { "data-tooltip": t.navForward, "data-tooltip-side": "bottom" } : {})}
           className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
             canGoForward
               ? isLight
@@ -172,7 +172,7 @@ export const TitleBar: FC<TitleBarProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ne çalmak istersiniz?"
+            placeholder={t.searchPlaceholder}
             className={`w-full h-8 pl-9 pr-4 rounded-full text-sm font-medium transition-all outline-none border shadow-sm ${
               isLight
                 ? "bg-white text-neutral-900 placeholder-neutral-500 border-neutral-200/80 focus:border-neutral-400"
@@ -195,7 +195,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         <div className="relative">
           <button
             onClick={toggleDownloadsPopover}
-            data-tooltip="İndirilenler"
+            data-tooltip={t.downloads}
             data-tooltip-side="bottom"
             className={`p-2 rounded-full transition-colors cursor-pointer relative ${
               isLight
@@ -229,7 +229,7 @@ export const TitleBar: FC<TitleBarProps> = ({
             <>
               <button
                 onClick={() => setIsAvatarMenuOpen((p) => !p)}
-                data-tooltip={userProfile.name || "Kullanıcı"}
+                data-tooltip={userProfile.name || t.user}
                 data-tooltip-side="bottom"
                 className="flex items-center p-0.5 rounded-full hover:scale-105 transition-all cursor-pointer ring-2 ring-transparent hover:ring-[#ff0000]"
               >
@@ -360,7 +360,7 @@ export const TitleBar: FC<TitleBarProps> = ({
       <div className="absolute right-0 top-0 h-14 flex items-center z-50 pr-2">
         <button
           onClick={() => minimizeWindow()}
-          data-tooltip="Simge Durumuna Küçült"
+          data-tooltip={t.minimize}
           data-tooltip-side="bottom"
           className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
             isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
@@ -370,7 +370,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         </button>
         <button
           onClick={() => toggleMaximizeWindow()}
-          data-tooltip="Büyüt / Geri Yükle"
+          data-tooltip={t.maximize}
           data-tooltip-side="bottom"
           className={`w-10 h-9 flex items-center justify-center transition-colors cursor-pointer ${
             isLight ? "text-neutral-600 hover:bg-black/10 hover:text-black" : "text-neutral-400 hover:text-white hover:bg-white/10"
@@ -380,7 +380,7 @@ export const TitleBar: FC<TitleBarProps> = ({
         </button>
         <button
           onClick={() => closeWindow()}
-          data-tooltip="Kapat"
+          data-tooltip={t.close}
           data-tooltip-side="bottom"
           className="w-10 h-9 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
         >

@@ -203,7 +203,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
           }
           let cleanLabel = d.label ? d.label.trim() : "";
           if (!cleanLabel) {
-            cleanLabel = `Hoparlör / Çıkış Aygıtı ${counter}`;
+            cleanLabel = `${t.speakerOutputDevice} ${counter}`;
           }
           mapped.push({
             deviceId: d.deviceId,
@@ -321,7 +321,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
       if (res.has_update) {
         setUpdateResult({
           status: "available",
-          version: res.version || "Yeni Sürüm",
+          version: res.version || (language === "tr" ? "Yeni Sürüm" : "New Version"),
           body: res.body || "",
           date: res.date,
           url: "https://github.com/muratbas/Tubify/releases",
@@ -394,7 +394,12 @@ export const SettingsView: FC<SettingsViewProps> = ({
       console.error("Install update failed:", err);
       setUpdateResult({
         status: "error",
-        message: err instanceof Error ? err.message : "Güncelleme yüklenirken bir sorun oluştu.",
+        message:
+          err instanceof Error
+            ? err.message
+            : language === "tr"
+            ? "Güncelleme yüklenirken bir sorun oluştu."
+            : "An error occurred while installing the update.",
       });
       setIsInstallingUpdate(false);
       setDownloadProgress(null);
@@ -427,7 +432,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
     {
       id: "library" as const,
       label: t.library,
-      subtitle: "Cache and audio buffer",
+      subtitle: t.cacheAndAudioBuffer,
       icon: FolderOpen,
     },
     {
@@ -1119,21 +1124,23 @@ export const SettingsView: FC<SettingsViewProps> = ({
                   {t.library}
                 </h3>
                 <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                  Cache and audio buffer settings
+                  {t.cacheAndAudioBuffer}
                 </p>
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-xs font-semibold ${isLight ? "text-[#18181b]" : "text-white"}`}>
-                    Streaming Cache
+                    {t.streamingCache}
                   </p>
                   <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                    Preload next queued track for instantaneous zero-latency playback.
+                    {language === "tr"
+                      ? "Anında ve gecikmesiz oynatma için sıradaki şarkıyı arka planda önceden yükler."
+                      : "Preload next queued track for instantaneous zero-latency playback."}
                   </p>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[11px] font-semibold">
-                  Enabled
+                  {t.enabled}
                 </span>
               </div>
             </div>

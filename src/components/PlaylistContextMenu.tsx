@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Playlist } from "../types/music";
 
 export interface ContextMenuPosition {
@@ -102,6 +103,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
   const { theme } = useTheme();
   const isLight = theme === "light";
   const player = usePlayer();
+  const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const [coords, setCoords] = useState<{ x: number; y: number }>(() =>
@@ -213,7 +215,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).catch(() => {});
     }
-    player.showToast("Çalma listesi bağlantısı panoya kopyalandı");
+    player.showToast(t.toastLinkCopied);
     onClose();
   };
 
@@ -237,7 +239,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
         }`}
       >
         <Play className="w-4 h-4 shrink-0 text-[#ff0000] fill-[#ff0000]" />
-        <span>Çal</span>
+        <span>{t.play}</span>
       </button>
 
       {/* 2. Karışık Çal */}
@@ -248,7 +250,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
         }`}
       >
         <Shuffle className="w-4 h-4 shrink-0 text-neutral-500 dark:text-neutral-300" />
-        <span>Karışık Çal</span>
+        <span>{t.shufflePlay}</span>
       </button>
 
       {/* Beğenilenler Dokunulmazlığı: Düzenle, Sil, Gizle, Sabitle Beğenilenler için gösterilmez */}
@@ -264,7 +266,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
             }`}
           >
             <Pencil className="w-4 h-4 shrink-0 text-neutral-500 dark:text-neutral-300" />
-            <span>Düzenle</span>
+            <span>{t.edit}</span>
           </button>
 
           {/* 4. Kitaplığından Sil */}
@@ -275,7 +277,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
             }`}
           >
             <Trash2 className="w-4 h-4 shrink-0" />
-            <span>Kitaplığından Sil</span>
+            <span>{t.deleteFromLibrary}</span>
           </button>
 
           {/* 5. Kitaplığından Gizle / Göster */}
@@ -288,12 +290,12 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
             {isHidden ? (
               <>
                 <Eye className="w-4 h-4 shrink-0 text-emerald-500" />
-                <span>Kitaplığında Göster</span>
+                <span>{t.showInLibrary}</span>
               </>
             ) : (
               <>
                 <EyeOff className="w-4 h-4 shrink-0 text-neutral-500 dark:text-neutral-300" />
-                <span>Kitaplığından Gizle</span>
+                <span>{t.hideFromLibrary}</span>
               </>
             )}
           </button>
@@ -310,12 +312,12 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
             {isPinned ? (
               <>
                 <PinOff className="w-4 h-4 shrink-0 text-neutral-500 dark:text-neutral-300" />
-                <span>Sabitlemeyi Kaldır</span>
+                <span>{t.unpinFromTop}</span>
               </>
             ) : (
               <>
                 <Pin className="w-4 h-4 shrink-0 text-[#ff0000]" />
-                <span>Başa Sabitle</span>
+                <span>{t.pinToTop}</span>
               </>
             )}
           </button>
@@ -332,7 +334,7 @@ export const PlaylistContextMenu: FC<PlaylistContextMenuProps> = ({
         }`}
       >
         <Share2 className="w-4 h-4 shrink-0 text-neutral-500 dark:text-neutral-300" />
-        <span>Bağlantıyı Kopyala</span>
+        <span>{t.copyLink}</span>
       </button>
     </div>
   );

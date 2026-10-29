@@ -11,6 +11,7 @@ import {
   HardDrive,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import { useDownload } from "../context/DownloadContext";
 import type { Track } from "../types/music";
@@ -33,6 +34,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
   onContextMenuTrack,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
   const { activeTrack, playbackStatus, playTrack, togglePlayPause } = usePlayer();
   const {
@@ -106,7 +108,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
           {/* Details */}
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight mt-1 pt-1 pb-1 leading-normal overflow-visible">
-              İndirilenler
+              {t.downloads}
             </h1>
             <p
               className={`text-sm mt-3 flex items-center gap-2 ${
@@ -115,7 +117,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
             >
               <HardDrive className="w-4 h-4 text-neutral-500 shrink-0" />
               <span>
-                {totalSavedCount} şarkı indirildi • Toplam {totalSavedFormatted} alan kullanılıyor
+                {totalSavedCount} {totalSavedCount === 1 ? t.songCountSingle : t.songCountMultiple} {t.songsDownloaded} • {t.totalOf} {totalSavedFormatted} {t.spaceUsed}
               </span>
             </p>
           </div>
@@ -129,9 +131,9 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
               onClick={handlePlayAll}
               disabled={filteredTracks.length === 0}
               className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#cc0000] active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 shadow-md"
-              title="Oynat"
+              title={t.play}
             >
-              {isPlaying && activeTrack && filteredTracks.some((t) => t.id === activeTrack.id) ? (
+              {isPlaying && activeTrack && filteredTracks.some((trk) => trk.id === activeTrack.id) ? (
                 <Pause className="w-6 h-6 fill-white stroke-white" />
               ) : (
                 <Play className="w-6 h-6 fill-white stroke-white ml-1" />
@@ -147,7 +149,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
                   ? "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
                   : "text-neutral-400 hover:text-white hover:bg-white/10"
               }`}
-              title="Karışık Çal"
+              title={t.shuffle}
             >
               <Shuffle className="w-6 h-6" />
             </button>
@@ -164,7 +166,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filtrele"
+              placeholder={t.filter}
               className={`h-8 pl-9 pr-4 rounded-full text-sm font-medium outline-none w-44 transition-colors ${
                 isLight
                   ? "bg-neutral-100/80 hover:bg-neutral-200/80 focus:bg-white focus:ring-1 focus:ring-neutral-300 text-neutral-900 placeholder-neutral-500"
@@ -183,12 +185,12 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
               <ArrowDownToLine className="w-8 h-8" />
             </div>
             <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-              {searchFilter ? "Eşleşen şarkı bulunamadı" : "Henüz indirilmiş şarkı yok"}
+              {searchFilter ? t.noDownloadsFound : t.noDownloadsYet}
             </h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mt-1">
               {searchFilter
-                ? "Farklı bir arama terimi deneyin."
-                : "Çalma listesi sayfalarında 'Listeyi İndir' butonuna basarak veya şarkılara sağ tıklayıp 'İndir' seçeneğini kullanarak çevrimdışı müzik arşivinizi oluşturun."}
+                ? t.tryDifferentSearch
+                : t.downloadDescriptionLong}
             </p>
           </div>
         ) : (
@@ -200,10 +202,10 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
               }`}
             >
               <div>#</div>
-              <div>Başlık</div>
-              <div>Albüm</div>
-              <div className="text-right">Boyut</div>
-              <div className="text-center">İşlem</div>
+              <div>{t.tableHeaderTitle}</div>
+              <div>{t.tableHeaderAlbum}</div>
+              <div className="text-right">{t.tableHeaderSize}</div>
+              <div className="text-center">{t.action}</div>
             </div>
 
             {/* Rows */}
@@ -236,7 +238,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
                     <div className="text-sm font-medium flex items-center">
                       <span className={`group-hover:hidden ${isActive ? "text-[#ff0000] font-bold" : ""}`}>
                         {isActive && isPlaying ? (
-                          <span className="flex items-center gap-1 h-3.5 px-0.5" title="Oynatılıyor">
+                          <span className="flex items-center gap-1 h-3.5 px-0.5" title={t.playing}>
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-1" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-2" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-3" />
@@ -257,7 +259,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
                         className={`hidden group-hover:flex w-6 h-6 items-center justify-center hover:scale-110 transition-transform cursor-pointer ${
                           isLight ? "text-black" : "text-white"
                         }`}
-                        title="Oynat"
+                        title={t.play}
                       >
                         {isActive && isPlaying ? (
                           <Pause className="w-4 h-4 fill-current stroke-current" />
@@ -335,7 +337,7 @@ export const DownloadsView: FC<DownloadsViewProps> = ({
                           e.stopPropagation();
                           deleteTrackDownload(track.id);
                         }}
-                        data-tooltip="İndirilenlerden Sil"
+                        data-tooltip={t.deleteFromDownloads}
                         data-tooltip-side="left"
                         className="p-1.5 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-200/50 dark:hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                       >

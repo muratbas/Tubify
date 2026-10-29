@@ -44,13 +44,13 @@ interface SearchViewProps {
   onScroll?: (e: React.UIEvent<HTMLElement>) => void;
 }
 
-const CATEGORIES: { id: SearchCategory; label: string }[] = [
-  { id: "all", label: "Tümü" },
-  { id: "songs", label: "Şarkılar" },
-  { id: "artists", label: "Sanatçılar" },
-  { id: "albums", label: "Albümler" },
-  { id: "playlists", label: "Çalma Listeleri" },
-  { id: "podcasts", label: "Podcast'ler" },
+const CATEGORY_IDS: SearchCategory[] = [
+  "all",
+  "songs",
+  "artists",
+  "albums",
+  "playlists",
+  "podcasts",
 ];
 
 // Rich Discover Categories for Empty Search State
@@ -164,9 +164,26 @@ export const SearchView: FC<SearchViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
-  const { t: _t } = useLanguage();
+  const { t, language } = useLanguage();
   const isLight = theme === "light";
   const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
+
+  const getCategoryLabel = (id: SearchCategory): string => {
+    switch (id) {
+      case "all":
+        return t.searchCategoryAll;
+      case "songs":
+        return t.searchCategorySongs;
+      case "artists":
+        return t.searchCategoryArtists;
+      case "albums":
+        return t.searchCategoryAlbums;
+      case "playlists":
+        return t.searchCategoryPlaylists;
+      case "podcasts":
+        return t.searchCategoryPodcasts;
+    }
+  };
 
   const [activeCategory, setActiveCategory] = useState<SearchCategory>("all");
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(() => {
@@ -273,7 +290,7 @@ export const SearchView: FC<SearchViewProps> = ({
       id: artistId,
       type: "artist",
       title: artistName,
-      subtitle: "Sanatçı",
+      subtitle: t.artist,
       thumbnailUrl: thumbnail || "",
     });
     onNavigateArtist(artistId, artistName, thumbnail);
@@ -283,8 +300,8 @@ export const SearchView: FC<SearchViewProps> = ({
     recordRecentItem({
       id: albumId,
       type: "album",
-      title: albumTitle || "Albüm",
-      subtitle: artistName || "Albüm",
+      title: albumTitle || (language === "tr" ? "Albüm" : "Album"),
+      subtitle: artistName || (language === "tr" ? "Albüm" : "Album"),
       thumbnailUrl: thumbnail || "",
     });
     onNavigateAlbum(albumId, albumTitle, artistName, thumbnail);
@@ -295,7 +312,7 @@ export const SearchView: FC<SearchViewProps> = ({
       id: playlist.id,
       type: "playlist",
       title: playlist.title,
-      subtitle: playlist.track_count || "Çalma listesi",
+      subtitle: playlist.track_count || t.playlistLabel,
       thumbnailUrl: playlist.thumbnail || "",
     });
     onSelectPlaylist(playlist);
@@ -387,19 +404,22 @@ export const SearchView: FC<SearchViewProps> = ({
     if (searchResults.length > 0 && qLower) {
       contextualMixes.push({
         id: `mix-${query}`,
-        title: `${query} Karışımı`,
-        description: `${searchResults[0]?.artist || query} ve benzeri sanatçılardan oluşan Tubify özel karışımı`,
+        title: `${query} ${t.searchMix}`,
+        description: `${searchResults[0]?.artist || query} ${t.searchMixDesc}`,
         thumbnail: searchResults[0]?.thumbnail || null,
-        track_count: `${searchResults.length} şarkı`,
+        track_count: `${searchResults.length} ${t.songCountMultiple}`,
       });
 
       if (searchResults[0]?.artist && searchResults[0].artist.toLowerCase() !== qLower) {
         contextualMixes.push({
           id: `radio-${searchResults[0].artist}`,
-          title: `${searchResults[0].artist} Radyosu`,
-          description: `${searchResults[0].artist} ile kesintisiz müzik akışı`,
+          title: `${searchResults[0].artist} ${language === "tr" ? "Radyosu" : "Radio"}`,
+          description:
+            language === "tr"
+              ? `${searchResults[0].artist} ile kesintisiz müzik akışı`
+              : `Non-stop music stream with ${searchResults[0].artist}`,
           thumbnail: searchResults[1]?.thumbnail || searchResults[0]?.thumbnail || null,
-          track_count: "50+ şarkı",
+          track_count: `50+ ${t.songCountMultiple}`,
         });
       }
     }
@@ -464,12 +484,12 @@ export const SearchView: FC<SearchViewProps> = ({
     >
       {/* 2. Arama Kategori Filtreleri (Pill Filter Bar) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none shrink-0 sticky top-0 z-20 pt-2 -mt-2">
-        {CATEGORIES.map((cat) => {
-          const isSelected = activeCategory === cat.id;
+        {CATEGORY_IDS.map((catId) => {
+          const isSelected = activeCategory === catId;
           return (
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              key={catId}
+              onClick={() => setActiveCategory(catId)}
               className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all shrink-0 cursor-pointer select-none ${
                 isSelected
                   ? isLight
@@ -480,7 +500,7 @@ export const SearchView: FC<SearchViewProps> = ({
                   : "bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
               }`}
             >
-              {cat.label}
+              {getCategoryLabel(catId)}
             </button>
           );
         })}
@@ -508,13 +528,13 @@ export const SearchView: FC<SearchViewProps> = ({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
-                  Son aramalar
+                  {t.recentSearches}
                 </h3>
                 <button
                   onClick={handleClearRecentSearches}
                   className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
                 >
-                  Hepsini temizle
+                  {t.clearAll}
                 </button>
               </div>
 
@@ -535,7 +555,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       <button
                         onClick={(e) => handleRemoveRecentSearch(e, item.id)}
                         className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md cursor-pointer"
-                        title="Kaldır"
+                        title={t.removeRecentSearch}
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -567,7 +587,7 @@ export const SearchView: FC<SearchViewProps> = ({
                               }
                             }}
                             className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-red-600/30 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer z-10"
-                            title={isCurrentPlaying ? "Duraklat" : "Oynat"}
+                            title={isCurrentPlaying ? t.pause : t.play}
                           >
                             {isCurrentPlaying ? (
                               <Pause className="w-4 h-4 fill-white text-white" />
@@ -591,13 +611,13 @@ export const SearchView: FC<SearchViewProps> = ({
                         </p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                           {isArtist
-                            ? "Sanatçı"
+                            ? t.artist
                             : item.subtitle ||
                               (item.type === "album"
-                                ? "Albüm"
+                                ? (language === "tr" ? "Albüm" : "Album")
                                 : item.type === "playlist"
-                                ? "Çalma listesi"
-                                : "Şarkı")}
+                                ? t.playlistLabel
+                                : t.song)}
                         </p>
                       </div>
                     </div>
@@ -610,7 +630,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {/* Hepsine Göz At (Browse All / Keşfet) */}
           <div>
             <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">
-              Hepsine göz at
+              {t.browseAll}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {DISCOVER_GENRES.map((genre, idx) => (
@@ -644,10 +664,10 @@ export const SearchView: FC<SearchViewProps> = ({
       {!isSearching && hasQuery && searchResults.length === 0 && !searchError && (
         <div className="py-24 text-center space-y-3">
           <p className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
-            "{query}" için sonuç bulunamadı
+            {language === "tr" ? `"${query}" için sonuç bulunamadı` : `No results found for "${query}"`}
           </p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
-            Lütfen kelimeleri doğru yazdığından emin ol veya farklı anahtar kelimelerle tekrar dene.
+            {t.searchNoResultsHelp}
           </p>
         </div>
       )}
@@ -664,7 +684,7 @@ export const SearchView: FC<SearchViewProps> = ({
                 {topResult && (
                   <div className="lg:col-span-5 flex flex-col">
                     <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">
-                      En iyi sonuç
+                      {t.topResult}
                     </h3>
                     <div
                       onClick={() => {
@@ -696,12 +716,12 @@ export const SearchView: FC<SearchViewProps> = ({
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium truncate">
                             {topResult.type === "artist"
-                              ? "Sanatçı"
-                              : `Şarkı • ${topResult.artistName}`}
+                              ? t.artist
+                              : `${t.song} • ${topResult.artistName}`}
                           </span>
                           {topResult.type === "artist" && (
                             <span className="px-2 py-0.5 text-[10px] font-bold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-full">
-                              Sanatçı
+                              {t.artist}
                             </span>
                           )}
                         </div>
@@ -715,7 +735,7 @@ export const SearchView: FC<SearchViewProps> = ({
                             handleTrackClick(topResult.track, searchResults);
                           }}
                           className="w-12 h-12 rounded-full bg-[#ff0000] text-white shadow-xl shadow-red-500/30 flex items-center justify-center absolute bottom-5 right-5 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-                          title="Oynat"
+                          title={t.play}
                         >
                           {activeTrack?.id === topResult.track.id && isPlaying ? (
                             <Pause className="w-5 h-5 fill-white text-white" />
@@ -731,7 +751,7 @@ export const SearchView: FC<SearchViewProps> = ({
                 {/* 3B. Sağ Sütun: "Şarkılar" (Top Songs - col-span-7) */}
                 <div className="lg:col-span-7 flex flex-col">
                   <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">
-                    Şarkılar
+                    {t.searchCategorySongs}
                   </h3>
                   <div className="space-y-1">
                     {topSongs.map((track) => {
@@ -821,7 +841,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                       if (downloaded) deleteTrackDownload(track.id);
                                     }}
                                     className="p-1.5 rounded-full cursor-pointer transition-transform active:scale-110"
-                                    title={downloaded ? "İndirildi (Silmek için tıkla)" : "İndiriliyor..."}
+                                    title={downloaded ? t.downloadedClickToDelete : t.downloading}
                                   >
                                     {downloading ? (
                                       <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
@@ -839,7 +859,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                     onToggleLike(track);
                                   }}
                                   className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
-                                  title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
+                                  title={isLiked ? t.unlike : t.like}
                                 >
                                   <Heart
                                     className={`w-4 h-4 ${
@@ -855,7 +875,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                       startTrackDownload(track);
                                     }}
                                     className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                                    title="İndir"
+                                    title={t.download}
                                   >
                                     <ArrowDownToLine className="w-4 h-4" />
                                   </button>
@@ -867,7 +887,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                     onContextMenuTrack?.(track, e);
                                   }}
                                   className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                                  title="Diğer seçenekler"
+                                  title={t.moreOptions}
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
@@ -888,7 +908,7 @@ export const SearchView: FC<SearchViewProps> = ({
               {artists.length > 0 && (
                 <div>
                   <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">
-                    Sanatçılar
+                    {t.searchCategoryArtists}
                   </h3>
                   <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
                     {artists.map((artist) => (
@@ -910,7 +930,7 @@ export const SearchView: FC<SearchViewProps> = ({
                           {artist.name}
                         </p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center mt-0.5">
-                          Sanatçı
+                          {t.artist}
                         </p>
                       </div>
                     ))}
@@ -922,7 +942,7 @@ export const SearchView: FC<SearchViewProps> = ({
               {albums.length > 0 && (
                 <div>
                   <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">
-                    Albümler
+                    {t.searchCategoryAlbums}
                   </h3>
                   <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
                     {albums.map((album) => (
@@ -950,7 +970,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                 }
                               }}
                               className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105 active:scale-95 cursor-pointer z-10"
-                              title="Oynat"
+                              title={t.play}
                             >
                               <Play className="w-4 h-4 fill-white text-white ml-0.5" />
                             </button>
@@ -972,7 +992,7 @@ export const SearchView: FC<SearchViewProps> = ({
               {matchingPlaylists.length > 0 && (
                 <div>
                   <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">
-                    Çalma Listeleri
+                    {t.searchCategoryPlaylists}
                   </h3>
                   <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
                     {matchingPlaylists.map((playlist) => (
@@ -998,7 +1018,7 @@ export const SearchView: FC<SearchViewProps> = ({
                           {playlist.title}
                         </p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
-                          {playlist.track_count || "Çalma listesi"}
+                          {playlist.track_count || t.playlistLabel}
                         </p>
                       </div>
                     ))}
@@ -1012,7 +1032,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {activeCategory === "songs" && (
             <div className="space-y-1 animate-in fade-in duration-200">
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">
-                Tüm Şarkılar ({searchResults.length})
+                {t.allSongs} ({searchResults.length})
               </h3>
               {searchResults.map((track, idx) => {
                 const isActive = activeTrack?.id === track.id;
@@ -1120,7 +1140,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                 if (downloaded) deleteTrackDownload(track.id);
                               }}
                               className="p-1.5 rounded-full cursor-pointer transition-transform active:scale-110"
-                              title={downloaded ? "İndirildi (Silmek için tıkla)" : "İndiriliyor..."}
+                              title={downloaded ? t.downloadedClickToDelete : t.downloading}
                             >
                               {downloading ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-[#ff0000]" />
@@ -1138,7 +1158,7 @@ export const SearchView: FC<SearchViewProps> = ({
                               onToggleLike(track);
                             }}
                             className="p-1.5 rounded-full text-neutral-400 hover:text-[#ff0000] transition-colors cursor-pointer"
-                            title={isLiked ? "Beğenilenlerden kaldır" : "Beğen"}
+                            title={isLiked ? t.unlike : t.like}
                           >
                             <Heart
                               className={`w-4 h-4 ${
@@ -1154,7 +1174,7 @@ export const SearchView: FC<SearchViewProps> = ({
                                 startTrackDownload(track);
                               }}
                               className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                              title="İndir"
+                              title={t.download}
                             >
                               <ArrowDownToLine className="w-4 h-4" />
                             </button>
@@ -1166,7 +1186,7 @@ export const SearchView: FC<SearchViewProps> = ({
                               onContextMenuTrack?.(track, e);
                             }}
                             className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                            title="Diğer seçenekler"
+                            title={t.moreOptions}
                           >
                             <MoreHorizontal className="w-4 h-4" />
                           </button>
@@ -1187,7 +1207,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {activeCategory === "artists" && (
             <div className="animate-in fade-in duration-200">
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-6">
-                Sanatçılar ({artists.length})
+                {t.searchCategoryArtists} ({artists.length})
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                 {artists.map((artist) => (
@@ -1209,7 +1229,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       {artist.name}
                     </p>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center mt-1">
-                      Sanatçı
+                      {t.artist}
                     </p>
                   </div>
                 ))}
@@ -1221,7 +1241,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {activeCategory === "albums" && (
             <div className="animate-in fade-in duration-200">
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-6">
-                Albümler ({albums.length})
+                {t.searchCategoryAlbums} ({albums.length})
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {albums.map((album) => (
@@ -1249,7 +1269,7 @@ export const SearchView: FC<SearchViewProps> = ({
                             }
                           }}
                           className="w-10 h-10 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105 active:scale-95 cursor-pointer z-10"
-                          title="Oynat"
+                          title={t.play}
                         >
                           <Play className="w-4 h-4 fill-white text-white ml-0.5" />
                         </button>
@@ -1271,7 +1291,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {activeCategory === "playlists" && (
             <div className="animate-in fade-in duration-200">
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-6">
-                Çalma Listeleri ({matchingPlaylists.length})
+                {t.searchCategoryPlaylists} ({matchingPlaylists.length})
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {matchingPlaylists.map((playlist) => (
@@ -1297,7 +1317,7 @@ export const SearchView: FC<SearchViewProps> = ({
                       {playlist.title}
                     </p>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
-                      {playlist.track_count || "Çalma listesi"}
+                      {playlist.track_count || t.playlistLabel}
                     </p>
                   </div>
                 ))}
@@ -1309,7 +1329,7 @@ export const SearchView: FC<SearchViewProps> = ({
           {activeCategory === "podcasts" && (
             <div className="animate-in fade-in duration-200">
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-6">
-                Podcast'ler & Bölümler ({podcastResults.length})
+                {t.searchCategoryPodcasts} ({podcastResults.length})
               </h3>
               <div className="space-y-2">
                 {podcastResults.map((pod) => (
@@ -1328,7 +1348,7 @@ export const SearchView: FC<SearchViewProps> = ({
 
                       <div className="min-w-0">
                         <span className="text-[11px] font-semibold text-[#ff0000] uppercase tracking-wider block mb-0.5">
-                          Podcast Bölümü
+                          {t.podcastEpisode}
                         </span>
                         <p className="font-bold text-sm text-neutral-900 dark:text-white truncate">
                           {pod.title}

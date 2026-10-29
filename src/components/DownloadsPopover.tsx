@@ -1,6 +1,7 @@
 import { useRef, useEffect, type FC } from "react";
 import { CheckCircle2, XCircle, Music2, ArrowDownToLine } from "lucide-react";
 import { useDownload } from "../context/DownloadContext";
+import { useLanguage } from "../context/LanguageContext";
 
 interface DownloadsPopoverProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const DownloadsPopover: FC<DownloadsPopoverProps> = ({
   onClose,
   onOpenDownloadsView,
 }) => {
+  const { t } = useLanguage();
   const {
     downloadedTracks,
     activeDownloads,
@@ -67,10 +69,10 @@ export const DownloadsPopover: FC<DownloadsPopoverProps> = ({
       {/* Header Area */}
       <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800/80">
         <h3 className="font-bold text-base text-neutral-900 dark:text-white">
-          Downloads
+          {t.downloads}
         </h3>
         <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-          {totalSavedCount} saved • {totalSavedFormatted}
+          {totalSavedCount} {totalSavedCount === 1 ? t.songCountSingle : t.songCountMultiple} • {totalSavedFormatted}
         </span>
       </div>
 
@@ -82,7 +84,7 @@ export const DownloadsPopover: FC<DownloadsPopoverProps> = ({
               <ArrowDownToLine className="w-5 h-5 text-neutral-400" />
             </div>
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              Henüz indirilen şarkı yok
+              {t.noDownloadsYet}
             </p>
           </div>
         )}
@@ -125,7 +127,7 @@ export const DownloadsPopover: FC<DownloadsPopoverProps> = ({
             {/* Cancel Button */}
             <button
               onClick={() => cancelTrackDownload(item.track_id)}
-              data-tooltip="İptal Et"
+              data-tooltip={t.cancelDownload}
               data-tooltip-side="left"
               className="p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
             >
@@ -178,7 +180,7 @@ export const DownloadsPopover: FC<DownloadsPopoverProps> = ({
         }}
         className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white py-2 mt-2 w-full text-center hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-xl transition-colors cursor-pointer"
       >
-        Open downloads
+        {t.openDownloads}
       </button>
     </div>
   );

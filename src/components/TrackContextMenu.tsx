@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { addTrackToPlaylist } from "../services/api";
 import type { Track, Playlist } from "../types/music";
 
@@ -160,6 +161,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
   const { theme } = useTheme();
   const isLight = theme === "light";
   const player = usePlayer();
+  const { t, language } = useLanguage();
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLDivElement | null>(null);
@@ -347,8 +349,12 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
       await player.toggleLike(track, true);
       player.showToast(
         isLiked
-          ? `"${track.title}" Beğenilenler'den kaldırıldı`
-          : `"${track.title}" Beğenilenler'e eklendi`
+          ? language === "tr"
+            ? `"${track.title}" Beğenilenler'den kaldırıldı`
+            : `"${track.title}" removed from Liked Songs`
+          : language === "tr"
+          ? `"${track.title}" Beğenilenler'e eklendi`
+          : `"${track.title}" added to Liked Songs`
       );
     }
   };
@@ -365,7 +371,11 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         await onToggleLike(track);
       } else {
         await player.toggleLike(track, true);
-        player.showToast(`"${track.title}" Beğenilenler'e eklendi`);
+        player.showToast(
+          language === "tr"
+            ? `"${track.title}" Beğenilenler'e eklendi`
+            : `"${track.title}" added to Liked Songs`
+        );
       }
       return;
     }
@@ -381,7 +391,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         if (!existing.some((t) => t.id === track.id)) {
           existing.push({
             ...track,
-            added_at: new Date().toLocaleDateString("tr-TR", {
+            added_at: new Date().toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
               day: "numeric",
               month: "short",
               year: "numeric",
@@ -391,10 +401,18 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         }
       } catch {}
 
-      player.showToast(`"${track.title}", "${pl.title}" listesine eklendi`);
+      player.showToast(
+        language === "tr"
+          ? `"${track.title}", "${pl.title}" listesine eklendi`
+          : `"${track.title}" added to "${pl.title}"`
+      );
     } catch (e: any) {
       console.error("Failed to add track to playlist:", e);
-      player.showToast(`Listeye eklenemedi: ${e?.message || e}`);
+      player.showToast(
+        language === "tr"
+          ? `Listeye eklenemedi: ${e?.message || e}`
+          : `Failed to add to playlist: ${e?.message || e}`
+      );
     }
   };
 
@@ -419,7 +437,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
 
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(`https://music.youtube.com/watch?v=${track.id}`);
-    player.showToast("Şarkı bağlantısı panoya kopyalandı");
+    player.showToast(t.toastLinkCopied);
     onClose();
   };
 
@@ -449,7 +467,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         }`}
       >
         <ListPlus className="w-4 h-4 shrink-0 text-[#ff0000]" />
-        <span>Sıraya Ekle</span>
+        <span>{t.addToQueue}</span>
       </button>
 
       {/* 2. Play Next */}
@@ -460,7 +478,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         }`}
       >
         <ListMusic className="w-4 h-4 shrink-0" />
-        <span>Bundan Sonra Çal</span>
+        <span>{t.playNext}</span>
       </button>
 
       {/* 3. Start Radio */}
@@ -471,7 +489,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         }`}
       >
         <Radio className="w-4 h-4 shrink-0 text-[#ff0000]" />
-        <span>Şarkı Radyosunu Başlat</span>
+        <span>{t.startRadio}</span>
       </button>
 
       <div className={`h-[1px] my-1 ${isLight ? "bg-neutral-200" : "bg-white/[0.08]"}`} />
@@ -488,7 +506,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
             isLiked ? "text-[#ff0000] fill-[#ff0000]" : "text-neutral-400"
           }`}
         />
-        <span>{isLiked ? "Beğenilenler'den Kaldır" : "Beğenilenler'e Ekle"}</span>
+        <span>{isLiked ? t.removeFromLikedSongs : t.saveToLikedSongs}</span>
       </button>
 
       {/* 5. Add to Playlist with Submenu */}
@@ -512,7 +530,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         >
           <div className="flex items-center gap-3">
             <PlusCircle className="w-4 h-4 shrink-0" />
-            <span>Çalma Listesine Ekle</span>
+            <span>{t.addToPlaylist}</span>
           </div>
           <ChevronRight className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
         </button>
@@ -545,7 +563,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
                 }`}
               >
                 <Heart className="w-3.5 h-3.5 text-[#ff0000] shrink-0" />
-                <span className="truncate">Beğenilen Şarkılar</span>
+                <span className="truncate">{t.likedSongs}</span>
               </button>
 
               {playlists.length > 0 && (
@@ -580,7 +598,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           }`}
         >
           <Trash2 className="w-4 h-4 shrink-0 text-[#ff0000]" />
-          <span>Bu Çalma Listesinden Kaldır</span>
+          <span>{t.removeFromPlaylist}</span>
         </button>
       )}
 
@@ -595,7 +613,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           }`}
         >
           <User className="w-4 h-4 shrink-0" />
-          <span>Sanatçıya Git</span>
+          <span>{t.goToArtist}</span>
         </button>
       )}
 
@@ -608,7 +626,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
           }`}
         >
           <Disc className="w-4 h-4 shrink-0" />
-          <span>Albüme Git</span>
+          <span>{t.goToAlbum}</span>
         </button>
       )}
 
@@ -620,7 +638,7 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
         }`}
       >
         <Share2 className="w-4 h-4 shrink-0" />
-        <span>Şarkı Bağlantısını Kopyala</span>
+        <span>{t.copyLink}</span>
       </button>
     </div>
   );

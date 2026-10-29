@@ -14,6 +14,7 @@ import {
   ArrowDownToLine,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useDownload } from "../context/DownloadContext";
 import { getAlbumDetails } from "../services/api";
 import type { AlbumDetails, Track } from "../types/music";
@@ -77,6 +78,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
+  const { t, language } = useLanguage();
   const isLight = theme === "light";
   const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
@@ -98,7 +100,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
       } catch (e: unknown) {
         if (!isCancelled) {
           console.error("Album load error:", e);
-          setError(e instanceof Error ? e.message : "Albüm bilgileri yüklenemedi");
+          setError(e instanceof Error ? e.message : t.albumLoadError);
         }
       } finally {
         if (!isCancelled) {
@@ -112,10 +114,13 @@ export const AlbumView: FC<AlbumViewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [albumId]);
+  }, [albumId, t.albumLoadError]);
 
+  const defaultAlbumWord = language === "tr" ? "Albüm" : "Album";
   const displayTitle =
-    (albumData?.title && albumData.title !== "Albüm" ? albumData.title : albumTitle) || "Albüm";
+    (albumData?.title && albumData.title !== "Albüm" && albumData.title !== "Album"
+      ? albumData.title
+      : albumTitle) || defaultAlbumWord;
   const displayArtist =
     (albumData?.artist && albumData.artist !== "Unknown Artist"
       ? albumData.artist
@@ -124,19 +129,19 @@ export const AlbumView: FC<AlbumViewProps> = ({
   const displayThumbnail = albumData?.thumbnail || initialThumbnail || null;
   const displayYear = albumData?.year || null;
   const displayTrackCount =
-    albumData?.track_count || (albumData?.tracks ? `${albumData.tracks.length} şarkı` : null);
+    albumData?.track_count || (albumData?.tracks ? `${albumData.tracks.length} ${t.songCountMultiple}` : null);
 
   const tracks: Track[] = useMemo(() => {
     if (!albumData?.tracks) return [];
-    return albumData.tracks.map((t) => ({
-      ...t,
+    return albumData.tracks.map((trk) => ({
+      ...trk,
       artist:
-        (t.artist && t.artist !== "Unknown Artist" ? t.artist : displayArtist) || "Unknown Artist",
-      artist_id: t.artist_id || displayArtistId || undefined,
-      album: t.album && t.album !== "Albüm" ? t.album : displayTitle,
-      album_id: t.album_id || albumId,
-      thumbnail: t.thumbnail || displayThumbnail || undefined,
-      plays: t.plays || undefined,
+        (trk.artist && trk.artist !== "Unknown Artist" ? trk.artist : displayArtist) || "Unknown Artist",
+      artist_id: trk.artist_id || displayArtistId || undefined,
+      album: trk.album && trk.album !== "Albüm" && trk.album !== "Album" ? trk.album : displayTitle,
+      album_id: trk.album_id || albumId,
+      thumbnail: trk.thumbnail || displayThumbnail || undefined,
+      plays: trk.plays || undefined,
     }));
   }, [albumData, displayArtist, displayArtistId, displayTitle, albumId, displayThumbnail]);
 
@@ -144,7 +149,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full p-8 text-center gap-3">
         <AlertCircle className="w-10 h-10 text-rose-500" />
-        <h2 className="text-lg font-bold">Albüm Sayfası Yüklenemedi</h2>
+        <h2 className="text-lg font-bold">{t.albumPageLoadError}</h2>
         <p className="text-xs text-neutral-400 max-w-sm">{error || "Bilinmeyen hata"}</p>
       </div>
     );
@@ -226,9 +231,9 @@ export const AlbumView: FC<AlbumViewProps> = ({
             onClick={() => onPlayAll(tracks)}
             disabled={tracks.length === 0}
             className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#cc0000] active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-            title="Tümünü Oynat"
+            title={t.playAll}
           >
-            {isPlaying && activeTrack && tracks.some((t) => t.id === activeTrack.id) ? (
+            {isPlaying && activeTrack && tracks.some((trk) => trk.id === activeTrack.id) ? (
               <Pause className="w-6 h-6 fill-white stroke-white" />
             ) : (
               <Play className="w-6 h-6 fill-white stroke-white ml-1" />
@@ -245,7 +250,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                   ? "text-neutral-500 hover:text-neutral-900"
                   : "text-neutral-400 hover:text-white"
               }`}
-              title="Karışık Çal"
+              title={t.shuffle}
             >
               <Shuffle className="w-6 h-6" />
             </button>
@@ -262,9 +267,9 @@ export const AlbumView: FC<AlbumViewProps> = ({
             }`}
           >
             <span>#</span>
-            <span className="min-w-0">BAŞLIK</span>
+            <span className="min-w-0">{t.tableHeaderTitle}</span>
             <span className="text-right pr-2 text-xs font-semibold text-neutral-400 tracking-wider">
-              DİNLENME SAYISI
+              {t.tableHeaderPlays}
             </span>
             <span className="text-center"></span>
             <span className="text-right flex items-center justify-end">
@@ -309,7 +314,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                     <div className="text-sm font-medium flex items-center">
                       <span className={`group-hover:hidden ${isActive ? "text-[#ff0000] font-bold" : ""}`}>
                         {isActive && isPlaying ? (
-                          <span className="flex items-center gap-1 h-3.5 px-0.5" title="Oynatılıyor">
+                          <span className="flex items-center gap-1 h-3.5 px-0.5" title={t.playing}>
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-1" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-2" />
                             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-tubify-dot-3" />
@@ -326,7 +331,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                         className={`hidden group-hover:flex w-6 h-6 items-center justify-center hover:scale-110 transition-transform cursor-pointer ${
                           isLight ? "text-black" : "text-white"
                         }`}
-                        title="Oynat"
+                        title={t.play}
                       >
                         {isActive && isPlaying ? (
                           <Pause className="w-4 h-4 fill-current stroke-current" />
@@ -400,7 +405,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                           onToggleLike(track);
                         }}
                         className="p-1 transition-transform active:scale-125 cursor-pointer"
-                        title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
+                        title={isLiked ? t.unlike : t.like}
                       >
                         <Heart
                           className={`w-4 h-4 ${
@@ -435,10 +440,10 @@ export const AlbumView: FC<AlbumViewProps> = ({
                             }`}
                             title={
                               downloaded
-                                ? "İndirildi (Silmek için tıkla)"
+                                ? t.downloadedClickToDelete
                                 : downloading
-                                ? "İndiriliyor..."
-                                : "İndir"
+                                ? t.downloading
+                                : t.download
                             }
                           >
                             {downloading ? (
@@ -466,7 +471,7 @@ export const AlbumView: FC<AlbumViewProps> = ({
                           }
                         }}
                         className="p-1 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-opacity cursor-pointer"
-                        title="Diğer seçenekler"
+                        title={t.moreOptions}
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </button>

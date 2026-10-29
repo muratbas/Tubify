@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FC, type FormEvent } from "react";
 import { X, Music2, Globe, EyeOff, Lock, Loader2, Camera, Trash2, Upload } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Playlist } from "../types/music";
 
 export type PrivacyStatus = "PUBLIC" | "UNLISTED" | "PRIVATE";
@@ -63,6 +64,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
   onSave,
 }) => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isLight = theme === "light";
 
   const [title, setTitle] = useState("");
@@ -113,7 +115,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WebP).");
+      setError(t.invalidImageFormat);
       return;
     }
 
@@ -123,7 +125,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
       setIsCoverModified(true);
       setError(null);
     } catch {
-      setError("Resim işlenirken bir sorun oluştu.");
+      setError(t.imageProcessingError);
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -151,7 +153,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
     const file = e.dataTransfer.files?.[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
-        setError("Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WebP).");
+        setError(t.invalidImageFormat);
         return;
       }
 
@@ -161,7 +163,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
         setIsCoverModified(true);
         setError(null);
       } catch {
-        setError("Resim işlenirken bir sorun oluştu.");
+        setError(t.imageProcessingError);
       }
       return;
     }
@@ -203,7 +205,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
       );
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Çalma listesi güncellenemedi");
+      setError(err instanceof Error ? err.message : t.playlistUpdateFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -235,7 +237,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
 
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-white/10">
-          <h3 className="text-base font-bold tracking-tight">Bilgileri düzenle</h3>
+          <h3 className="text-base font-bold tracking-tight">{t.editPlaylist}</h3>
           <button
             onClick={onClose}
             disabled={isSubmitting}
@@ -274,7 +276,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                     ? "bg-neutral-100 border-neutral-200 hover:border-neutral-400"
                     : "bg-neutral-800 border-white/10 hover:border-white/30"
                 }`}
-                title="Kapak görseli seçmek veya sürükleyip bırakmak için tıkla"
+                title={t.chooseOrDragPhoto}
               >
                 {coverPreview ? (
                   <img
@@ -291,7 +293,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                   <div className="absolute inset-0 bg-[#ff0000]/25 backdrop-blur-xs flex flex-col items-center justify-center gap-1 text-white z-20 p-2 text-center pointer-events-none">
                     <Upload className="w-6 h-6 text-white animate-bounce" />
                     <span className="text-[10px] font-bold tracking-tight leading-tight drop-shadow">
-                      Buraya bırakın
+                      {t.chooseOrDragPhotoDrop}
                     </span>
                   </div>
                 ) : (
@@ -299,7 +301,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white z-10 p-2 text-center">
                     <Camera className="w-5 h-5 drop-shadow" />
                     <span className="text-[10px] font-bold tracking-tight leading-tight drop-shadow">
-                      Fotoğraf seç veya sürükle
+                      {t.chooseOrDragPhoto}
                     </span>
                   </div>
                 )}
@@ -313,7 +315,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                   className="text-[11px] font-medium text-neutral-400 hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Kaldır</span>
+                  <span>{t.removeCover}</span>
                 </button>
               )}
             </div>
@@ -322,7 +324,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-xs font-semibold mb-1 text-neutral-500 dark:text-neutral-400">
-                  Ad <span className="text-[#ff0000]">*</span>
+                  {t.titleLabel} <span className="text-[#ff0000]">*</span>
                 </label>
                 <input
                   type="text"
@@ -331,7 +333,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                   disabled={isSubmitting}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Çalma listesi adı"
+                  placeholder={t.playlistNamePlaceholder}
                   className={`w-full px-3 py-2 text-xs rounded-lg font-medium outline-none transition-all ${
                     isLight
                       ? "bg-neutral-50 border border-neutral-300 focus:border-[#ff0000] focus:bg-white text-neutral-900"
@@ -342,14 +344,14 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold mb-1 text-neutral-500 dark:text-neutral-400">
-                  Açıklama (İsteğe bağlı)
+                  {t.descriptionLabel}
                 </label>
                 <textarea
                   rows={2}
                   disabled={isSubmitting}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Açıklama ekle"
+                  placeholder={t.descriptionPlaceholder}
                   className={`w-full px-3 py-2 text-xs rounded-lg font-medium outline-none resize-none transition-all ${
                     isLight
                       ? "bg-neutral-50 border border-neutral-300 focus:border-[#ff0000] focus:bg-white text-neutral-900"
@@ -363,7 +365,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
           {/* Privacy Selector */}
           <div>
             <label className="block text-xs font-semibold mb-1.5 text-neutral-500 dark:text-neutral-400">
-              Gizlilik
+              {t.privacyLabel}
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -381,7 +383,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                 }`}
               >
                 <Globe className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Herkese Açık</span>
+                <span className="text-[11px]">{t.privacyPublic}</span>
               </button>
 
               <button
@@ -399,7 +401,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                 }`}
               >
                 <EyeOff className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Liste Dışı</span>
+                <span className="text-[11px]">{t.privacyUnlisted}</span>
               </button>
 
               <button
@@ -417,13 +419,13 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                 }`}
               >
                 <Lock className="w-4 h-4 mb-1" />
-                <span className="text-[11px]">Özel</span>
+                <span className="text-[11px]">{t.privacyPrivate}</span>
               </button>
             </div>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1.5 px-0.5">
-              {privacyStatus === "PUBLIC" && "Herkes arayabilir ve görüntüleyebilir."}
-              {privacyStatus === "UNLISTED" && "Yalnızca bağlantıya sahip olanlar görüntüleyebilir."}
-              {privacyStatus === "PRIVATE" && "Yalnızca siz görüntüleyebilirsiniz."}
+              {privacyStatus === "PUBLIC" && t.privacyPublicDesc}
+              {privacyStatus === "UNLISTED" && t.privacyUnlistedDesc}
+              {privacyStatus === "PRIVATE" && t.privacyPrivateDesc}
             </p>
           </div>
 
@@ -439,7 +441,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
                   : "bg-white/10 hover:bg-white/15 text-neutral-200"
               }`}
             >
-              İptal
+              {t.cancel}
             </button>
             <button
               type="submit"
@@ -447,7 +449,7 @@ export const EditPlaylistModal: FC<EditPlaylistModalProps> = ({
               className="px-5 py-2 text-xs font-bold rounded-full bg-[#ff0000] text-white hover:bg-[#e60000] disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
             >
               {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</span>
+              <span>{isSubmitting ? t.saving : t.save}</span>
             </button>
           </div>
         </form>

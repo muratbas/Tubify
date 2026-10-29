@@ -88,7 +88,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
               ref={activeTrackRef}
               onClick={() => playTrack(activeTrack)}
               className="relative group cursor-pointer"
-              title={`Şu an çalan: ${activeTrack.title} • ${activeTrack.artist}`}
+              title={`${t.nowPlayingTag} ${activeTrack.title} • ${activeTrack.artist}`}
             >
               <div className="w-10 h-10 rounded-lg overflow-hidden ring-2 ring-[#FF0000] p-0.5 bg-neutral-900">
                 {activeTrack.thumbnail ? (
@@ -127,7 +127,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                   ref={activeTrackRef}
                   onClick={() => playTrack(track)}
                   className="relative group cursor-pointer"
-                  title={`Şu an çalan: ${track.title} • ${track.artist}`}
+                  title={`${t.nowPlayingTag} ${track.title} • ${track.artist}`}
                 >
                   <div className="w-10 h-10 rounded-lg overflow-hidden ring-2 ring-[#FF0000] p-0.5 bg-neutral-900">
                     {track.thumbnail ? (
@@ -169,7 +169,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                     ? "opacity-50 hover:opacity-100"
                     : "opacity-100 hover:scale-105 active:scale-95"
                 }`}
-                title={`${isPast ? "(Önceki) " : ""}${track.title} • ${track.artist}`}
+                title={`${isPast ? t.previousTag : ""}${track.title} • ${track.artist}`}
               >
                 <div className="w-10 h-10 rounded-md overflow-hidden bg-neutral-200 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/5">
                   {track.thumbnail ? (
@@ -229,7 +229,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
           {/* Shuffle Toggle */}
           <button
             onClick={toggleShuffle}
-            title={isShuffle ? "Karışık Çalma Açık" : "Sırayı Karıştır"}
+            title={isShuffle ? t.shuffleQueueOn : t.shuffleQueue}
             className={`p-1.5 rounded-md transition-colors cursor-pointer ${
               isShuffle
                 ? "text-[#FF0000] bg-rose-500/10"
@@ -244,7 +244,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
           {/* Save queue as playlist */}
           <button
             onClick={saveQueueAsPlaylist}
-            title="Sırayı çalma listesi olarak kaydet"
+            title={t.saveQueueAsPlaylist}
             className={`p-1.5 rounded-md transition-colors cursor-pointer ${
               isLight
                 ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
@@ -257,7 +257,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
           {/* Clear queue */}
           <button
             onClick={clearQueue}
-            title="Sırayı temizle"
+            title={t.clearQueue}
             className={`p-1.5 rounded-md transition-colors cursor-pointer ${
               isLight
                 ? "text-neutral-500 hover:text-[#FF0000] hover:bg-rose-50"
@@ -322,7 +322,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                       ? "text-neutral-500 hover:text-black hover:bg-black/5"
                       : "text-neutral-300 hover:text-white hover:bg-white/10"
                   }`}
-                  title="Daha fazla seçenek"
+                  title={t.moreOptions}
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
@@ -335,7 +335,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
         {queue.length === 0 && !activeTrack ? (
           <div className="py-12 text-center space-y-2">
             <p className="text-xs text-neutral-400 dark:text-neutral-500">
-              Sırada parça yok.
+              {t.noTracksInQueue}
             </p>
           </div>
         ) : (
@@ -410,7 +410,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                               ? "text-neutral-500 hover:text-black hover:bg-black/5"
                               : "text-neutral-300 hover:text-white hover:bg-white/10"
                           }`}
-                          title="Daha fazla seçenek"
+                          title={t.moreOptions}
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
@@ -492,7 +492,7 @@ export const RightDrawer: FC<RightDrawerProps> = ({ onContextMenuTrack }) => {
                           ? "text-neutral-500 hover:text-black hover:bg-black/5"
                           : "text-neutral-400 hover:text-white hover:bg-white/10"
                       }`}
-                      title="Daha fazla seçenek"
+                      title={t.moreOptions}
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </button>

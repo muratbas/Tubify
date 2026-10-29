@@ -105,7 +105,25 @@ pub struct SessionData {
 // Global thread-safe session store
 pub static SESSION: Mutex<Option<SessionData>> = Mutex::new(None);
 
+pub fn get_session_file_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Ok(path) = std::env::current_dir() {
+        paths.push(path.join("tubify_session.json"));
+        paths.push(path.join("src-tauri").join("tubify_session.json"));
+    }
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        paths.push(PathBuf::from(appdata).join("com.tubify.music").join("tubify_session.json"));
+    }
+    paths.push(PathBuf::from("tubify_session.json"));
+    paths
+}
+
 fn get_session_file_path() -> PathBuf {
+    for p in get_session_file_paths() {
+        if p.exists() {
+            return p;
+        }
+    }
     if let Ok(path) = std::env::current_dir() {
         return path.join("tubify_session.json");
     }
@@ -117,17 +135,23 @@ pub fn load_saved_session() {
     if file.exists() {
         if let Ok(content) = fs::read_to_string(&file) {
             if let Ok(data) = serde_json::from_str::<SessionData>(&content) {
+                let raw_cookie = data.cookie.clone();
+                let is_auth = data.profile.as_ref().map_or(false, |p| p.is_authenticated);
+                if raw_cookie.trim().is_empty() || !is_auth {
+                    let mut lock = SESSION.lock().unwrap();
+                    *lock = None;
+                    return;
+                }
                 let should_refresh = match &data.profile {
                     Some(p) => p.avatar_url.as_ref().map_or(true, |u| u.contains("=w1500-h844-") || u.is_empty()),
                     None => true,
                 };
-                let raw_cookie = data.cookie.clone();
                 {
                     let mut lock = SESSION.lock().unwrap();
                     *lock = Some(data);
                 }
                 if should_refresh && !raw_cookie.is_empty() {
-                    tokio::spawn(async move {
+                    tauri::async_runtime::spawn(async move {
                         let _ = verify_and_save_cookie(&raw_cookie).await;
                     });
                 }
@@ -137,16 +161,27 @@ pub fn load_saved_session() {
 }
 
 pub fn save_session_to_file(data: &SessionData) {
-    let file = get_session_file_path();
     if let Ok(json) = serde_json::to_string_pretty(data) {
-        let _ = fs::write(file, json);
+        let file = get_session_file_path();
+        let _ = fs::write(&file, &json);
+        if let Ok(path) = std::env::current_dir() {
+            let root_f = path.join("tubify_session.json");
+            let src_f = path.join("src-tauri").join("tubify_session.json");
+            if root_f != file {
+                let _ = fs::write(root_f, &json);
+            }
+            if src_f != file {
+                let _ = fs::write(src_f, &json);
+            }
+        }
     }
 }
 
 pub fn clear_session_file() {
-    let file = get_session_file_path();
-    if file.exists() {
-        let _ = fs::remove_file(file);
+    for p in get_session_file_paths() {
+        if p.exists() {
+            let _ = fs::remove_file(p);
+        }
     }
     let mut lock = SESSION.lock().unwrap();
     *lock = None;
@@ -236,7 +271,7 @@ pub fn build_client(cookie: &str, sapisid: Option<&str>) -> Result<(reqwest::Cli
     Ok((client, headers))
 }
 
-pub async fn fetch_account_profile(client: &reqwest::Client) -> (Option<String>, Option<String>, Option<String>) {
+pub async fn fetch_account_profile(client: &reqwest::Client) -> (Option<String>, Option<String>, Option<String>, bool) {
     let url = "https://music.youtube.com/youtubei/v1/account/account_menu";
     let payload = serde_json::json!({
         "context": {
@@ -251,6 +286,23 @@ pub async fn fetch_account_profile(client: &reqwest::Client) -> (Option<String>,
 
     if let Ok(res) = client.post(url).json(&payload).send().await {
         if let Ok(json) = res.json::<serde_json::Value>().await {
+            let is_logged_in = json.pointer("/responseContext/serviceTrackingParams")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter().any(|service| {
+                        service.get("params")
+                            .and_then(|p| p.as_array())
+                            .map(|params| {
+                                params.iter().any(|param| {
+                                    param.get("key").and_then(|k| k.as_str()) == Some("logged_in")
+                                        && param.get("value").and_then(|v| v.as_str()) == Some("1")
+                                })
+                            })
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false);
+
             let header = json.pointer("/actions/0/openPopupAction/popup/multiPageMenuRenderer/header/activeAccountHeaderRenderer");
             if let Some(h) = header {
                 let name = h.pointer("/accountName/runs/0/text")
@@ -268,18 +320,39 @@ pub async fn fetch_account_profile(client: &reqwest::Client) -> (Option<String>,
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 
-                return (name, avatar, handle);
+                return (name, avatar, handle, true);
             }
+            return (None, None, None, is_logged_in);
         }
     }
-    (None, None, None)
+    (None, None, None, false)
 }
 
 pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, String> {
     let sapisid = extract_sapisid(raw_cookie);
     let (client, _) = build_client(raw_cookie, sapisid.as_deref())?;
 
-    let (acct_name, acct_avatar, acct_handle) = fetch_account_profile(&client).await;
+    let (acct_name, acct_avatar, acct_handle, is_logged_in) = fetch_account_profile(&client).await;
+
+    if !is_logged_in && acct_name.is_none() && acct_avatar.is_none() {
+        let unauth_profile = UserProfile {
+            is_authenticated: false,
+            name: None,
+            email: None,
+            avatar_url: None,
+        };
+        {
+            let mut lock = SESSION.lock().unwrap();
+            *lock = Some(SessionData {
+                cookie: "".to_string(),
+                sapisid: None,
+                profile: Some(unauth_profile.clone()),
+            });
+        }
+        clear_session_file();
+        return Err("Google oturumu geçerli değil veya süresi dolmuş.".to_string());
+    }
+
     let name = acct_name.or_else(|| Some("Google Hesabım".to_string()));
     let mut avatar_url = acct_avatar;
     let email = acct_handle;

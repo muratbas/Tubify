@@ -200,6 +200,7 @@ const DynamicShelf: FC<{
   onClickItem,
   onContextMenuTrack,
 }) => {
+  const { language } = useLanguage();
   const shelfSlug = useMemo(
     () => `shelf-${section.title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
     [section.title]
@@ -388,7 +389,7 @@ const DynamicShelf: FC<{
                     className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5 leading-snug"
                     title={item.subtitle || ""}
                   >
-                    {item.subtitle || (item.item_type === "album" ? "Albüm" : "Çalma Listesi")}
+                    {item.subtitle || (item.item_type === "album" ? (language === "tr" ? "Albüm" : "Album") : (language === "tr" ? "Çalma Listesi" : "Playlist"))}
                   </p>
                 </div>
               </div>
@@ -473,7 +474,7 @@ export const HomeView: FC<HomeViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const isLight = theme === "light";
 
   // Dynamic Home Feed State (shelves from InnerTube FEmusic_home)
@@ -967,7 +968,7 @@ export const HomeView: FC<HomeViewProps> = ({
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 mb-2.5">
                     {pl.id === "liked" || pl.id === "LM" ? (
-                      <div className="w-full h-full bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center">
+                      <div className="w-full h-full bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center">
                         <Heart className="w-9 h-9 text-white fill-white" />
                       </div>
                     ) : (
@@ -987,7 +988,7 @@ export const HomeView: FC<HomeViewProps> = ({
                           onPlayPlaylist?.(pl);
                         }}
                         className="w-9 h-9 rounded-full bg-[#ff0000] text-white flex items-center justify-center shadow-lg shadow-black/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                        data-tooltip="Oynat"
+                        data-tooltip={language === "tr" ? "Oynat" : "Play"}
                       >
                         <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
                       </button>
@@ -999,9 +1000,9 @@ export const HomeView: FC<HomeViewProps> = ({
                       className={`font-semibold text-sm truncate ${
                         isLight ? "text-neutral-900" : "text-white"
                       }`}
-                      title={pl.title}
+                      title={pl.id === "liked" || pl.id === "LM" ? t.likedSongs : pl.title}
                     >
-                      {pl.title}
+                      {pl.id === "liked" || pl.id === "LM" ? t.likedSongs : pl.title}
                     </h4>
                     <p
                       className={`text-xs mt-0.5 truncate ${
@@ -1032,7 +1033,7 @@ export const HomeView: FC<HomeViewProps> = ({
           {isLoadingMore ? (
             <div className="flex items-center gap-2 text-sm text-neutral-400">
               <Loader2 className="w-5 h-5 animate-spin text-[#ff0000]" />
-              <span>Daha fazla içerik yükleniyor...</span>
+              <span>{language === "tr" ? "Daha fazla içerik yükleniyor..." : "Loading more content..."}</span>
             </div>
           ) : (
             <button
@@ -1043,7 +1044,7 @@ export const HomeView: FC<HomeViewProps> = ({
                   : "bg-white/10 hover:bg-white/20 text-neutral-200"
               }`}
             >
-              Daha fazla göster
+              {language === "tr" ? "Daha fazla göster" : "Show more"}
             </button>
           )}
         </div>

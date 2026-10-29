@@ -93,7 +93,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   onEditCover,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { queueViewMode, showToast } = usePlayer();
   const {
     isDownloaded,
@@ -104,8 +104,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
   } = useDownload();
   const isLight = theme === "light";
 
-  const isAnyPlaylistTrackDownloading = tracks.some((t) => isDownloading(t.id));
-  const areAllTracksDownloaded = tracks.length > 0 && tracks.every((t) => isDownloaded(t.id));
+  const isAnyPlaylistTrackDownloading = tracks.some((trk) => isDownloading(trk.id));
+  const areAllTracksDownloaded = tracks.length > 0 && tracks.every((trk) => isDownloaded(trk.id));
 
   const [filterQuery, setFilterQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(50);
@@ -244,10 +244,12 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
     const hours = Math.floor(totalDurationSeconds / 3600);
     const minutes = Math.floor((totalDurationSeconds % 3600) / 60);
     if (hours > 0) {
-      return minutes > 0 ? `${hours} sa ${minutes} dk` : `${hours} sa`;
+      return minutes > 0
+        ? `${hours} ${t.durationHour} ${minutes} ${t.durationMinute}`
+        : `${hours} ${t.durationHour}`;
     }
-    return `${Math.max(1, minutes)} dk`;
-  }, [totalDurationSeconds]);
+    return `${Math.max(1, minutes)} ${t.durationMinute}`;
+  }, [totalDurationSeconds, t]);
 
   // Clean track count string ensuring "parça" is never concatenated with "şarkı"
   const trackCountText = useMemo(() => {
@@ -257,7 +259,11 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
       ? playlist.track_count
       : null;
 
-    if (!raw) return `${tracks.length.toLocaleString()} şarkı`;
+    if (!raw) {
+      return `${tracks.length.toLocaleString()} ${
+        tracks.length === 1 ? t.songCountSingle : t.songCountMultiple
+      }`;
+    }
     const cleaned = raw
       .replace(/parça(lar)?/gi, "")
       .replace(/şarkı(lar)?/gi, "")
@@ -265,8 +271,12 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
       .replace(/tracks?/gi, "")
       .replace(/songs?/gi, "")
       .trim();
-    return cleaned ? `${cleaned} şarkı` : `${tracks.length.toLocaleString()} şarkı`;
-  }, [isLikedPlaylist, likedSongsTotalCount, playlist, tracks.length]);
+    return cleaned
+      ? `${cleaned} ${cleaned === "1" ? t.songCountSingle : t.songCountMultiple}`
+      : `${tracks.length.toLocaleString()} ${
+          tracks.length === 1 ? t.songCountSingle : t.songCountMultiple
+        }`;
+  }, [isLikedPlaylist, likedSongsTotalCount, playlist, tracks.length, t]);
 
   const isQueueExpanded = queueViewMode === "expanded";
   const gridTemplate = isQueueExpanded
@@ -320,7 +330,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             }`}
           >
             {isLikedPlaylist ? (
-              <div className="w-full h-full bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center">
+              <div className="w-full h-full bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center">
                 <svg
                   className="w-20 h-20 text-white fill-white drop-shadow-md"
                   viewBox="0 0 24 24"
@@ -350,10 +360,10 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-20 p-3 text-center pointer-events-none animate-in fade-in duration-150">
                 <Upload className="w-8 h-8 text-[#ff0000] animate-bounce" />
                 <span className="text-xs font-bold leading-tight drop-shadow">
-                  Fotoğrafı buraya bırakın
+                  {language === "tr" ? "Fotoğrafı buraya bırakın" : "Drop artwork here"}
                 </span>
                 <span className="text-[10px] text-white/70">
-                  Kapak hemen güncellenir
+                  {language === "tr" ? "Kapak hemen güncellenir" : "Cover will be updated"}
                 </span>
               </div>
             )}
@@ -366,14 +376,14 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                 isLight ? "text-neutral-600" : "text-white/80"
               }`}
             >
-              Çalma Listesi
+              {t.playlistLabel}
             </span>
             <h1
               className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 transition-colors ${
                 isLight ? "text-neutral-900" : "text-white"
               }`}
             >
-              {isLikedPlaylist ? "Beğenilenler" : playlist.title}
+              {isLikedPlaylist ? t.likedSongs : playlist.title}
             </h1>
 
             {playlist.description && (
@@ -454,10 +464,10 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             } disabled:opacity-50`}
             title={
               areAllTracksDownloaded
-                ? "Tüm liste indirildi"
+                ? t.downloadedAll
                 : isAnyPlaylistTrackDownloading
-                ? "Liste indiriliyor..."
-                : "Listeyi İndir"
+                ? t.downloadingList
+                : t.downloadAll
             }
           >
             {isAnyPlaylistTrackDownloading ? (
@@ -482,7 +492,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   ? "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
                   : "text-neutral-400 hover:text-white hover:bg-white/10"
               }`}
-              title="Daha fazla seçenek"
+              title={t.moreOptions}
             >
               <MoreHorizontal className="w-6 h-6" />
             </button>
@@ -506,7 +516,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     }`}
                   >
                     <Pencil className="w-4 h-4 text-neutral-400" />
-                    <span>Bilgileri düzenle</span>
+                    <span>{t.editPlaylist}</span>
                   </button>
                 )}
 
@@ -516,9 +526,9 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     const cleanId = (playlist.id || "").replace(/^VL/, "");
                     const url = `https://music.youtube.com/playlist?list=${cleanId}`;
                     navigator.clipboard.writeText(url).then(() => {
-                      showToast("Bağlantı panoya kopyalandı");
+                      showToast(t.toastLinkCopied);
                     }).catch(() => {
-                      showToast("Bağlantı kopyalanamadı");
+                      showToast(language === "tr" ? "Bağlantı kopyalanamadı" : "Failed to copy link");
                     });
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
@@ -526,7 +536,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                   }`}
                 >
                   <Copy className="w-4 h-4 text-neutral-400" />
-                  <span>Bağlantıyı kopyala</span>
+                  <span>{t.copyLink}</span>
                 </button>
 
                 {isEditable && onDeletePlaylist && (
@@ -540,7 +550,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                       className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>Kitaplığından sil</span>
+                      <span>{t.deleteFromLibrary}</span>
                     </button>
                   </>
                 )}
@@ -559,7 +569,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Filtrele"
+              placeholder={t.filter}
               className={`h-8 pl-9 pr-4 rounded-full text-sm font-medium outline-none w-44 transition-colors ${
                 isLight
                   ? "bg-neutral-100/80 hover:bg-neutral-200/80 focus:bg-white focus:ring-1 focus:ring-neutral-300 text-neutral-900 placeholder-neutral-500"
@@ -602,8 +612,8 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
               <span className="flex items-center">
                 <span>#</span>
               </span>
-              <span className="min-w-[200px]">BAŞLIK</span>
-              <span className={isQueueExpanded ? "hidden xl:block truncate" : "truncate"}>ALBÜM</span>
+              <span className="min-w-[200px]">{t.tableHeaderTitle}</span>
+              <span className={isQueueExpanded ? "hidden xl:block truncate" : "truncate"}>{t.tableHeaderAlbum}</span>
               <span className="text-center"></span>
               <span className="text-right flex items-center justify-end">
                 <Clock3 className="w-4 h-4" />
@@ -759,7 +769,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                           onToggleLike(track);
                         }}
                         className="p-1 transition-transform active:scale-125 cursor-pointer"
-                        title={isLiked ? "Beğenilenler'den kaldır" : "Beğen"}
+                        title={isLiked ? t.unlike : t.like}
                       >
                         <Heart
                           className={`w-4 h-4 ${
@@ -794,10 +804,16 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             }`}
                             title={
                               downloaded
-                                ? "İndirildi (Silmek için tıkla)"
+                                ? language === "tr"
+                                  ? "İndirildi (Silmek için tıkla)"
+                                  : "Downloaded (Click to remove)"
                                 : downloading
-                                ? "İndiriliyor..."
-                                : "İndir"
+                                ? language === "tr"
+                                  ? "İndiriliyor..."
+                                  : "Downloading..."
+                                : language === "tr"
+                                ? "İndir"
+                                : "Download"
                             }
                           >
                             {downloading ? (
@@ -867,14 +883,14 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                     isLight ? "text-neutral-900" : "text-white"
                   }`}
                 >
-                  Öneriler
+                  {t.suggestions}
                 </h2>
                 <p
                   className={`text-xs mt-0.5 ${
                     isLight ? "text-neutral-500" : "text-neutral-400"
                   }`}
                 >
-                  Bu çalma listesindeki parçalara göre
+                  {t.suggestionsBasedOn}
                 </p>
               </div>
               {onRefreshSuggestions && (
@@ -886,14 +902,14 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                       ? "bg-neutral-100 hover:bg-neutral-200 text-neutral-700 active:scale-95"
                       : "bg-white/10 hover:bg-white/15 text-neutral-200 active:scale-95"
                   }`}
-                  title="Önerileri Yenile"
+                  title={t.refreshSuggestions}
                 >
                   <RotateCw
                     className={`w-3.5 h-3.5 ${
                       isRefreshingSuggestions ? "animate-spin text-[#ff0000]" : ""
                     }`}
                   />
-                  <span>Yenile</span>
+                  <span>{t.refresh}</span>
                 </button>
               )}
             </div>
@@ -1057,7 +1073,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                             ? "bg-neutral-100 hover:bg-[#ff0000] text-neutral-600 hover:text-white shadow-sm"
                             : "bg-white/10 hover:bg-[#ff0000] text-neutral-300 hover:text-white shadow-sm"
                         }`}
-                        title="Listeye Ekle"
+                        title={t.addToList}
                       >
                         <Plus className="w-4 h-4 stroke-[2.5]" />
                       </button>

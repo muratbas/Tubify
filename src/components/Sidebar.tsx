@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type FC, type MouseEvent } from "react";
+import { useState, useEffect, useRef, useMemo, type FC, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   Home,
   Search,
@@ -18,6 +18,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTheme } from "../context/ThemeContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useLanguage, type Translations } from "../context/LanguageContext";
 import type { Playlist, UserProfile } from "../types/music";
 import { PlaylistContextMenu, type ContextMenuPosition } from "./PlaylistContextMenu";
 import { EditPlaylistModal } from "./EditPlaylistModal";
@@ -52,11 +53,16 @@ interface SidebarProps {
 
 type SortOption = "recent" | "alphabetical" | "custom";
 
-const SORT_LABELS: Record<SortOption, string> = {
-  recent: "Son çalınanlar",
-  alphabetical: "Ad",
-  custom: "Özel sıralama",
-};
+function getSortLabel(opt: SortOption, t: Translations): string {
+  switch (opt) {
+    case "recent":
+      return t.sortRecent;
+    case "alphabetical":
+      return t.sortAlphabetical;
+    case "custom":
+      return t.sortCustom;
+  }
+}
 
 /**
  * Filter out duplicate Liked Songs playlist ("Beğendiğim müzikler" / "LM" / "VLLM")
@@ -77,7 +83,7 @@ export function isLikedSongsPlaylist(pl: { id?: string; title?: string } | null 
   return false;
 }
 
-function cleanSidebarTrackCount(raw: string): string {
+function cleanSidebarTrackCount(raw: string, t: Translations): string {
   const cleaned = raw
     .replace(/parça(lar)?/gi, "")
     .replace(/şarkı(lar)?/gi, "")
@@ -85,16 +91,16 @@ function cleanSidebarTrackCount(raw: string): string {
     .replace(/tracks?/gi, "")
     .replace(/songs?/gi, "")
     .trim();
-  return cleaned ? `${cleaned} şarkı` : raw;
+  return cleaned ? `${cleaned} ${cleaned === "1" ? t.songCountSingle : t.songCountMultiple}` : raw;
 }
 
 /**
  * Clean subtitle helper ensuring "Google Hesabı" or "Google Account" NEVER appears
  */
-function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): string {
+function getPlaylistSubtitle(pl: Playlist, userProfileName: string | null | undefined, t: Translations): string {
   if (pl.track_count && pl.track_count.trim()) {
-    const countText = cleanSidebarTrackCount(pl.track_count.trim());
-    return `Çalma listesi • ${countText}`;
+    const countText = cleanSidebarTrackCount(pl.track_count.trim(), t);
+    return `${t.playlistLabel} • ${countText}`;
   }
 
   // Check if we have local stored track count
@@ -103,7 +109,7 @@ function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): str
     if (local) {
       const arr = JSON.parse(local);
       if (Array.isArray(arr) && arr.length > 0) {
-        return `Çalma listesi • ${arr.length} şarkı`;
+        return `${t.playlistLabel} • ${arr.length} ${arr.length === 1 ? t.songCountSingle : t.songCountMultiple}`;
       }
     }
   } catch {}
@@ -115,18 +121,18 @@ function getPlaylistSubtitle(pl: Playlist, userProfileName?: string | null): str
       author.toLowerCase().includes("hesab"));
 
   if (author && !isGoogle) {
-    return `Çalma listesi • ${author}`;
+    return `${t.playlistLabel} • ${author}`;
   }
 
-  return "Çalma listesi";
+  return t.playlistLabel;
 }
 
 /**
  * Clean subtitle for 2-column Grid cards: e.g. "1177 şarkı" or "murat"
  */
-function getGridSubtitle(pl: Playlist, userProfileName?: string | null): string {
+function getGridSubtitle(pl: Playlist, userProfileName: string | null | undefined, t: Translations): string {
   if (pl.track_count && pl.track_count.trim()) {
-    return cleanSidebarTrackCount(pl.track_count.trim());
+    return cleanSidebarTrackCount(pl.track_count.trim(), t);
   }
 
   try {
@@ -134,7 +140,7 @@ function getGridSubtitle(pl: Playlist, userProfileName?: string | null): string 
     if (local) {
       const arr = JSON.parse(local);
       if (Array.isArray(arr) && arr.length > 0) {
-        return `${arr.length} şarkı`;
+        return `${arr.length} ${arr.length === 1 ? t.songCountSingle : t.songCountMultiple}`;
       }
     }
   } catch {}
@@ -149,7 +155,7 @@ function getGridSubtitle(pl: Playlist, userProfileName?: string | null): string 
     return author;
   }
 
-  return "Çalma listesi";
+  return t.playlistLabel;
 }
 
 /**
@@ -188,6 +194,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const { theme } = useTheme();
   const isLight = theme === "light";
   const player = usePlayer();
+  const { t } = useLanguage();
 
   const [filterText, setFilterText] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -232,11 +239,9 @@ export const Sidebar: FC<SidebarProps> = ({
   };
 
   const likedSongsCountText =
-    typeof likedSongsCount === "string"
-      ? likedSongsCount.toLowerCase().includes("şarkı")
-        ? likedSongsCount
-        : `${likedSongsCount} şarkı`
-      : `${likedSongsCount.toLocaleString()} şarkı`;
+    typeof likedSongsCount === "number"
+      ? `${likedSongsCount.toLocaleString()} ${likedSongsCount === 1 ? t.songCountSingle : t.songCountMultiple}`
+      : cleanSidebarTrackCount(String(likedSongsCount), t);
 
   // Sorting state & persistent storage
   const [sortOption, setSortOption] = useState<SortOption>(() => {
@@ -292,10 +297,10 @@ export const Sidebar: FC<SidebarProps> = ({
       const isPinned = next.has(playlistId);
       if (isPinned) {
         next.delete(playlistId);
-        player.showToast("Sabitleme kaldırıldı");
+        player.showToast(t.toastUnpinned);
       } else {
         next.add(playlistId);
-        player.showToast("Başa sabitlendi");
+        player.showToast(t.toastPinned);
       }
       try {
         localStorage.setItem("tubify_pinned_playlist_ids", JSON.stringify(Array.from(next)));
@@ -321,10 +326,10 @@ export const Sidebar: FC<SidebarProps> = ({
       const isHidden = next.has(playlistId);
       if (isHidden) {
         next.delete(playlistId);
-        player.showToast("Kitaplıkta gösterildi");
+        player.showToast(t.toastUnhidden);
       } else {
         next.add(playlistId);
-        player.showToast("Kitaplıktan gizlendi");
+        player.showToast(t.toastHidden);
       }
       try {
         localStorage.setItem("tubify_hidden_playlist_ids", JSON.stringify(Array.from(next)));
@@ -365,7 +370,60 @@ export const Sidebar: FC<SidebarProps> = ({
     };
   }, [isSortDropdownOpen]);
 
+  // Custom playlist order state & persistent storage
+  const [customOrder, setCustomOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("tubify_custom_playlist_order");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const customOrderRef = useRef<string[]>(customOrder);
+
+  useEffect(() => {
+    customOrderRef.current = customOrder;
+  }, [customOrder]);
+
+  // Drag and Drop state for playlist reordering (Pure Pointer Events)
+  const [draggedPlaylistId, setDraggedPlaylistId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<"before" | "after" | null>(null);
+
+  const dragPointerRef = useRef<{
+    playlistId: string;
+    startX: number;
+    startY: number;
+    isDragActive: boolean;
+  } | null>(null);
+  const ignoreClickRef = useRef(false);
+
+  const customOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    customOrder.forEach((id, idx) => {
+      map.set(id, idx);
+    });
+    return map;
+  }, [customOrder]);
+
   const handleSelectSort = (opt: SortOption) => {
+    if (opt === "custom") {
+      const allCurrent = [
+        ...sortedPinnedPlaylists.map((p) => p.id),
+        ...sortedUnpinnedPlaylists.map((p) => p.id),
+      ];
+      let base = customOrderRef.current.filter((id) => allCurrent.includes(id));
+      for (const id of allCurrent) {
+        if (!base.includes(id)) {
+          base.push(id);
+        }
+      }
+      customOrderRef.current = base;
+      setCustomOrder(base);
+      try {
+        localStorage.setItem("tubify_custom_playlist_order", JSON.stringify(base));
+      } catch {}
+    }
     setSortOption(opt);
     setIsSortDropdownOpen(false);
     try {
@@ -408,7 +466,16 @@ export const Sidebar: FC<SidebarProps> = ({
       if (sortOption === "alphabetical") {
         return a.title.localeCompare(b.title, "tr-TR", { sensitivity: "base" });
       }
-      // "custom" - keep order
+      if (sortOption === "custom") {
+        const hasA = customOrderMap.has(a.id);
+        const hasB = customOrderMap.has(b.id);
+        if (hasA && hasB) {
+          return customOrderMap.get(a.id)! - customOrderMap.get(b.id)!;
+        }
+        if (hasA) return -1;
+        if (hasB) return 1;
+        return 0;
+      }
       return 0;
     });
   };
@@ -416,11 +483,236 @@ export const Sidebar: FC<SidebarProps> = ({
   // Pinned vs Unpinned visible playlists
   const sortedPinnedPlaylists = useMemo(() => {
     return sortList(visiblePlaylists.filter((pl) => pinnedPlaylistIds.has(pl.id)));
-  }, [visiblePlaylists, pinnedPlaylistIds, sortOption, interactionTimestamps]);
+  }, [visiblePlaylists, pinnedPlaylistIds, sortOption, interactionTimestamps, customOrderMap]);
 
   const sortedUnpinnedPlaylists = useMemo(() => {
     return sortList(visiblePlaylists.filter((pl) => !pinnedPlaylistIds.has(pl.id)));
-  }, [visiblePlaylists, pinnedPlaylistIds, sortOption, interactionTimestamps]);
+  }, [visiblePlaylists, pinnedPlaylistIds, sortOption, interactionTimestamps, customOrderMap]);
+
+  const sortedPinnedPlaylistsRef = useRef(sortedPinnedPlaylists);
+  sortedPinnedPlaylistsRef.current = sortedPinnedPlaylists;
+
+  const sortedUnpinnedPlaylistsRef = useRef(sortedUnpinnedPlaylists);
+  sortedUnpinnedPlaylistsRef.current = sortedUnpinnedPlaylists;
+
+  // Pointer-based Drag & Drop handlers (100% reliable in Tauri/WebView2)
+  const handlePlaylistPointerDown = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    pl: Playlist | "liked"
+  ) => {
+    if (e.button !== 0) return; // Only left mouse button
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("input") || target.closest("a")) {
+      return;
+    }
+
+    const playlistId = typeof pl === "string" ? pl : pl.id;
+    if (playlistId === "liked") return; // Liked songs stays anchored at top
+
+    dragPointerRef.current = {
+      playlistId,
+      startX: e.clientX,
+      startY: e.clientY,
+      isDragActive: false,
+    };
+  };
+
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      const state = dragPointerRef.current;
+      if (!state) return;
+
+      const dx = Math.abs(e.clientX - state.startX);
+      const dy = Math.abs(e.clientY - state.startY);
+
+      if (!state.isDragActive) {
+        if (dx >= 4 || dy >= 4) {
+          state.isDragActive = true;
+          ignoreClickRef.current = true;
+          setDraggedPlaylistId(state.playlistId);
+          document.body.style.cursor = "grabbing";
+
+          // Current displayed order
+          const currentDisplayed = [
+            ...sortedPinnedPlaylistsRef.current.map((p) => p.id),
+            ...sortedUnpinnedPlaylistsRef.current.map((p) => p.id),
+          ];
+
+          // Switch to custom sort if not already in custom sort, WITHOUT toast notification!
+          if (sortOption !== "custom") {
+            customOrderRef.current = currentDisplayed;
+            setCustomOrder(currentDisplayed);
+            try {
+              localStorage.setItem("tubify_custom_playlist_order", JSON.stringify(currentDisplayed));
+            } catch {}
+
+            setSortOption("custom");
+            try {
+              localStorage.setItem("tubify_sidebar_sort", "custom");
+            } catch {}
+          } else {
+            let existing = customOrderRef.current.filter((id) => currentDisplayed.includes(id));
+            for (const id of currentDisplayed) {
+              if (!existing.includes(id)) {
+                existing.push(id);
+              }
+            }
+            customOrderRef.current = existing;
+            setCustomOrder(existing);
+            try {
+              localStorage.setItem("tubify_custom_playlist_order", JSON.stringify(existing));
+            } catch {}
+          }
+        } else {
+          return;
+        }
+      }
+
+      // Drag is active: find hovered playlist card
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const playlistCard = el?.closest("[data-playlist-id]");
+      if (!playlistCard) {
+        setDropTargetId(null);
+        setDropPosition(null);
+        return;
+      }
+
+      const targetId = playlistCard.getAttribute("data-playlist-id");
+      if (!targetId || targetId === state.playlistId) {
+        setDropTargetId(null);
+        setDropPosition(null);
+        return;
+      }
+
+      if (targetId === "liked") {
+        setDropTargetId("liked");
+        setDropPosition("after");
+        return;
+      }
+
+      const rect = playlistCard.getBoundingClientRect();
+      const isTopHalf = (e.clientY - rect.top) < rect.height / 2;
+      const pos: "before" | "after" = isTopHalf ? "before" : "after";
+
+      setDropTargetId(targetId);
+      setDropPosition(pos);
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      const state = dragPointerRef.current;
+      if (!state) return;
+
+      document.body.style.cursor = "";
+      dragPointerRef.current = null;
+
+      if (!state.isDragActive) {
+        setDraggedPlaylistId(null);
+        setDropTargetId(null);
+        setDropPosition(null);
+        return;
+      }
+
+      const sourceId = state.playlistId;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const playlistCard = el?.closest("[data-playlist-id]");
+      let finalTargetId = playlistCard?.getAttribute("data-playlist-id") || null;
+      let pos: "before" | "after" = "after";
+
+      if (playlistCard && finalTargetId !== "liked") {
+        const rect = playlistCard.getBoundingClientRect();
+        pos = (e.clientY - rect.top) < rect.height / 2 ? "before" : "after";
+      }
+
+      setDraggedPlaylistId(null);
+      setDropTargetId(null);
+      setDropPosition(null);
+
+      setTimeout(() => {
+        ignoreClickRef.current = false;
+      }, 150);
+
+      const allCurrentIds = [
+        ...sortedPinnedPlaylistsRef.current.map((p) => p.id),
+        ...sortedUnpinnedPlaylistsRef.current.map((p) => p.id),
+      ];
+
+      let baseOrder = (customOrderRef.current.length > 0 ? customOrderRef.current : allCurrentIds).filter((id) => allCurrentIds.includes(id));
+      for (const id of allCurrentIds) {
+        if (!baseOrder.includes(id)) {
+          baseOrder.push(id);
+        }
+      }
+
+      if (!finalTargetId) {
+        finalTargetId = baseOrder[baseOrder.length - 1];
+      }
+
+      if (!finalTargetId || sourceId === finalTargetId) {
+        return;
+      }
+
+      baseOrder = baseOrder.filter((id) => id !== sourceId);
+
+      if (finalTargetId === "liked") {
+        baseOrder.unshift(sourceId);
+      } else {
+        const targetIndex = baseOrder.indexOf(finalTargetId);
+        if (targetIndex !== -1) {
+          const insertIndex = pos === "after" ? targetIndex + 1 : targetIndex;
+          baseOrder.splice(insertIndex, 0, sourceId);
+        } else {
+          baseOrder.push(sourceId);
+        }
+      }
+
+      // Sync pinned status
+      if (finalTargetId === "liked") {
+        if (pinnedPlaylistIds.size > 0 && !pinnedPlaylistIds.has(sourceId)) {
+          setPinnedPlaylistIds((prev) => {
+            const next = new Set(prev);
+            next.add(sourceId);
+            try {
+              localStorage.setItem("tubify_pinned_playlist_ids", JSON.stringify(Array.from(next)));
+            } catch {}
+            return next;
+          });
+        }
+      } else if (pinnedPlaylistIds.has(finalTargetId) && !pinnedPlaylistIds.has(sourceId)) {
+        setPinnedPlaylistIds((prev) => {
+          const next = new Set(prev);
+          next.add(sourceId);
+          try {
+            localStorage.setItem("tubify_pinned_playlist_ids", JSON.stringify(Array.from(next)));
+          } catch {}
+          return next;
+        });
+      } else if (!pinnedPlaylistIds.has(finalTargetId) && pinnedPlaylistIds.has(sourceId)) {
+        setPinnedPlaylistIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sourceId);
+          try {
+            localStorage.setItem("tubify_pinned_playlist_ids", JSON.stringify(Array.from(next)));
+          } catch {}
+          return next;
+        });
+      }
+
+      customOrderRef.current = baseOrder;
+      setCustomOrder(baseOrder);
+      try {
+        localStorage.setItem("tubify_custom_playlist_order", JSON.stringify(baseOrder));
+      } catch {}
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [sortOption, pinnedPlaylistIds]);
 
   const isHomeActive = currentView === "home" && !selectedPlaylistId;
   const isSearchActive = currentView === "search";
@@ -445,6 +737,7 @@ export const Sidebar: FC<SidebarProps> = ({
   };
 
   const handlePlaylistClick = (pl: Playlist | "liked") => {
+    if (ignoreClickRef.current) return;
     // Only navigate to the playlist; do NOT update 'Son çalınanlar' on simple click/view
     onSelectPlaylist(pl);
   };
@@ -492,6 +785,13 @@ export const Sidebar: FC<SidebarProps> = ({
     if (onDeletePlaylist) {
       onDeletePlaylist(pl.id);
     }
+    setCustomOrder((prev) => {
+      const next = prev.filter((id) => id !== pl.id);
+      try {
+        localStorage.setItem("tubify_custom_playlist_order", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     player.showToast(`"${pl.title}" kitaplıktan silindi`);
   };
 
@@ -559,7 +859,7 @@ export const Sidebar: FC<SidebarProps> = ({
             }`}
           >
             <Home className={`w-5 h-5 ${isHomeActive ? "text-[#ff0000]" : ""}`} />
-            <span>Ana Sayfa</span>
+            <span>{t.home}</span>
           </button>
 
           <button
@@ -573,7 +873,7 @@ export const Sidebar: FC<SidebarProps> = ({
             }`}
           >
             <Search className={`w-5 h-5 ${isSearchActive ? "text-[#ff0000]" : ""}`} />
-            <span>Ara</span>
+            <span>{t.search}</span>
           </button>
         </div>
       )}
@@ -592,7 +892,7 @@ export const Sidebar: FC<SidebarProps> = ({
           <div className="flex items-center justify-center py-1 shrink-0">
             <button
               onClick={toggleCollapse}
-              data-tooltip="Kitaplığı Genişlet"
+              data-tooltip={t.expandLibrary}
               data-tooltip-side="right"
               className={`w-11 h-11 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${
                 isLight
@@ -608,23 +908,27 @@ export const Sidebar: FC<SidebarProps> = ({
           <div className="flex-1 overflow-y-auto px-1 py-1.5 space-y-2.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col items-center w-full">
             {/* Beğenilenler */}
             <div
+              data-playlist-id="liked"
               onClick={() => handlePlaylistClick("liked")}
               onContextMenu={(e) => handlePlaylistContextMenu(e, "liked", false)}
-              data-tooltip={`Beğenilenler • ${likedSongsCountText}`}
+              data-tooltip={`${t.likedSongs} • ${likedSongsCountText}`}
               data-tooltip-side="right"
-              className={`w-12 h-12 rounded-xl bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center shrink-0 shadow-sm cursor-pointer transition-all active:scale-95 hover:brightness-110 relative ${
+              className={`w-12 h-12 rounded-xl bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center shrink-0 shadow-sm cursor-pointer select-none transition-all active:scale-95 hover:brightness-110 relative ${
                 selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
                   ? "ring-2 ring-[#ff0000] ring-offset-2 ring-offset-white dark:ring-offset-[#121212]"
                   : ""
               }`}
             >
+              {dropTargetId === "liked" && (
+                <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+              )}
               <svg
-                className="w-5 h-5 text-white fill-white"
+                className="w-5 h-5 text-white fill-white pointer-events-none"
                 viewBox="0 0 24 24"
               >
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
               </svg>
-              <div className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded-full text-white">
+              <div className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded-full text-white pointer-events-none">
                 <Pin className="w-2 h-2 fill-white text-white rotate-45" />
               </div>
             </div>
@@ -632,26 +936,38 @@ export const Sidebar: FC<SidebarProps> = ({
             {/* Pinned Playlists */}
             {sortedPinnedPlaylists.map((pl) => {
               const isSelected = selectedPlaylistId === pl.id;
-              const subtitle = getPlaylistSubtitle(pl, userProfile.name);
+              const subtitle = getPlaylistSubtitle(pl, userProfile.name, t);
+              const isDragging = draggedPlaylistId === pl.id;
 
               return (
                 <div
                   key={`mini-${pl.id}`}
+                  data-playlist-id={pl.id}
+                  onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                   onClick={() => handlePlaylistClick(pl)}
                   onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
                   data-tooltip={`${pl.title} • ${subtitle}`}
                   data-tooltip-side="right"
-                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm cursor-pointer transition-all active:scale-95 hover:brightness-110 relative ${
+                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm cursor-pointer select-none transition-all active:scale-95 hover:brightness-110 relative ${
+                    isDragging ? "opacity-30 scale-95 ring-2 ring-[#ff0000]" : ""
+                  } ${
                     isSelected
                       ? "ring-2 ring-[#ff0000] ring-offset-2 ring-offset-white dark:ring-offset-[#121212]"
                       : ""
                   }`}
                 >
+                  {dropTargetId === pl.id && dropPosition === "before" && (
+                    <div className="absolute -top-1.5 left-0 right-0 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
+                  {dropTargetId === pl.id && dropPosition === "after" && (
+                    <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
                   {pl.thumbnail ? (
                     <img
                       src={pl.thumbnail}
                       alt={pl.title}
-                      className="w-full h-full object-cover"
+                      draggable={false}
+                      className="w-full h-full object-cover pointer-events-none"
                     />
                   ) : (
                     <div
@@ -662,7 +978,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       <Music2 className="w-5 h-5 text-neutral-400" />
                     </div>
                   )}
-                  <div className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded-full text-white">
+                  <div className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded-full text-white pointer-events-none">
                     <Pin className="w-2 h-2 fill-white text-white rotate-45" />
                   </div>
                 </div>
@@ -672,26 +988,38 @@ export const Sidebar: FC<SidebarProps> = ({
             {/* Unpinned Playlists */}
             {sortedUnpinnedPlaylists.map((pl) => {
               const isSelected = selectedPlaylistId === pl.id;
-              const subtitle = getPlaylistSubtitle(pl, userProfile.name);
+              const subtitle = getPlaylistSubtitle(pl, userProfile.name, t);
+              const isDragging = draggedPlaylistId === pl.id;
 
               return (
                 <div
                   key={`mini-${pl.id}`}
+                  data-playlist-id={pl.id}
+                  onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                   onClick={() => handlePlaylistClick(pl)}
                   onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
                   data-tooltip={`${pl.title} • ${subtitle}`}
                   data-tooltip-side="right"
-                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm cursor-pointer transition-all active:scale-95 hover:brightness-110 relative ${
+                  className={`w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-sm cursor-pointer select-none transition-all active:scale-95 hover:brightness-110 relative ${
+                    isDragging ? "opacity-30 scale-95 ring-2 ring-[#ff0000]" : ""
+                  } ${
                     isSelected
                       ? "ring-2 ring-[#ff0000] ring-offset-2 ring-offset-white dark:ring-offset-[#121212]"
                       : ""
                   }`}
                 >
+                  {dropTargetId === pl.id && dropPosition === "before" && (
+                    <div className="absolute -top-1.5 left-0 right-0 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
+                  {dropTargetId === pl.id && dropPosition === "after" && (
+                    <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
                   {pl.thumbnail ? (
                     <img
                       src={pl.thumbnail}
                       alt={pl.title}
-                      className="w-full h-full object-cover"
+                      draggable={false}
+                      className="w-full h-full object-cover pointer-events-none"
                     />
                   ) : (
                     <div
@@ -722,13 +1050,13 @@ export const Sidebar: FC<SidebarProps> = ({
               }`}
             >
               <Library className="w-5 h-5" />
-              <span>Kitaplık</span>
+              <span>{t.library}</span>
             </button>
 
             <div className="flex items-center gap-0.5">
               <button
                 onClick={() => setIsSearchOpen((prev) => !prev)}
-                data-tooltip="Kitaplıkta ara"
+                data-tooltip={t.searchInLibrary}
                 className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                   isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
                 }`}
@@ -743,7 +1071,7 @@ export const Sidebar: FC<SidebarProps> = ({
                     setIsCreateModalOpen(true);
                   }
                 }}
-                data-tooltip="Çalma listesi oluştur"
+                data-tooltip={t.createPlaylist}
                 className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                   isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
                 }`}
@@ -752,7 +1080,7 @@ export const Sidebar: FC<SidebarProps> = ({
               </button>
               <button
                 onClick={toggleViewMode}
-                data-tooltip={viewMode === "list" ? "Görünüm (Izgara)" : "Görünüm (Liste)"}
+                data-tooltip={viewMode === "list" ? t.viewGrid : t.viewList}
                 className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                   isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
                 }`}
@@ -765,7 +1093,7 @@ export const Sidebar: FC<SidebarProps> = ({
               </button>
               <button
                 onClick={toggleCollapse}
-                data-tooltip="Kitaplığı Daralt"
+                data-tooltip={t.collapseLibrary}
                 className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                   isLight ? "hover:bg-neutral-100 hover:text-black" : "hover:bg-white/10 hover:text-white"
                 }`}
@@ -784,7 +1112,7 @@ export const Sidebar: FC<SidebarProps> = ({
                   autoFocus
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
-                  placeholder="Kitaplıkta ara..."
+                  placeholder={t.searchInLibraryPlaceholder}
                   className={`w-full h-7 pl-2 pr-6 rounded-md text-xs outline-none transition-colors ${
                     isLight
                       ? "bg-neutral-100 border border-neutral-300/80 text-neutral-900 focus:bg-white"
@@ -813,14 +1141,14 @@ export const Sidebar: FC<SidebarProps> = ({
                       ? "bg-neutral-100/90 text-neutral-700 hover:bg-neutral-200"
                       : "bg-white/10 text-white/80 hover:bg-white/15"
                   }`}
-                  title="Sıralama ölçütü"
+                  title={t.sortBy}
                 >
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-150 ${
                       isSortDropdownOpen ? "rotate-180" : ""
                     }`}
                   />
-                  <span>{SORT_LABELS[sortOption]}</span>
+                  <span>{getSortLabel(sortOption, t)}</span>
                 </button>
 
                 {/* Sorting Dropdown Menu */}
@@ -851,7 +1179,7 @@ export const Sidebar: FC<SidebarProps> = ({
                             <Check className="w-3.5 h-3.5 stroke-[2.5] text-neutral-900 dark:text-white" />
                           )}
                         </div>
-                        <span>{SORT_LABELS[opt]}</span>
+                        <span>{getSortLabel(opt, t)}</span>
                       </button>
                     ))}
                   </div>
@@ -867,9 +1195,10 @@ export const Sidebar: FC<SidebarProps> = ({
               <div className="space-y-0.5">
                 {/* Pinned 1: Beğenilenler */}
                 <div
+                  data-playlist-id="liked"
                   onClick={() => handlePlaylistClick("liked")}
                   onContextMenu={(e) => handlePlaylistContextMenu(e, "liked", false)}
-                  className={`flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group ${
+                  className={`relative flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group select-none ${
                     selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
                       ? isLight
                         ? "bg-neutral-100/90 text-neutral-900"
@@ -879,10 +1208,13 @@ export const Sidebar: FC<SidebarProps> = ({
                       : "hover:bg-white/5 text-neutral-400"
                   }`}
                 >
+                  {dropTargetId === "liked" && (
+                    <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-md bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center shrink-0 shadow-sm">
+                    <div className="w-11 h-11 rounded-md bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center shrink-0 shadow-sm pointer-events-none">
                       <svg
-                        className="w-5 h-5 text-white fill-white"
+                        className="w-5 h-5 text-white fill-white pointer-events-none"
                         viewBox="0 0 24 24"
                       >
                         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -899,32 +1231,37 @@ export const Sidebar: FC<SidebarProps> = ({
                             : "text-white"
                         }`}
                       >
-                        Beğenilenler
+                        {t.likedSongs}
                       </h4>
                       <p
                         className={`text-xs truncate leading-normal py-0.5 ${
                           isLight ? "text-neutral-500" : "text-neutral-400"
                         }`}
                       >
-                        Çalma listesi • {likedSongsCountText}
+                        {t.playlistLabel} • {likedSongsCountText}
                       </p>
                     </div>
                   </div>
 
-                  <Pin className="w-3.5 h-3.5 text-[#ff0000] fill-[#ff0000] rotate-45 shrink-0" />
+                  <Pin className="w-3.5 h-3.5 text-[#ff0000] fill-[#ff0000] rotate-45 shrink-0 pointer-events-none" />
                 </div>
 
                 {/* Pinned User Playlists */}
                 {sortedPinnedPlaylists.map((pl) => {
                   const isSelected = selectedPlaylistId === pl.id;
-                  const subtitle = getPlaylistSubtitle(pl, userProfile.name);
+                  const subtitle = getPlaylistSubtitle(pl, userProfile.name, t);
+                  const isDragging = draggedPlaylistId === pl.id;
 
                   return (
                     <div
                       key={`pinned-${pl.id}`}
+                      data-playlist-id={pl.id}
+                      onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                       onClick={() => handlePlaylistClick(pl)}
                       onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
-                      className={`flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group ${
+                      className={`relative flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group select-none ${
+                        isDragging ? "opacity-30 scale-[0.98] bg-neutral-200/50 dark:bg-white/10" : ""
+                      } ${
                         isSelected
                           ? isLight
                             ? "bg-neutral-100/90 text-neutral-900"
@@ -934,12 +1271,20 @@ export const Sidebar: FC<SidebarProps> = ({
                           : "hover:bg-white/5 text-neutral-400"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      {dropTargetId === pl.id && dropPosition === "before" && (
+                        <div className="absolute top-0 left-2 right-2 h-0.5 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+                      {dropTargetId === pl.id && dropPosition === "after" && (
+                        <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+
+                      <div className="flex items-center gap-3 min-w-0 pointer-events-none">
                         {pl.thumbnail ? (
                           <img
                             src={pl.thumbnail}
                             alt={pl.title}
-                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-neutral-200"
+                            draggable={false}
+                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-neutral-200 pointer-events-none"
                           />
                         ) : (
                           <div
@@ -973,7 +1318,7 @@ export const Sidebar: FC<SidebarProps> = ({
                         </div>
                       </div>
 
-                      <Pin className="w-3.5 h-3.5 text-[#ff0000] fill-[#ff0000] rotate-45 shrink-0" />
+                      <Pin className="w-3.5 h-3.5 text-[#ff0000] fill-[#ff0000] rotate-45 shrink-0 pointer-events-none" />
                     </div>
                   );
                 })}
@@ -981,14 +1326,19 @@ export const Sidebar: FC<SidebarProps> = ({
                 {/* Unpinned User Playlists */}
                 {sortedUnpinnedPlaylists.map((pl) => {
                   const isSelected = selectedPlaylistId === pl.id;
-                  const subtitle = getPlaylistSubtitle(pl, userProfile.name);
+                  const subtitle = getPlaylistSubtitle(pl, userProfile.name, t);
+                  const isDragging = draggedPlaylistId === pl.id;
 
                   return (
                     <div
                       key={pl.id}
+                      data-playlist-id={pl.id}
+                      onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                       onClick={() => handlePlaylistClick(pl)}
                       onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
-                      className={`flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group ${
+                      className={`relative flex items-center justify-between p-2 rounded-lg transition-all cursor-pointer group select-none ${
+                        isDragging ? "opacity-30 scale-[0.98] bg-neutral-200/50 dark:bg-white/10" : ""
+                      } ${
                         isSelected
                           ? isLight
                             ? "bg-neutral-100/90 text-neutral-900"
@@ -998,12 +1348,20 @@ export const Sidebar: FC<SidebarProps> = ({
                           : "hover:bg-white/5 text-neutral-400"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      {dropTargetId === pl.id && dropPosition === "before" && (
+                        <div className="absolute top-0 left-2 right-2 h-0.5 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+                      {dropTargetId === pl.id && dropPosition === "after" && (
+                        <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+
+                      <div className="flex items-center gap-3 min-w-0 pointer-events-none">
                         {pl.thumbnail ? (
                           <img
                             src={pl.thumbnail}
                             alt={pl.title}
-                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-neutral-200"
+                            draggable={false}
+                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-neutral-200 pointer-events-none"
                           />
                         ) : (
                           <div
@@ -1054,7 +1412,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Folder className="w-4 h-4 text-neutral-500 shrink-0" />
                         <span className="text-xs font-semibold truncate">
-                          Gizlenenler ({hiddenPlaylists.length})
+                          {t.hiddenPlaylists} ({hiddenPlaylists.length})
                         </span>
                       </div>
                       <ChevronDown
@@ -1068,7 +1426,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       <div className="space-y-0.5 mt-1 pl-1">
                         {hiddenPlaylists.map((pl) => {
                           const isSelected = selectedPlaylistId === pl.id;
-                          const subtitle = getPlaylistSubtitle(pl, userProfile.name);
+                          const subtitle = getPlaylistSubtitle(pl, userProfile.name, t);
 
                           return (
                             <div
@@ -1136,9 +1494,10 @@ export const Sidebar: FC<SidebarProps> = ({
               <div className="grid grid-cols-2 gap-2.5 pb-2">
                 {/* Pinned 1: Beğenilenler */}
                 <div
+                  data-playlist-id="liked"
                   onClick={() => handlePlaylistClick("liked")}
                   onContextMenu={(e) => handlePlaylistContextMenu(e, "liked", false)}
-                  className={`flex flex-col group cursor-pointer p-1.5 rounded-xl transition-all ${
+                  className={`relative flex flex-col group cursor-pointer select-none p-1.5 rounded-xl transition-all ${
                     selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
                       ? isLight
                         ? "bg-neutral-100/90 text-neutral-900"
@@ -1148,21 +1507,24 @@ export const Sidebar: FC<SidebarProps> = ({
                       : "hover:bg-white/5 text-neutral-300"
                   }`}
                 >
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#c471ed] flex items-center justify-center">
+                  {dropTargetId === "liked" && (
+                    <div className="absolute -bottom-1 left-1 right-1 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                  )}
+                  <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center pointer-events-none">
                     <svg
-                      className="w-9 h-9 text-white fill-white drop-shadow-sm"
+                      className="w-9 h-9 text-white fill-white drop-shadow-sm pointer-events-none"
                       viewBox="0 0 24 24"
                     >
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                     </svg>
                     {/* Top-left dark translucent pin badge */}
-                    <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white shadow-sm flex items-center justify-center">
+                    <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white shadow-sm flex items-center justify-center pointer-events-none">
                       <Pin className="w-3 h-3 fill-white text-white rotate-45" />
                     </div>
                   </div>
 
                   <h4
-                    className={`font-semibold text-[13px] truncate mt-1.5 leading-snug ${
+                    className={`font-semibold text-[13px] truncate mt-1.5 leading-snug pointer-events-none ${
                       selectedPlaylistId === "liked" || selectedPlaylistId === "LM"
                         ? "text-[#ff0000]"
                         : isLight
@@ -1170,10 +1532,10 @@ export const Sidebar: FC<SidebarProps> = ({
                         : "text-white"
                     }`}
                   >
-                    Beğenilenler
+                    {t.likedSongs}
                   </h4>
                   <p
-                    className={`text-[11px] truncate leading-tight ${
+                    className={`text-[11px] truncate leading-tight pointer-events-none ${
                       isLight ? "text-neutral-500" : "text-neutral-400"
                     }`}
                   >
@@ -1184,14 +1546,19 @@ export const Sidebar: FC<SidebarProps> = ({
                 {/* Pinned User Playlists (Grid) */}
                 {sortedPinnedPlaylists.map((pl) => {
                   const isSelected = selectedPlaylistId === pl.id;
-                  const gridSubtitle = getGridSubtitle(pl, userProfile.name);
+                  const gridSubtitle = getGridSubtitle(pl, userProfile.name, t);
+                  const isDragging = draggedPlaylistId === pl.id;
 
                   return (
                     <div
                       key={`grid-pinned-${pl.id}`}
+                      data-playlist-id={pl.id}
+                      onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                       onClick={() => handlePlaylistClick(pl)}
                       onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
-                      className={`flex flex-col group cursor-pointer p-1.5 rounded-xl transition-all ${
+                      className={`relative flex flex-col group cursor-pointer select-none p-1.5 rounded-xl transition-all ${
+                        isDragging ? "opacity-30 scale-95 ring-2 ring-[#ff0000]" : ""
+                      } ${
                         isSelected
                           ? isLight
                             ? "bg-neutral-100/90 text-neutral-900"
@@ -1201,25 +1568,33 @@ export const Sidebar: FC<SidebarProps> = ({
                           : "hover:bg-white/5 text-neutral-300"
                       }`}
                     >
-                      <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800">
+                      {dropTargetId === pl.id && dropPosition === "before" && (
+                        <div className="absolute -top-1 left-1 right-1 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+                      {dropTargetId === pl.id && dropPosition === "after" && (
+                        <div className="absolute -bottom-1 left-1 right-1 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+
+                      <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 pointer-events-none">
                         {pl.thumbnail ? (
                           <img
                             src={pl.thumbnail}
                             alt={pl.title}
-                            className="w-full h-full object-cover"
+                            draggable={false}
+                            className="w-full h-full object-cover pointer-events-none"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Music2 className="w-8 h-8 text-neutral-400" />
                           </div>
                         )}
-                        <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white shadow-sm flex items-center justify-center">
+                        <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white shadow-sm flex items-center justify-center pointer-events-none">
                           <Pin className="w-3 h-3 fill-white text-white rotate-45" />
                         </div>
                       </div>
 
                       <h4
-                        className={`font-semibold text-[13px] truncate mt-1.5 leading-snug ${
+                        className={`font-semibold text-[13px] truncate mt-1.5 leading-snug pointer-events-none ${
                           isSelected
                             ? "text-[#ff0000]"
                             : isLight
@@ -1230,7 +1605,7 @@ export const Sidebar: FC<SidebarProps> = ({
                         {pl.title}
                       </h4>
                       <p
-                        className={`text-[11px] truncate leading-tight ${
+                        className={`text-[11px] truncate leading-tight pointer-events-none ${
                           isLight ? "text-neutral-500" : "text-neutral-400"
                         }`}
                       >
@@ -1243,14 +1618,19 @@ export const Sidebar: FC<SidebarProps> = ({
                 {/* Unpinned User Playlists (Grid) */}
                 {sortedUnpinnedPlaylists.map((pl) => {
                   const isSelected = selectedPlaylistId === pl.id;
-                  const gridSubtitle = getGridSubtitle(pl, userProfile.name);
+                  const gridSubtitle = getGridSubtitle(pl, userProfile.name, t);
+                  const isDragging = draggedPlaylistId === pl.id;
 
                   return (
                     <div
                       key={`grid-${pl.id}`}
+                      data-playlist-id={pl.id}
+                      onPointerDown={(e) => handlePlaylistPointerDown(e, pl)}
                       onClick={() => handlePlaylistClick(pl)}
                       onContextMenu={(e) => handlePlaylistContextMenu(e, pl, false)}
-                      className={`flex flex-col group cursor-pointer p-1.5 rounded-xl transition-all ${
+                      className={`relative flex flex-col group cursor-pointer select-none p-1.5 rounded-xl transition-all ${
+                        isDragging ? "opacity-30 scale-95 ring-2 ring-[#ff0000]" : ""
+                      } ${
                         isSelected
                           ? isLight
                             ? "bg-neutral-100/90 text-neutral-900"
@@ -1260,12 +1640,20 @@ export const Sidebar: FC<SidebarProps> = ({
                           : "hover:bg-white/5 text-neutral-300"
                       }`}
                     >
-                      <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800">
+                      {dropTargetId === pl.id && dropPosition === "before" && (
+                        <div className="absolute -top-1 left-1 right-1 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+                      {dropTargetId === pl.id && dropPosition === "after" && (
+                        <div className="absolute -bottom-1 left-1 right-1 h-1 bg-[#ff0000] rounded-full z-20 pointer-events-none shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                      )}
+
+                      <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-sm bg-neutral-200 dark:bg-neutral-800 pointer-events-none">
                         {pl.thumbnail ? (
                           <img
                             src={pl.thumbnail}
                             alt={pl.title}
-                            className="w-full h-full object-cover"
+                            draggable={false}
+                            className="w-full h-full object-cover pointer-events-none"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -1275,7 +1663,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       </div>
 
                       <h4
-                        className={`font-semibold text-[13px] truncate mt-1.5 leading-snug ${
+                        className={`font-semibold text-[13px] truncate mt-1.5 leading-snug pointer-events-none ${
                           isSelected
                             ? "text-[#ff0000]"
                             : isLight
@@ -1286,7 +1674,7 @@ export const Sidebar: FC<SidebarProps> = ({
                         {pl.title}
                       </h4>
                       <p
-                        className={`text-[11px] truncate leading-tight ${
+                        className={`text-[11px] truncate leading-tight pointer-events-none ${
                           isLight ? "text-neutral-500" : "text-neutral-400"
                         }`}
                       >
@@ -1310,7 +1698,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Folder className="w-4 h-4 text-neutral-500 shrink-0" />
                         <span className="text-xs font-semibold truncate">
-                          Gizlenenler ({hiddenPlaylists.length})
+                          {t.hiddenPlaylists} ({hiddenPlaylists.length})
                         </span>
                       </div>
                       <ChevronDown
@@ -1324,7 +1712,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         {hiddenPlaylists.map((pl) => {
                           const isSelected = selectedPlaylistId === pl.id;
-                          const gridSubtitle = getGridSubtitle(pl, userProfile.name);
+                          const gridSubtitle = getGridSubtitle(pl, userProfile.name, t);
 
                           return (
                             <div
@@ -1392,16 +1780,16 @@ export const Sidebar: FC<SidebarProps> = ({
               >
                 <FolderPlus className="w-6 h-6 mx-auto text-neutral-400" />
                 <p className={`text-xs font-bold ${isLight ? "text-neutral-900" : "text-white"}`}>
-                  İlk çalma listeni oluştur
+                  {t.createFirstPlaylist}
                 </p>
                 <p className={`text-[11px] ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
-                  Çalma listelerine ve beğenilen şarkılarına erişmek için Google hesabına bağlan.
+                  {t.createFirstPlaylistDesc}
                 </p>
                 <button
                   onClick={onOpenLogin}
                   className="w-full py-1.5 px-3 bg-[#ff0000] text-white text-xs font-bold rounded-full hover:bg-[#e60000] transition-all cursor-pointer shadow-sm active:scale-95"
                 >
-                  Giriş Yap
+                  {t.signIn}
                 </button>
               </div>
             )}
