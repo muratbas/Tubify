@@ -91,7 +91,8 @@ export const TitleBar: FC<TitleBarProps> = ({
   };
 
   const handleMouseDown = (e: MouseEvent<HTMLElement>) => {
-    if (e.button === 0) {
+    // Only drag on single click (detail === 1), prevent dragging from triggering on double-clicks
+    if (e.button === 0 && e.detail === 1) {
       const target = e.target as HTMLElement;
       if (
         target.closest("button") ||
@@ -185,7 +186,6 @@ export const TitleBar: FC<TitleBarProps> = ({
       {/* Broad Middle Draggable Region */}
       <div
         data-tauri-drag-region
-        onMouseDown={handleMouseDown}
         className="flex-1 h-full min-w-4 cursor-default"
       />
 

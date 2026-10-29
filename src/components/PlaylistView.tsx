@@ -371,13 +371,6 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
 
           {/* Details */}
           <div className="flex flex-col gap-1.5 min-w-0 pb-1">
-            <span
-              className={`text-xs font-bold tracking-wider uppercase ${
-                isLight ? "text-neutral-600" : "text-white/80"
-              }`}
-            >
-              {t.playlistLabel}
-            </span>
             <h1
               className={`text-6xl font-extrabold tracking-tight leading-snug pb-2 pt-1 transition-colors ${
                 isLight ? "text-neutral-900" : "text-white"
@@ -425,7 +418,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
             onClick={onPlayAll}
             disabled={tracks.length === 0}
             className="w-14 h-14 rounded-full bg-[#ff0000] hover:bg-[#cc0000] active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-            title="Oynat"
+            title={t.play}
           >
             {isPlaying && activeTrack && tracks.some((t) => t.id === activeTrack.id) ? (
               <Pause className="w-6 h-6 fill-white stroke-white" />
@@ -444,7 +437,7 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                 ? "text-neutral-500 hover:text-neutral-900"
                 : "text-neutral-400 hover:text-white"
             }`}
-            title="Karışık Çal"
+            title={t.shufflePlay}
           >
             <Shuffle className="w-6 h-6" />
           </button>

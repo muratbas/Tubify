@@ -1149,34 +1149,6 @@ export const SettingsView: FC<SettingsViewProps> = ({
           {/* TAB 5: ABOUT (Hakkında: App Info, Updates & GitHub) */}
           {activeTab === "about" && (
             <div className="space-y-6">
-              {/* Main App Brand Card */}
-              <div
-                className={`p-6 rounded-3xl border transition-all shadow-sm ${
-                  isLight ? "bg-[#ffffff] border-[#e4e4e7]" : "bg-[#101010] border-[#222222]"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  {/* Tubify Brand Icon */}
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ff2a2a] via-[#ff0000] to-[#b30000] flex items-center justify-center text-white shadow-lg shadow-red-500/25 shrink-0">
-                    <Sparkles className="w-7 h-7 stroke-[2.2]" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2.5">
-                      <h2 className={`text-xl font-extrabold tracking-tight ${isLight ? "text-[#111111]" : "text-white"}`}>
-                        Tubify
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-100 dark:bg-[#1f1f1f] border border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300">
-                        v{appVersion}
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-1 font-medium ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                      Ultra-lightweight Standalone YouTube Music Client
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               {/* Updates Section Card */}
               <div
                 className={`p-6 rounded-3xl border transition-all shadow-sm space-y-4 ${

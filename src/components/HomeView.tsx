@@ -9,7 +9,6 @@ import {
   ArrowDownToLine,
   ChevronLeft,
   ChevronRight,
-  ThumbsUp,
   Loader2,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
@@ -200,7 +199,7 @@ const DynamicShelf: FC<{
   onClickItem,
   onContextMenuTrack,
 }) => {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const shelfSlug = useMemo(
     () => `shelf-${section.title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
     [section.title]
@@ -296,7 +295,10 @@ const DynamicShelf: FC<{
           const isLikedSongs =
             item.id === "VLLM" ||
             item.id === "LM" ||
-            item.title.toLowerCase().includes("beğendiğim müzikler");
+            item.id === "femusic_liked" ||
+            item.title.toLowerCase().includes("beğendiğim") ||
+            item.title.toLowerCase().includes("beğenilenler") ||
+            item.title.toLowerCase().includes("liked");
 
           return (
             <div
@@ -308,7 +310,7 @@ const DynamicShelf: FC<{
                     {
                       id: item.video_id || item.id,
                       title: item.title,
-                      artist: item.subtitle || "Sanatçı",
+                      artist: item.subtitle || t.artist,
                       thumbnail: item.thumbnail,
                       is_explicit: item.explicit,
                     },
@@ -327,8 +329,8 @@ const DynamicShelf: FC<{
                 }`}
               >
                 {isLikedSongs && (!item.thumbnail || item.thumbnail.includes("pbg/liked-songs")) ? (
-                  <div className="w-full h-full bg-gradient-to-br from-[#7928CA] via-[#B800FF] to-[#FF0080] flex items-center justify-center">
-                    <ThumbsUp className="w-11 h-11 text-white fill-white drop-shadow-md" />
+                  <div className="w-full h-full bg-gradient-to-br from-[#ff0033] via-[#cc0029] to-[#700010] flex items-center justify-center">
+                    <Heart className="w-11 h-11 text-white fill-white drop-shadow-md" />
                   </div>
                 ) : (
                   <TrackCover
@@ -371,9 +373,9 @@ const DynamicShelf: FC<{
                       ? "text-neutral-900"
                       : "text-neutral-100"
                   }`}
-                  title={item.title}
+                  title={isLikedSongs ? t.likedSongs : item.title}
                 >
-                  {item.title}
+                  {isLikedSongs ? t.likedSongs : item.title}
                 </h3>
 
                 <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
@@ -721,7 +723,7 @@ export const HomeView: FC<HomeViewProps> = ({
       .map((it) => ({
         id: it.video_id || it.id,
         title: it.title,
-        artist: it.subtitle || "Sanatçı",
+        artist: it.subtitle || t.artist,
         thumbnail: it.thumbnail,
         is_explicit: it.explicit,
       }));
@@ -729,7 +731,7 @@ export const HomeView: FC<HomeViewProps> = ({
     const currentTrack: Track = {
       id: item.video_id || item.id,
       title: item.title,
-      artist: item.subtitle || "Sanatçı",
+      artist: item.subtitle || t.artist,
       thumbnail: item.thumbnail,
       is_explicit: item.explicit,
     };
@@ -1023,7 +1025,7 @@ export const HomeView: FC<HomeViewProps> = ({
       {isLoadingHome && sections.length === 0 && (
         <div className="py-12 flex flex-col items-center justify-center gap-3 text-neutral-400">
           <Loader2 className="w-7 h-7 animate-spin text-[#ff0000]" />
-          <span className="text-sm font-medium">YouTube Music içerikleri yükleniyor...</span>
+          <span className="text-sm font-medium">{t.homeFeedLoading}</span>
         </div>
       )}
 
@@ -1033,7 +1035,7 @@ export const HomeView: FC<HomeViewProps> = ({
           {isLoadingMore ? (
             <div className="flex items-center gap-2 text-sm text-neutral-400">
               <Loader2 className="w-5 h-5 animate-spin text-[#ff0000]" />
-              <span>{language === "tr" ? "Daha fazla içerik yükleniyor..." : "Loading more content..."}</span>
+              <span>{t.homeFeedLoadingMore}</span>
             </div>
           ) : (
             <button

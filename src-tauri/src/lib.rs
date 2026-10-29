@@ -16,8 +16,8 @@ use tauri::{AppHandle, Manager};
 
 
 #[tauri::command]
-async fn search_music(query: String) -> Result<Vec<Track>, String> {
-    search::search_youtube_music(&query).await
+async fn search_music(query: String, language: Option<String>) -> Result<Vec<Track>, String> {
+    search::search_youtube_music(&query, language.as_deref()).await
 }
 
 #[tauri::command]

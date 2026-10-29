@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return savedLegacy;
       }
     } catch {}
-    return "system";
+    return "light";
   });
 
   const [systemTheme, setSystemTheme] = useState<Theme>(getSystemTheme);

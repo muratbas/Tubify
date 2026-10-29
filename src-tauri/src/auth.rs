@@ -495,7 +495,11 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
                 }
             }
 
-            if text != "Song" && text != " • " && text != " & " && text != ", " && !text.is_empty() {
+            if crate::search::is_media_type_indicator(text) || crate::search::is_separator_or_empty(text) {
+                continue;
+            }
+
+            if text != " • " && text != " & " && text != ", " && !text.is_empty() {
                 if text.chars().all(|c| c.is_ascii_digit() || c == ':') && text.contains(':') {
                     duration = Some(text.to_string());
                 } else if b_id.is_some() && !b_id.unwrap().starts_with("UC") && album.is_none() {

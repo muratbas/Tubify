@@ -53,6 +53,46 @@ const CATEGORY_IDS: SearchCategory[] = [
   "podcasts",
 ];
 
+export function isMediaTypeIndicator(text?: string | null): boolean {
+  if (!text) return false;
+  const lower = text.trim().toLowerCase();
+  return [
+    "song", "songs", "şarkı", "şarkılar",
+    "video", "videos", "videolar",
+    "artist", "artists", "sanatçı", "sanatçılar",
+    "album", "albums", "albüm", "albümler",
+    "single", "singles", "tekli", "tekliler",
+    "ep", "podcast", "podcasts"
+  ].includes(lower);
+}
+
+export function isPlayCountMetric(text?: string | null): boolean {
+  if (!text) return false;
+  const lower = text.trim().toLowerCase();
+  return (
+    lower.includes("dinlenme") ||
+    lower.includes("plays") ||
+    lower.includes("play") ||
+    lower.includes("görüntüleme") ||
+    lower.includes("views") ||
+    lower.includes("view") ||
+    lower.includes("wiedergaben") ||
+    lower.includes("écoutes") ||
+    lower.includes("vues") ||
+    lower.includes("reproducciones") ||
+    lower.includes("visualizzazioni") ||
+    /^\d+([.,]\d+)?\s*(k|m|b|mn|mr|bin|milyon|milyar)?(\s*(plays?|views?|dinlenme|görüntüleme))?$/i.test(lower)
+  );
+}
+
+export function cleanTrackArtist(artist?: string | null): string {
+  if (!artist) return "Unknown Artist";
+  let cleaned = artist.trim();
+  // Strip leading media indicator (e.g. "Şarkı, ", "Video, ", "Song • ")
+  cleaned = cleaned.replace(/^(şarkı|video|song|single|tekli|ep|albüm|album)\s*[,•·-]\s*/i, "").trim();
+  return cleaned || artist;
+}
+
 // Rich Discover Categories for Empty Search State
 const DISCOVER_GENRES = [
   { title: "Pop", color: "from-pink-500 to-rose-600", query: "Pop" },
@@ -362,12 +402,17 @@ export const SearchView: FC<SearchViewProps> = ({
   const artists = useMemo(() => {
     const map = new Map<string, { id: string; name: string; thumbnail?: string }>();
     for (const track of searchResults) {
-      if (track.artist && !map.has(track.artist.toLowerCase())) {
-        map.set(track.artist.toLowerCase(), {
-          id: track.artist_id || track.artist,
-          name: track.artist,
-          thumbnail: track.thumbnail || undefined,
-        });
+      if (track.artist) {
+        const cleanName = cleanTrackArtist(track.artist);
+        if (isMediaTypeIndicator(cleanName)) continue;
+        const key = cleanName.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            id: track.artist_id || cleanName,
+            name: cleanName,
+            thumbnail: track.thumbnail || undefined,
+          });
+        }
       }
     }
     return Array.from(map.values());
@@ -380,13 +425,19 @@ export const SearchView: FC<SearchViewProps> = ({
       { id: string; title: string; artist: string; thumbnail?: string }
     >();
     for (const track of searchResults) {
-      if (track.album && !map.has(track.album.toLowerCase())) {
-        map.set(track.album.toLowerCase(), {
-          id: track.album_id || `album-${track.album}`,
-          title: track.album,
-          artist: track.artist,
-          thumbnail: track.thumbnail || undefined,
-        });
+      if (track.album) {
+        const trimmedAlbum = track.album.trim();
+        if (isPlayCountMetric(trimmedAlbum) || isMediaTypeIndicator(trimmedAlbum)) {
+          continue;
+        }
+        if (!map.has(trimmedAlbum.toLowerCase())) {
+          map.set(trimmedAlbum.toLowerCase(), {
+            id: track.album_id || `album-${trimmedAlbum}`,
+            title: trimmedAlbum,
+            artist: cleanTrackArtist(track.artist),
+            thumbnail: track.thumbnail || undefined,
+          });
+        }
       }
     }
     return Array.from(map.values());
@@ -714,14 +765,13 @@ export const SearchView: FC<SearchViewProps> = ({
                         </h4>
 
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium truncate">
-                            {topResult.type === "artist"
-                              ? t.artist
-                              : `${t.song} • ${topResult.artistName}`}
-                          </span>
-                          {topResult.type === "artist" && (
+                          {topResult.type === "artist" ? (
                             <span className="px-2 py-0.5 text-[10px] font-bold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-full">
                               {t.artist}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium truncate">
+                              {`${t.song} • ${cleanTrackArtist(topResult.artistName)}`}
                             </span>
                           )}
                         </div>
@@ -813,15 +863,16 @@ export const SearchView: FC<SearchViewProps> = ({
                               <p
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  const cArtist = cleanTrackArtist(track.artist);
                                   handleArtistClick(
-                                    track.artist_id || track.artist,
-                                    track.artist,
+                                    track.artist_id || cArtist,
+                                    cArtist,
                                     track.thumbnail || undefined
                                   );
                                 }}
                                 className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 hover:underline cursor-pointer"
                               >
-                                {track.artist}
+                                {cleanTrackArtist(track.artist)}
                               </p>
                             </div>
                           </div>
@@ -1096,28 +1147,29 @@ export const SearchView: FC<SearchViewProps> = ({
                         <p
                           onClick={(e) => {
                             e.stopPropagation();
+                            const cArtist = cleanTrackArtist(track.artist);
                             handleArtistClick(
-                              track.artist_id || track.artist,
-                              track.artist,
+                              track.artist_id || cArtist,
+                              cArtist,
                               track.thumbnail || undefined
                             );
                           }}
                           className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 hover:underline cursor-pointer"
                         >
-                          {track.artist}
+                          {cleanTrackArtist(track.artist)}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">
-                      {track.album && (
+                      {track.album && !isPlayCountMetric(track.album) && !isMediaTypeIndicator(track.album) && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAlbumClick(
                               track.album_id || `album-${track.album}`,
                               track.album || undefined,
-                              track.artist,
+                              cleanTrackArtist(track.artist),
                               track.thumbnail || undefined
                             );
                           }}

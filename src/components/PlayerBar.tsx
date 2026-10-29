@@ -138,67 +138,67 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
           }
         }}
       >
-        <div
-          className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 shadow-sm ${
-            isLight ? "bg-neutral-100" : "bg-[#282828]"
-          }`}
-        >
-          {track?.thumbnail ? (
-            <img
-              src={track.thumbnail}
-              alt={track.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Music2 className={`w-6 h-6 ${isLight ? "text-neutral-400" : "text-neutral-500"}`} />
+        {track ? (
+          <>
+            <div
+              className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 shadow-sm ${
+                isLight ? "bg-neutral-100" : "bg-[#282828]"
+              }`}
+            >
+              {track.thumbnail ? (
+                <img
+                  src={track.thumbnail}
+                  alt={track.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Music2 className={`w-6 h-6 ${isLight ? "text-neutral-400" : "text-neutral-500"}`} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="min-w-0 flex-1 max-w-[200px] overflow-hidden flex flex-col justify-center">
-          {(() => {
-            const hasAlbum = !!(
-              track?.album_id &&
-              track.album &&
-              track.album.toLowerCase() !== "single"
-            );
-            return (
+            <div className="min-w-0 flex-1 max-w-[200px] overflow-hidden flex flex-col justify-center">
+              {(() => {
+                const hasAlbum = !!(
+                  track.album_id &&
+                  track.album &&
+                  track.album.toLowerCase() !== "single"
+                );
+                return (
+                  <MarqueeText
+                    text={track.title}
+                    title={track.title}
+                    onClick={() => {
+                      if (hasAlbum && props.onNavigateAlbum) {
+                        props.onNavigateAlbum(
+                          track.album_id!,
+                          track.album || undefined,
+                          track.artist,
+                          track.thumbnail || undefined
+                        );
+                      }
+                    }}
+                    className={`text-sm font-semibold leading-normal py-0.5 ${
+                      hasAlbum ? "hover:underline cursor-pointer" : ""
+                    } ${isLight ? "text-neutral-900" : "text-white"}`}
+                  />
+                );
+              })()}
               <MarqueeText
-                text={track ? track.title : "Tubify"}
-                title={track?.title}
+                text={track.artist}
+                title={track.artist}
                 onClick={() => {
-                  if (hasAlbum && props.onNavigateAlbum) {
-                    props.onNavigateAlbum(
-                      track!.album_id!,
-                      track!.album || undefined,
-                      track!.artist,
-                      track!.thumbnail || undefined
-                    );
+                  if (props.onNavigateArtist) {
+                    props.onNavigateArtist(track.artist_id || track.artist, track.artist);
                   }
                 }}
-                className={`text-sm font-semibold leading-normal py-0.5 ${
-                  hasAlbum ? "hover:underline cursor-pointer" : ""
-                } ${isLight ? "text-neutral-900" : "text-white"}`}
+                className={`text-xs leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
+                  isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                }`}
               />
-            );
-          })()}
-          <MarqueeText
-            text={track ? track.artist : "Çalmaya başlamak için bir parça seçin"}
-            title={track?.artist}
-            onClick={() => {
-              if (track && props.onNavigateArtist) {
-                props.onNavigateArtist(track.artist_id || track.artist, track.artist);
-              }
-            }}
-            className={`text-xs leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
-              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
-            }`}
-          />
-        </div>
+            </div>
 
-        {track && (
-          <>
             <button
               onClick={onToggleLike}
               className={`p-1.5 transition-transform active:scale-125 cursor-pointer ml-1 shrink-0 ${
@@ -228,7 +228,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               <MoreHorizontal className="w-4 h-4" />
             </button>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* 2. Center: Playback Controls & Timeline Progress Bar */}
@@ -382,7 +382,7 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               onTouchEnd={() => {
                 setIsDraggingSeek(false);
               }}
-              aria-label="Şarkı ilerleme çubuğu"
+              aria-label={t.progressBar}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>

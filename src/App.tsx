@@ -997,7 +997,7 @@ export const App: FC = () => {
     navigateTo({ type: "search", query: q });
 
     try {
-      const results = await searchMusic(q);
+      const results = await searchMusic(q, language);
       setSearchResults(results);
     } catch (e: unknown) {
       setSearchError(e instanceof Error ? e.message : "Search error occurred");

@@ -79,6 +79,10 @@ export interface Translations {
   queue: string;
   nowPlaying: string;
   lyrics: string;
+  selectTrackToPlay: string;
+  progressBar: string;
+  homeFeedLoading: string;
+  homeFeedLoadingMore: string;
 
   // Context Menus
   addToQueue: string;
@@ -393,6 +397,10 @@ export const translations: Record<Language, Translations> = {
     queue: "Queue",
     nowPlaying: "Now Playing",
     lyrics: "Lyrics",
+    selectTrackToPlay: "Select a track to start playing",
+    progressBar: "Track progress bar",
+    homeFeedLoading: "Loading YouTube Music content...",
+    homeFeedLoadingMore: "Loading more content...",
 
     // Context Menus
     addToQueue: "Add to Queue",
@@ -701,6 +709,10 @@ export const translations: Record<Language, Translations> = {
     queue: "Sıradaki Şarkılar",
     nowPlaying: "Şu An Çalan",
     lyrics: "Şarkı Sözleri",
+    selectTrackToPlay: "Çalmaya başlamak için bir parça seçin",
+    progressBar: "Şarkı ilerleme çubuğu",
+    homeFeedLoading: "YouTube Music içerikleri yükleniyor...",
+    homeFeedLoadingMore: "Daha fazla içerik yükleniyor...",
 
     // Context Menus
     addToQueue: "Sıraya Ekle",
@@ -948,7 +960,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem("tubify_lang");
       if (saved === "en" || saved === "tr") return saved;
     } catch {}
-    return "en";
+    return "tr";
   });
 
   useEffect(() => {

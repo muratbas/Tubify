@@ -65,7 +65,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
   onScroll,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isLight = theme === "light";
   const { isDownloaded, isDownloading, startTrackDownload, deleteTrackDownload } = useDownload();
 
@@ -87,7 +87,7 @@ export const ArtistView: FC<ArtistViewProps> = ({
         } else {
           // Fallback: search YouTube Music for artist name
           const query = artistName || artistId;
-          const searchTracks = await searchMusic(query);
+          const searchTracks = await searchMusic(query, language);
           const matched = searchTracks.find((t) => t.artist_id?.startsWith("UC"));
           if (matched?.artist_id) {
             details = await getArtistDetails(matched.artist_id);

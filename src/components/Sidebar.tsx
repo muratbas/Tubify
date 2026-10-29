@@ -718,7 +718,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const isSearchActive = currentView === "search";
 
   const handleMouseDown = (e: MouseEvent<HTMLElement>) => {
-    if (e.button === 0) {
+    if (e.button === 0 && e.detail === 1) {
       const target = e.target as HTMLElement;
       if (
         target.closest("button") ||

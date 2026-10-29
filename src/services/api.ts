@@ -25,20 +25,21 @@ export function getStoredAudioQuality(): AudioQualityPreference {
   return "high";
 }
 
-export async function searchMusic(query: string): Promise<Track[]> {
+export async function searchMusic(query: string, language?: string): Promise<Track[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
   if (isTauri) {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      return await invoke<Track[]>("search_music", { query: trimmed });
+      return await invoke<Track[]>("search_music", { query: trimmed, language: language || "tr" });
     } catch (err) {
       console.warn("Tauri invoke failed, falling back to HTTP API:", err);
     }
   }
 
-  const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
+  const langParam = language ? `&hl=${encodeURIComponent(language)}` : "";
+  const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}${langParam}`);
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(`Search request failed (${res.status}): ${errorText}`);
