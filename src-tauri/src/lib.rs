@@ -4,6 +4,7 @@ pub mod downloader;
 pub mod media;
 pub mod search;
 pub mod stream;
+pub mod updater;
 
 use auth::{AlbumDetails, ArtistDetails, Playlist, PlaylistTracksResult, UserProfile};
 use search::Track;
@@ -250,10 +251,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(discord::DiscordRpcManager::new())
+        .manage(updater::UpdaterState::default())
         .register_asynchronous_uri_scheme_protocol("tubify-local", |ctx, req, resp| {
             let app = ctx.app_handle();
             downloader::handle_uri_scheme(app, req, resp);
         })
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_window_state::Builder::default()
@@ -306,7 +309,9 @@ pub fn run() {
             downloader::get_downloaded_audio_bytes,
             downloader::get_cached_library,
             downloader::delete_cached_track,
-            downloader::get_cached_track_bytes
+            downloader::get_cached_track_bytes,
+            updater::check_for_updates,
+            updater::install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tubify tauri application");

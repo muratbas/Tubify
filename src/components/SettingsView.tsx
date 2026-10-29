@@ -21,10 +21,16 @@ import {
   Sparkles,
   ChevronDown,
   Volume2,
+  Download,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
-import { openExternalUrl } from "../services/api";
+import {
+  openExternalUrl,
+  checkForUpdates,
+  installUpdate,
+  type DownloadProgressPayload,
+} from "../services/api";
 import type { UserProfile, SettingsTab, AudioQualityPreference } from "../types/music";
 
 interface SettingsViewProps {
@@ -82,10 +88,13 @@ export const SettingsView: FC<SettingsViewProps> = ({
   // About Tab state
   const [appVersion, setAppVersion] = useState("0.1.0");
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [updateResult, setUpdateResult] = useState<
     | null
     | { status: "latest" }
-    | { status: "available"; version: string; body: string; url: string }
+    | { status: "available"; version: string; body: string; date?: string; url?: string }
+    | { status: "restarting" }
     | { status: "error"; message?: string }
   >(null);
 
@@ -306,39 +315,93 @@ export const SettingsView: FC<SettingsViewProps> = ({
   const handleCheckUpdate = async () => {
     setIsCheckingUpdate(true);
     setUpdateResult(null);
+    setDownloadProgress(null);
     try {
-      const res = await fetch("https://api.github.com/repos/muratbas/Tubify/releases/latest", {
-        headers: {
-          Accept: "application/vnd.github.v3+json",
-        },
-      });
-
-      if (res.status === 404) {
-        // No releases published yet on the repository; client is up-to-date
-        setUpdateResult({ status: "latest" });
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error(`GitHub API responded with status ${res.status}`);
-      }
-
-      const data = await res.json();
-      const latestTag = data.tag_name || "";
-      if (latestTag && isVersionNewer(latestTag, appVersion)) {
+      const res = await checkForUpdates();
+      if (res.has_update) {
         setUpdateResult({
           status: "available",
-          version: latestTag,
-          body: data.body || "",
-          url: data.html_url || "https://github.com/muratbas/Tubify/releases",
+          version: res.version || "Yeni Sürüm",
+          body: res.body || "",
+          date: res.date,
+          url: "https://github.com/muratbas/Tubify/releases",
         });
       } else {
         setUpdateResult({ status: "latest" });
       }
-    } catch {
-      setUpdateResult({ status: "error" });
+    } catch (err) {
+      console.warn("Tauri updater check failed, falling back to GitHub API:", err);
+      try {
+        const res = await fetch("https://api.github.com/repos/muratbas/Tubify/releases/latest", {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+          },
+        });
+
+        if (res.status === 404) {
+          setUpdateResult({ status: "latest" });
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(`GitHub API responded with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const latestTag = data.tag_name || "";
+        if (latestTag && isVersionNewer(latestTag, appVersion)) {
+          setUpdateResult({
+            status: "available",
+            version: latestTag,
+            body: data.body || "",
+            date: data.published_at,
+            url: data.html_url || "https://github.com/muratbas/Tubify/releases",
+          });
+        } else {
+          setUpdateResult({ status: "latest" });
+        }
+      } catch (ghErr) {
+        setUpdateResult({
+          status: "error",
+          message: ghErr instanceof Error ? ghErr.message : undefined,
+        });
+      }
     } finally {
       setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    setIsInstallingUpdate(true);
+    setDownloadProgress(0);
+    let unlisten: (() => void) | undefined;
+    try {
+      const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      if (isTauri) {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen<DownloadProgressPayload>("download-progress", (event) => {
+          if (event.payload.percentage !== undefined && event.payload.percentage !== null) {
+            setDownloadProgress(Math.round(event.payload.percentage));
+          } else if (event.payload.total && event.payload.total > 0) {
+            setDownloadProgress(Math.min(100, Math.round((event.payload.downloaded / event.payload.total) * 100)));
+          }
+        });
+      }
+
+      await installUpdate();
+      setUpdateResult({ status: "restarting" });
+    } catch (err) {
+      console.error("Install update failed:", err);
+      setUpdateResult({
+        status: "error",
+        message: err instanceof Error ? err.message : "Güncelleme yüklenirken bir sorun oluştu.",
+      });
+      setIsInstallingUpdate(false);
+      setDownloadProgress(null);
+    } finally {
+      if (unlisten) {
+        unlisten();
+      }
     }
   };
 
@@ -1123,14 +1186,38 @@ export const SettingsView: FC<SettingsViewProps> = ({
                     </p>
                   </div>
 
-                  <button
-                    onClick={handleCheckUpdate}
-                    disabled={isCheckingUpdate}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#ff0000] hover:bg-[#e60000] text-white transition-all cursor-pointer shadow-md shadow-red-500/20 active:scale-95 disabled:opacity-60"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? "animate-spin" : ""}`} />
-                    <span>{isCheckingUpdate ? t.checkingForUpdates : t.checkForUpdates}</span>
-                  </button>
+                  {updateResult?.status === "available" ? (
+                    <button
+                      onClick={handleInstallUpdate}
+                      disabled={isInstallingUpdate}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#ff0000] hover:bg-[#e60000] text-white transition-all cursor-pointer shadow-md shadow-red-500/20 active:scale-95 disabled:opacity-60"
+                    >
+                      {isInstallingUpdate ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>
+                            {downloadProgress !== null
+                              ? `${t.downloadingUpdate} %${downloadProgress}`
+                              : t.updating}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{t.updateAndRestart}</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCheckUpdate}
+                      disabled={isCheckingUpdate}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#ff0000] hover:bg-[#e60000] text-white transition-all cursor-pointer shadow-md shadow-red-500/20 active:scale-95 disabled:opacity-60"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? "animate-spin" : ""}`} />
+                      <span>{isCheckingUpdate ? t.checkingForUpdates : t.checkForUpdates}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Update Check Results */}
@@ -1146,7 +1233,7 @@ export const SettingsView: FC<SettingsViewProps> = ({
                     )}
 
                     {updateResult.status === "available" && (
-                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3">
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-amber-500" />
@@ -1154,20 +1241,50 @@ export const SettingsView: FC<SettingsViewProps> = ({
                               {t.updateAvailable}: {updateResult.version}
                             </span>
                           </div>
-                          <button
-                            onClick={() => openExternalUrl(updateResult.url)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-black hover:bg-amber-400 transition-all cursor-pointer shadow-sm active:scale-95"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>{t.downloadUpdate}</span>
-                          </button>
+                          {updateResult.url && (
+                            <button
+                              onClick={() => openExternalUrl(updateResult.url!)}
+                              className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 underline cursor-pointer"
+                            >
+                              GitHub
+                            </button>
+                          )}
                         </div>
 
+                        {/* Progress Bar when installing */}
+                        {isInstallingUpdate && (
+                          <div className="p-3 rounded-xl bg-black/5 dark:bg-black/30 border border-black/10 dark:border-white/5 space-y-2">
+                            <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+                              <span>
+                                {downloadProgress !== null && downloadProgress >= 100
+                                  ? t.updateCompleteRestarting
+                                  : t.downloadingUpdate}
+                              </span>
+                              <span>{downloadProgress !== null ? `%${downloadProgress}` : "..."}</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-[#ff0000] to-emerald-500 rounded-full transition-all duration-150"
+                                style={{ width: `${downloadProgress ?? 8}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
                         {updateResult.body && (
-                          <div className="p-3 rounded-xl bg-black/5 dark:bg-black/30 border border-black/10 dark:border-white/5 text-[11px] leading-relaxed max-h-36 overflow-y-auto custom-scrollbar font-mono whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">
+                          <div className="p-3 rounded-xl bg-black/5 dark:bg-black/30 border border-black/10 dark:border-white/5 text-[11px] leading-relaxed max-h-40 overflow-y-auto custom-scrollbar font-mono whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">
                             {updateResult.body}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {updateResult.status === "restarting" && (
+                      <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 animate-pulse">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-semibold">
+                          {t.updateCompleteRestarting}
+                        </span>
                       </div>
                     )}
 
@@ -1175,7 +1292,9 @@ export const SettingsView: FC<SettingsViewProps> = ({
                       <div className="flex items-center justify-between p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400">
                         <div className="flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span className="text-xs font-semibold">{t.updateCheckFailed}</span>
+                          <span className="text-xs font-semibold">
+                            {updateResult.message || t.updateCheckFailed}
+                          </span>
                         </div>
                         <button
                           onClick={handleCheckUpdate}

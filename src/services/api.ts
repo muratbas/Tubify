@@ -593,4 +593,32 @@ export async function getDownloadedAudioBlobUrl(trackId: string): Promise<string
   return await getCachedTrackBlobUrl(trackId);
 }
 
+export interface UpdateCheckResult {
+  has_update: boolean;
+  version?: string;
+  body?: string;
+  date?: string;
+}
+
+export interface DownloadProgressPayload {
+  downloaded: number;
+  total?: number;
+  percentage?: number;
+}
+
+export async function checkForUpdates(): Promise<UpdateCheckResult> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<UpdateCheckResult>("check_for_updates");
+  }
+  return { has_update: false };
+}
+
+export async function installUpdate(): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke("install_update");
+  }
+}
+
 

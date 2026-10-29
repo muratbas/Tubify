@@ -896,6 +896,33 @@ Rust/InnerTube bağlantılarını ve IPC katmanını bozmadan arayüzü hibrit m
       - Gerçek Discord masaüstü istemcisiyle canlı `DISPATCH / READY`, `ActivityType::Listening`, player countdown progress bar ve `clear_presence` başarıyla test edildi.
       - `cargo check` (0 hata, 0 uyarı) ve `npx tsc --noEmit` (0 hata) ile tam uyumluluk ve sıfır regresyon doğrulandı.
 
+  - [x] **Aşama 70:** Tauri Otomatik Güncelleme (Auto-Updater) ve GitHub Releases Entegrasyonu:
+    - **1. Tauri Yapılandırması & İmza Anahtarları (`tauri.conf.json`, `Cargo.toml`, `.gitignore`):**
+      - `Cargo.toml` bağımlılıklarına `tauri-plugin-updater = "2.14.1"` eklendi.
+      - Tauri signer CLI ile kriptografik güncelleme imza anahtar çifti (`tubify.key` ve `tubify.key.pub`) üretildi; public key `tauri.conf.json` altındaki `plugins.updater.pubkey` alanına tanımlandı.
+      - Updater endpoint'i GitHub Releases en güncel sürüm JSON'una bağlandı: `https://github.com/muratbas/Tubify/releases/latest/download/latest.json`.
+      - `src-tauri/capabilities/default.json` içerisine `updater:default` izni eklendi.
+      - Özel imza anahtarlarının (`*.key`, `src-tauri/*.key`) git deposuna yanlışlıkla aktarılmasını önlemek için `.gitignore` kuralı yazıldı.
+    - **2. Rust Backend Mimarisi (`updater.rs`, `lib.rs`):**
+      - `src-tauri/src/updater.rs` modülü oluşturuldu; `UpdaterState` (`Arc<Mutex<Option<Update>>>`) state yönetimi kuruldu.
+      - `tauri_plugin_updater::Builder::new().build()` eklentisi `lib.rs` builder zincirine kaydedildi.
+      - **`check_for_updates`:** GitHub'daki `latest.json` dosyasını `app.updater()?.check()` ile asenkron sorgular; yeni sürüm varsa `{ has_update: true, version, body, date }` döner ve bulunan güncelleme nesnesini state'te önbelleğe alır. Güncelse `{ has_update: false }` döner.
+      - **`install_update`:** Önbellekteki veya taze güncelleme paketini indirir; her parça (`chunk`) geldikçe hesaplanan yüzdeyi (`percentage`) ve baytları `download-progress` olayıyla frontend'e anlık yayar (`emit`). İndirme tamamlandığında `app.restart()` çağrısıyla uygulamayı kesintisiz yeni sürümle yeniden başlatır.
+    - **3. Frontend & UI Entegrasyonu (`SettingsView.tsx`, `api.ts`, `LanguageContext.tsx`):**
+      - `src/services/api.ts` içerisine `checkForUpdates` ve `installUpdate` IPC köprüleri ile `UpdateCheckResult` ve `DownloadProgressPayload` tipleri tanımlandı.
+      - **Ayarlar > Hakkında** sekmesindeki `"Güncellemeleri Denetle"` butonu tam entegre edildi:
+        - Tıklandığında dönen spinner ile yükleniyor durumuna geçer.
+        - Güncelleme yoksa yeşil onay rozetiyle `"En son sürümü kullanıyorsunuz (vX.X.X)"` mesajı gösterilir.
+        - Güncelleme varsa sürüm etiketi ve sürüm notları (release notes) gösterilir; buton dinamik olarak kırmızı/vurgulu `"Şimdi Güncelle ve Yeniden Başlat"` haline dönüşür.
+        - Güncellemeye tıklandığında anlık yüzde indirme barı gösterilir (`%XX`), bitince `"Güncelleme tamamlandı. Yeniden başlatılıyor..."` durumuna geçer.
+      - Hem Türkçe hem İngilizce dil anahtarları (`updateAndRestart`, `downloadingUpdate`, `updateCompleteRestarting`, vb.) entegre edildi.
+    - **4. GitHub Actions CI/CD Mimarisi (`.github/workflows/release.yml`):**
+      - `v*` tag push'ları ve `workflow_dispatch` ile tetiklenen Release iş akışı kuruldu.
+      - `tauri-apps/tauri-action@v0` adımı entegre edildi; `TAURI_SIGNING_PRIVATE_KEY` ve `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secret'ları bağlandı.
+      - `includeUpdaterJson: true` ile her release tag'inde derlenen Windows binary'leri ile birlikte `latest.json` imzalı manifestosunun otomatik üretilip GitHub Release varlıklarına (assets) yüklenmesi sağlandı.
+    - **5. Doğrulama:**
+      - `cargo check` (0 hata, 0 uyarı), `npx tsc --noEmit` (0 hata) ve `npm run build` (0 hata) ile tam uyumluluk ve sıfır regresyon doğrulandı.
+
 ## Gelecek / Sonraki Adımlar
 - Kullanıcı geri bildirimine göre sonraki özellik veya geliştirmelerin planlanması.
 

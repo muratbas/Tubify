@@ -88,6 +88,10 @@ export interface Translations {
   updateAvailable: string;
   updateCheckFailed: string;
   downloadUpdate: string;
+  updateAndRestart: string;
+  updating: string;
+  downloadingUpdate: string;
+  updateCompleteRestarting: string;
   sourceCodeGithub: string;
   sourceCodeGithubDesc: string;
 
@@ -188,6 +192,10 @@ export const translations: Record<Language, Translations> = {
     updateAvailable: "New version available",
     updateCheckFailed: "Failed to check for updates",
     downloadUpdate: "View Release & Download",
+    updateAndRestart: "Update and Restart Now",
+    updating: "Updating...",
+    downloadingUpdate: "Downloading update...",
+    updateCompleteRestarting: "Update complete. Restarting...",
     sourceCodeGithub: "Source Code (GitHub)",
     sourceCodeGithubDesc: "Visit open source repository, star or contribute.",
 
@@ -285,6 +293,10 @@ export const translations: Record<Language, Translations> = {
     updateAvailable: "Yeni bir sürüm mevcut",
     updateCheckFailed: "Güncelleme denetlenemedi",
     downloadUpdate: "Sürümü İncele ve İndir",
+    updateAndRestart: "Şimdi Güncelle ve Yeniden Başlat",
+    updating: "Güncelleniyor...",
+    downloadingUpdate: "Güncelleme indiriliyor...",
+    updateCompleteRestarting: "Güncelleme tamamlandı. Yeniden başlatılıyor...",
     sourceCodeGithub: "Kaynak Kodu (GitHub)",
     sourceCodeGithubDesc: "Açık kaynak depoyu ziyaret edin, yıldız verin veya katkıda bulunun.",
 

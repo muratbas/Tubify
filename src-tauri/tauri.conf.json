@@ -36,5 +36,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ1RURCQkEzNEEyMDY1NUUKUldSZVpTQktvN3Z0MVQwaUtqRElkZ2hjMWk5alFGdis0MFlOZkc1eWNSV1JJQkpJVzVkcXFEYWwK",
+      "endpoints": [
+        "https://github.com/muratbas/Tubify/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

@@ -9,6 +9,8 @@ build/
 .env
 .env.*
 !.env.example
+*.key
+src-tauri/*.key
 
 # Logs
 logs/
