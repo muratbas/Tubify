@@ -15,9 +15,10 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import { getHomeFeed } from "../services/api";
-import type { Track, Playlist, HomeSection, HomeItem } from "../types/music";
+import type { Track, Playlist, HomeSection, HomeItem, UserProfile } from "../types/music";
 
 interface HomeViewProps {
+  userProfile?: UserProfile;
   recentlyPlayed: Track[];
   recommendations?: Track[];
   playlists?: Playlist[];
@@ -139,46 +140,6 @@ const TrackCover: FC<{
     />
   );
 };
-
-// Initial fallback tracks if recentlyPlayed is empty
-const INITIAL_FALLBACK_TRACKS: Track[] = [
-  {
-    id: "gQlMMD8auMs",
-    title: "Starboy",
-    artist: "The Weeknd, Daft Punk",
-    thumbnail: "https://i.ytimg.com/vi/gQlMMD8auMs/hqdefault.jpg",
-  },
-  {
-    id: "kJQP7kiw5Fk",
-    title: "Despacito",
-    artist: "Luis Fonsi, Daddy Yankee",
-    thumbnail: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg",
-  },
-  {
-    id: "fJ9rUzIMcZQ",
-    title: "Bohemian Rhapsody",
-    artist: "Queen",
-    thumbnail: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg",
-  },
-  {
-    id: "JGwWNGJdvx8",
-    title: "Shape of You",
-    artist: "Ed Sheeran",
-    thumbnail: "https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg",
-  },
-  {
-    id: "3JZ_D3ELwOQ",
-    title: "Radioactive",
-    artist: "Imagine Dragons",
-    thumbnail: "https://i.ytimg.com/vi/3JZ_D3ELwOQ/hqdefault.jpg",
-  },
-  {
-    id: "hT_nvWreIhg",
-    title: "Counting Stars",
-    artist: "OneRepublic",
-    thumbnail: "https://i.ytimg.com/vi/hT_nvWreIhg/hqdefault.jpg",
-  },
-];
 
 /**
  * Dynamic Horizontal Carousel Shelf Component
@@ -461,6 +422,7 @@ function shouldHideShelf(title: string, items?: HomeItem[]): boolean {
 }
 
 export const HomeView: FC<HomeViewProps> = ({
+  userProfile,
   recentlyPlayed,
   playlists,
   activeTrack,
@@ -481,7 +443,11 @@ export const HomeView: FC<HomeViewProps> = ({
   const isLight = theme === "light";
 
   // Dynamic Home Feed State (shelves from InnerTube FEmusic_home)
+  const isAuthenticated = Boolean(userProfile?.is_authenticated);
+
+  // Dynamic Home Feed State (shelves from InnerTube FEmusic_home)
   const [sections, setSections] = useState<HomeSection[]>(() => {
+    if (!isAuthenticated) return [];
     try {
       const cached = localStorage.getItem("tubify_home_feed_cache");
       if (cached) {
@@ -498,8 +464,14 @@ export const HomeView: FC<HomeViewProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch initial home feed on mount
+  // Fetch home feed only when authenticated
   useEffect(() => {
+    if (!isAuthenticated) {
+      setSections([]);
+      setContinuation(null);
+      return;
+    }
+
     let isMounted = true;
     const fetchFeed = async () => {
       try {
@@ -523,7 +495,7 @@ export const HomeView: FC<HomeViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // Fetch next continuation batch
   const handleLoadMore = useCallback(async () => {
@@ -585,14 +557,11 @@ export const HomeView: FC<HomeViewProps> = ({
     return "Good evening";
   };
 
-  // Top 6 tracks for Recently Played section
+  // Top 6 tracks for Recently Played section (only if authenticated & has played tracks)
   const displayTracks = useMemo(() => {
-    const pool =
-      recentlyPlayed && recentlyPlayed.length > 0
-        ? recentlyPlayed
-        : INITIAL_FALLBACK_TRACKS;
-    return pool.slice(0, 6);
-  }, [recentlyPlayed]);
+    if (!isAuthenticated) return [];
+    return (recentlyPlayed || []).slice(0, 6);
+  }, [isAuthenticated, recentlyPlayed]);
 
   // Quick Access Hub Navigation Items (Kitaplık, Göz At, İndirilenler)
   const quickAccessItems = useMemo(
@@ -817,18 +786,21 @@ export const HomeView: FC<HomeViewProps> = ({
             );
           })}
         </div>
+      </section>
 
-        {/* SECTION: Son dinledikleriniz (6 Compact Cards) */}
-        <h2
-          className={`text-xl md:text-2xl font-bold tracking-tight mb-4 ${
-            isLight ? "text-neutral-900" : "text-white"
-          }`}
-        >
-          {language === "tr" ? "Son dinledikleriniz" : "Recently played"}
-        </h2>
+      {/* SECTION: Son dinledikleriniz (6 Compact Cards) - Only when authenticated & has history */}
+        {isAuthenticated && displayTracks.length > 0 && (
+          <section className="space-y-4">
+            <h2
+              className={`text-xl md:text-2xl font-bold tracking-tight mb-4 ${
+                isLight ? "text-neutral-900" : "text-white"
+              }`}
+            >
+              {language === "tr" ? "Son dinledikleriniz" : "Recently played"}
+            </h2>
 
-        {/* 6-column responsive grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 md:gap-4">
+            {/* 6-column responsive grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 md:gap-4">
           {displayTracks.map((track, i) => {
             const isActive = activeTrack?.id === track.id;
             const isThisPlaying = isActive && isPlaying;
@@ -937,25 +909,27 @@ export const HomeView: FC<HomeViewProps> = ({
               </div>
             );
           })}
-        </div>
-      </section>
+            </div>
+          </section>
+        )}
 
       {/* 2. DYNAMIC INNER-TUBE CAROUSEL SHELVES ("Yeni keşifler...", "Sizin için önerilen albümler", "Unutulan favoriler", vb.) */}
-      {sections.map((section) => (
-        <DynamicShelf
-          key={section.title}
-          section={section}
-          isLight={isLight}
-          activeTrackId={activeTrack?.id}
-          isPlaying={isPlaying}
-          onPlayItem={handlePlayItem}
-          onClickItem={handleItemClick}
-          onContextMenuTrack={onContextMenuTrack}
-        />
-      ))}
+      {isAuthenticated &&
+        sections.map((section) => (
+          <DynamicShelf
+            key={section.title}
+            section={section}
+            isLight={isLight}
+            activeTrackId={activeTrack?.id}
+            isPlaying={isPlaying}
+            onPlayItem={handlePlayItem}
+            onClickItem={handleItemClick}
+            onContextMenuTrack={onContextMenuTrack}
+          />
+        ))}
 
       {/* Fallback "Kitaplığınızdan" if no sections are available yet */}
-      {sections.length === 0 && libraryPlaylists.length > 0 && (
+      {isAuthenticated && sections.length === 0 && libraryPlaylists.length > 0 && (
         <section className="space-y-4">
           <h2
             className={`text-xl md:text-2xl font-bold tracking-tight ${

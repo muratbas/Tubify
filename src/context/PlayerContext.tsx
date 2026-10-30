@@ -31,41 +31,6 @@ import {
   sendWatchtimePing,
 } from "../services/api";
 
-const INITIAL_RECENT: Track[] = [
-  {
-    id: "ViwtNLUqkMY",
-    title: "Crazy In Love (feat. JAY-Z)",
-    artist: "Beyoncé",
-    album: "Dangerously in Love",
-    thumbnail: "https://i.ytimg.com/vi/ViwtNLUqkMY/mqdefault.jpg",
-    duration: "3:55",
-  },
-  {
-    id: "gN9O1k_iV9Q",
-    title: "Sesinde Aşk Var",
-    artist: "Yalın",
-    album: "Herşey Sensin",
-    thumbnail: "https://i.ytimg.com/vi/gN9O1k_iV9Q/mqdefault.jpg",
-    duration: "3:42",
-  },
-  {
-    id: "bU_kF9_H7g4",
-    title: "Sugar On My Tongue",
-    artist: "Tyler, The Creator",
-    album: "CHROMAKOPIA",
-    thumbnail: "https://i.ytimg.com/vi/bU_kF9_H7g4/mqdefault.jpg",
-    duration: "2:50",
-  },
-  {
-    id: "0Wc2J3Y9s8w",
-    title: "See You Again (feat. Kali Uchis)",
-    artist: "Tyler, The Creator",
-    album: "Flower Boy",
-    thumbnail: "https://i.ytimg.com/vi/0Wc2J3Y9s8w/mqdefault.jpg",
-    duration: "3:00",
-  },
-];
-
 interface PlayerContextType {
   activeTrack: Track | null;
   playbackStatus: PlaybackStatus;
@@ -184,9 +149,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [recentTracks, setRecentTracks] = useState<Track[]>(() => {
     try {
       const saved = localStorage.getItem("tubify_recent_tracks");
-      return saved ? JSON.parse(saved) : INITIAL_RECENT;
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      // Filter out any legacy mock filler tracks
+      const MOCK_IDS = new Set(["ViwtNLUqkMY", "gN9O1k_iV9Q", "bU_kF9_H7g4", "0Wc2J3Y9s8w", "gQlMMD8auMs", "kJQP7kiw5Fk", "fJ9rUzIMcZQ", "JGwWNGJdvx8", "3JZ_D3ELwOQ", "hT_nvWreIhg"]);
+      return parsed.filter((t: Track) => t && t.id && !MOCK_IDS.has(t.id));
     } catch {
-      return INITIAL_RECENT;
+      return [];
     }
   });
 

@@ -45,58 +45,6 @@ import type { Track, UserProfile, Playlist, SettingsTab, AccountInfo } from "./t
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { AlertCircle, Check } from "lucide-react";
 
-const INITIAL_RECOMMENDED: Track[] = [
-  {
-    id: "Ckom3gf57Yw",
-    title: "Hayırlı Günler 2.0",
-    artist: "deth, nieh",
-    album: "Single",
-    thumbnail: "https://i.ytimg.com/vi/Ckom3gf57Yw/mqdefault.jpg",
-    duration: "3:10",
-  },
-  {
-    id: "8j7416MTn08",
-    title: "Bitmesin",
-    artist: "Gökhan Türkmen",
-    album: "Romantik",
-    thumbnail: "https://i.ytimg.com/vi/8j7416MTn08/mqdefault.jpg",
-    duration: "4:15",
-  },
-  {
-    id: "2Vv-BfVoq4g",
-    title: "Feel It Still",
-    artist: "Portugal. The Man",
-    album: "Woodstock",
-    thumbnail: "https://i.ytimg.com/vi/2Vv-BfVoq4g/mqdefault.jpg",
-    duration: "2:43",
-  },
-  {
-    id: "3YxaaGgTQYM",
-    title: "Bring Me To Life",
-    artist: "Evanescence",
-    album: "Fallen",
-    thumbnail: "https://i.ytimg.com/vi/3YxaaGgTQYM/mqdefault.jpg",
-    duration: "3:58",
-  },
-  {
-    id: "3A20hK_h8eE",
-    title: "Leaving Tonight",
-    artist: "The Neighbourhood",
-    album: "I Love You.",
-    thumbnail: "https://i.ytimg.com/vi/3A20hK_h8eE/mqdefault.jpg",
-    duration: "4:01",
-  },
-  {
-    id: "rYEDA3JcQqw",
-    title: "Rolling in the Deep",
-    artist: "Adele",
-    album: "21",
-    thumbnail: "https://i.ytimg.com/vi/rYEDA3JcQqw/mqdefault.jpg",
-    duration: "3:48",
-  },
-];
-
-
 const EPISODES_TRACKS: Track[] = [
   {
     id: "ep-1",
@@ -1567,13 +1515,13 @@ export const App: FC = () => {
             {/* VIEW 6: Home View */}
             {currentNav.type === "home" && (
               <HomeView
+                userProfile={userProfile}
                 recentlyPlayed={player.recentTracks}
-                recommendations={INITIAL_RECOMMENDED}
                 playlists={playlists}
                 activeTrack={player.activeTrack}
                 isPlaying={player.playbackStatus === "playing"}
                 onPlayTrack={(t, list) => {
-                  player.playTrack(t, list || [...player.recentTracks, ...INITIAL_RECOMMENDED], "home");
+                  player.playTrack(t, list || player.recentTracks, "home");
                 }}
                 onSelectPlaylist={(pl) => navigateTo({ type: "playlist", playlist: pl })}
                 onPlayPlaylist={(pl) => handlePlayPlaylist(pl)}
