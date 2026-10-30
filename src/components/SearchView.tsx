@@ -8,10 +8,7 @@ import {
   MoreHorizontal,
   Loader2,
   X,
-  Disc,
-  Mic2,
-  Flame,
-  Sparkles,
+  Search,
   CheckCircle2,
   ArrowDownToLine,
 } from "lucide-react";
@@ -93,22 +90,6 @@ export function cleanTrackArtist(artist?: string | null): string {
   cleaned = cleaned.replace(/^(şarkı|video|song|single|tekli|ep|albüm|album)\s*[,•·-]\s*/i, "").trim();
   return cleaned || artist;
 }
-
-// Rich Discover Categories for Empty Search State
-const DISCOVER_GENRES = [
-  { title: "Pop", color: "from-pink-500 to-rose-600", query: "Pop" },
-  { title: "Rock", color: "from-red-600 to-orange-700", query: "Rock" },
-  { title: "Hip-Hop", color: "from-orange-500 to-amber-600", query: "Hip Hop" },
-  { title: "Dans ve Elektronik", color: "from-teal-500 to-emerald-600", query: "Elektronik Dans" },
-  { title: "Türkçe Pop", color: "from-purple-600 to-indigo-700", query: "Türkçe Pop" },
-  { title: "Chill & Rahatlama", color: "from-blue-500 to-cyan-600", query: "Chill Relax" },
-  { title: "Odaklanma", color: "from-emerald-600 to-teal-700", query: "Focus Study" },
-  { title: "Antrenman", color: "from-rose-600 to-red-700", query: "Workout Gym" },
-  { title: "Caz & Akustik", color: "from-amber-600 to-yellow-700", query: "Jazz Acoustic" },
-  { title: "R&B & Soul", color: "from-violet-600 to-purple-800", query: "RnB Soul" },
-  { title: "Uyku", color: "from-indigo-800 to-slate-900", query: "Sleep Ambient" },
-  { title: "Parti", color: "from-fuchsia-600 to-pink-600", query: "Party Hits" },
-];
 
 // Sample podcast episodes for Podcast category
 const SAMPLE_PODCASTS: Track[] = [
@@ -201,7 +182,7 @@ export const SearchView: FC<SearchViewProps> = ({
   onNavigateAlbum,
   onPlayAlbum,
   onSelectPlaylist,
-  onSelectQuery,
+  onSelectQuery: _onSelectQuery,
   onScroll,
 }) => {
   const { theme } = useTheme();
@@ -679,36 +660,21 @@ export const SearchView: FC<SearchViewProps> = ({
             </div>
           )}
 
-          {/* Hepsine Göz At (Browse All / Keşfet) */}
-          <div>
-            <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">
-              {t.browseAll}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {DISCOVER_GENRES.map((genre, idx) => (
-                <div
-                  key={`genre-${idx}`}
-                  onClick={() => onSelectQuery(genre.query)}
-                  className={`relative aspect-[16/10] rounded-2xl p-4 overflow-hidden bg-gradient-to-br ${genre.color} text-white cursor-pointer shadow-md group hover:scale-[1.02] active:scale-[0.98] transition-all`}
-                >
-                  <span className="font-bold text-base md:text-lg block tracking-tight leading-tight">
-                    {genre.title}
-                  </span>
-                  <div className="absolute -bottom-2 -right-2 w-14 h-14 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center rotate-12 group-hover:rotate-0 transition-transform">
-                    {idx % 4 === 0 ? (
-                      <Flame className="w-7 h-7 text-white/80" />
-                    ) : idx % 4 === 1 ? (
-                      <Disc className="w-7 h-7 text-white/80" />
-                    ) : idx % 4 === 2 ? (
-                      <Mic2 className="w-7 h-7 text-white/80" />
-                    ) : (
-                      <Sparkles className="w-7 h-7 text-white/80" />
-                    )}
-                  </div>
-                </div>
-              ))}
+          {recentSearches.length === 0 && (
+            <div className="py-24 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+                <Search className="w-6 h-6" />
+              </div>
+              <p className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
+                {language === "tr" ? "Şarkı, sanatçı veya çalma listesi arayın" : "Search for songs, artists, or playlists"}
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+                {language === "tr"
+                  ? "Dinlemek istediğiniz müziği bulmak için yukarıdaki arama çubuğunu kullanın."
+                  : "Use the search bar above to find the music you want to listen to."}
+              </p>
             </div>
-          </div>
+          )}
         </div>
       )}
 
