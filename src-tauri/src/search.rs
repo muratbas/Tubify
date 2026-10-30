@@ -1,12 +1,21 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackArtist {
+    pub name: String,
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
     pub id: String,
     pub title: String,
     pub artist: String,
     #[serde(default)]
     pub artist_id: Option<String>,
+    #[serde(default)]
+    pub artists: Option<Vec<TrackArtist>>,
     pub album: Option<String>,
     #[serde(default)]
     pub album_id: Option<String>,
@@ -217,6 +226,7 @@ pub async fn search_youtube_music(query: &str, language: Option<&str>) -> Result
 
         let mut artist = "Unknown Artist".to_string();
         let mut artist_id: Option<String> = None;
+        let mut artist_list: Vec<TrackArtist> = Vec::new();
         let mut album: Option<String> = None;
         let mut album_id: Option<String> = None;
         let mut duration: Option<String> = None;
@@ -262,6 +272,12 @@ pub async fn search_youtube_music(query: &str, language: Option<&str>) -> Result
                             artist_id = Some(bid.to_string());
                         }
                         artist_parts.push(text);
+                        if !artist_list.iter().any(|a| a.name == text) {
+                            artist_list.push(TrackArtist {
+                                name: text.to_string(),
+                                id: Some(bid.to_string()),
+                            });
+                        }
                     } else if bid.starts_with("MPREb_")
                         || bid.starts_with("FEmusic_library_privately_owned_release")
                         || bid.starts_with("OLAK5uy_")
@@ -364,6 +380,7 @@ pub async fn search_youtube_music(query: &str, language: Option<&str>) -> Result
             title,
             artist,
             artist_id,
+            artists: if !artist_list.is_empty() { Some(artist_list) } else { None },
             album,
             album_id,
             duration,

@@ -1,3 +1,4 @@
+import { parseArtists } from "./ArtistLinks";
 import {
   useState,
   useEffect,
@@ -604,18 +605,41 @@ export const TrackContextMenu: FC<TrackContextMenuProps> = ({
 
       <div className={`h-[1px] my-1 ${isLight ? "bg-neutral-200" : "bg-white/[0.08]"}`} />
 
-      {/* 6. Go to Artist */}
-      {track.artist && (
-        <button
-          onClick={handleGoArtist}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left cursor-pointer ${
-            isLight ? "hover:bg-neutral-100 text-neutral-800" : "hover:bg-white/10 text-neutral-200"
-          }`}
-        >
-          <User className="w-4 h-4 shrink-0" />
-          <span>{t.goToArtist}</span>
-        </button>
-      )}
+      {/* 6. Go to Artist (Supports Multiple Artists) */}
+      {(() => {
+        const parsed = parseArtists(track.artist, track.artist_id, track.artists);
+        if (parsed.length > 1) {
+          return parsed.map((a) => (
+            <button
+              key={a.name}
+              onClick={() => {
+                onNavigateArtist?.(a.id, a.name);
+                onClose();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 text-neutral-800" : "hover:bg-white/10 text-neutral-200"
+              }`}
+            >
+              <User className="w-4 h-4 shrink-0" />
+              <span className="truncate">{a.name}</span>
+            </button>
+          ));
+        }
+        if (track.artist) {
+          return (
+            <button
+              onClick={handleGoArtist}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left cursor-pointer ${
+                isLight ? "hover:bg-neutral-100 text-neutral-800" : "hover:bg-white/10 text-neutral-200"
+              }`}
+            >
+              <User className="w-4 h-4 shrink-0" />
+              <span>{t.goToArtist}</span>
+            </button>
+          );
+        }
+        return null;
+      })()}
 
       {/* 7. Go to Album */}
       {track.album_id && track.album && track.album.toLowerCase() !== "single" && (

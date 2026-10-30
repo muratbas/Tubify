@@ -1,3 +1,4 @@
+import { ArtistLinks } from "./ArtistLinks";
 import { type FC, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Play,
@@ -908,22 +909,29 @@ export const HomeView: FC<HomeViewProps> = ({
                         E
                       </span>
                     )}
-                    <p
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onNavigateArtist) {
-                          onNavigateArtist(track.artist_id || track.artist, track.artist);
-                        }
-                      }}
-                      className={`text-xs truncate hover:underline cursor-pointer ${
+                    <div
+                      className={`text-xs truncate ${
                         isLight
-                          ? "text-neutral-500 hover:text-neutral-900"
-                          : "text-neutral-400 hover:text-white"
+                          ? "text-neutral-500"
+                          : "text-neutral-400"
                       }`}
                       title={track.artist}
                     >
-                      {track.artist}
-                    </p>
+                      <ArtistLinks
+                        artist={track.artist}
+                        artistId={track.artist_id}
+                        artists={track.artists}
+                        onNavigateArtist={onNavigateArtist}
+                        linkClassName={
+                          isLight
+                            ? "text-neutral-500 hover:text-neutral-900"
+                            : "text-neutral-400 hover:text-white"
+                        }
+                        separatorClassName={
+                          isLight ? "text-neutral-400" : "text-neutral-500"
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

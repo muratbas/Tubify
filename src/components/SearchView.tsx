@@ -1,3 +1,4 @@
+import { ArtistLinks } from "./ArtistLinks";
 import { type FC, useState, useMemo, useEffect } from "react";
 import {
   Play,
@@ -860,20 +861,16 @@ export const SearchView: FC<SearchViewProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <p
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const cArtist = cleanTrackArtist(track.artist);
-                                  handleArtistClick(
-                                    track.artist_id || cArtist,
-                                    cArtist,
-                                    track.thumbnail || undefined
-                                  );
-                                }}
-                                className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 hover:underline cursor-pointer"
-                              >
-                                {cleanTrackArtist(track.artist)}
-                              </p>
+                              <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                                <ArtistLinks
+                                  artist={cleanTrackArtist(track.artist)}
+                                  artistId={track.artist_id}
+                                  artists={track.artists}
+                                  onNavigateArtist={(id, name) => handleArtistClick(id, name, track.thumbnail || undefined)}
+                                  linkClassName="hover:underline cursor-pointer hover:text-neutral-900 dark:hover:text-white"
+                                  separatorClassName="text-neutral-400 dark:text-neutral-500"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -1144,20 +1141,16 @@ export const SearchView: FC<SearchViewProps> = ({
                             </span>
                           )}
                         </div>
-                        <p
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const cArtist = cleanTrackArtist(track.artist);
-                            handleArtistClick(
-                              track.artist_id || cArtist,
-                              cArtist,
-                              track.thumbnail || undefined
-                            );
-                          }}
-                          className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 hover:underline cursor-pointer"
-                        >
-                          {cleanTrackArtist(track.artist)}
-                        </p>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                          <ArtistLinks
+                            artist={cleanTrackArtist(track.artist)}
+                            artistId={track.artist_id}
+                            artists={track.artists}
+                            onNavigateArtist={(id, name) => handleArtistClick(id, name, track.thumbnail || undefined)}
+                            linkClassName="hover:underline cursor-pointer hover:text-neutral-900 dark:hover:text-white"
+                            separatorClassName="text-neutral-400 dark:text-neutral-500"
+                          />
+                        </div>
                       </div>
                     </div>
 

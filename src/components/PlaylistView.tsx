@@ -1,3 +1,4 @@
+import { ArtistLinks } from "./ArtistLinks";
 import { useState, useRef, useEffect, useMemo, type FC } from "react";
 import {
   Play,
@@ -707,19 +708,26 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                               E
                             </span>
                           )}
-                          <p
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onNavigateArtist) {
-                                onNavigateArtist(track.artist_id || track.artist, track.artist);
-                              }
-                            }}
-                            className={`text-xs truncate leading-normal py-0.5 hover:underline cursor-pointer ${
-                              isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                          <div
+                            className={`text-xs truncate leading-normal py-0.5 ${
+                              isLight ? "text-neutral-500" : "text-neutral-400"
                             }`}
                           >
-                            {track.artist}
-                          </p>
+                            <ArtistLinks
+                              artist={track.artist}
+                              artistId={track.artist_id}
+                              artists={track.artists}
+                              onNavigateArtist={onNavigateArtist}
+                              linkClassName={
+                                isLight
+                                  ? "text-neutral-500 hover:text-neutral-900"
+                                  : "text-neutral-400 hover:text-white"
+                              }
+                              separatorClassName={
+                                isLight ? "text-neutral-400" : "text-neutral-500"
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -993,24 +1001,26 @@ export const PlaylistView: FC<PlaylistViewProps> = ({
                               E
                             </span>
                           )}
-                          <p
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onNavigateArtist) {
-                                onNavigateArtist(
-                                  track.artist_id || track.artist,
-                                  track.artist
-                                );
-                              }
-                            }}
-                            className={`text-xs truncate leading-normal py-0.5 hover:underline cursor-pointer ${
-                              isLight
-                                ? "text-neutral-500 hover:text-neutral-900"
-                                : "text-neutral-400 hover:text-white"
+                          <div
+                            className={`text-xs truncate leading-normal py-0.5 ${
+                              isLight ? "text-neutral-500" : "text-neutral-400"
                             }`}
                           >
-                            {track.artist}
-                          </p>
+                            <ArtistLinks
+                              artist={track.artist}
+                              artistId={track.artist_id}
+                              artists={track.artists}
+                              onNavigateArtist={onNavigateArtist}
+                              linkClassName={
+                                isLight
+                                  ? "text-neutral-500 hover:text-neutral-900"
+                                  : "text-neutral-400 hover:text-white"
+                              }
+                              separatorClassName={
+                                isLight ? "text-neutral-400" : "text-neutral-500"
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

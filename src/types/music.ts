@@ -1,8 +1,14 @@
+export interface TrackArtist {
+  name: string;
+  id?: string | null;
+}
+
 export interface Track {
   id: string;
   title: string;
   artist: string;
   artist_id?: string | null;
+  artists?: TrackArtist[] | null;
   album?: string | null;
   album_id?: string | null;
   duration?: string | null;

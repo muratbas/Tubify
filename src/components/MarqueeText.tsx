@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type FC, type MouseEvent } from "react";
 
 export interface MarqueeTextProps {
   text: string;
+  children?: React.ReactNode;
   className?: string;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   title?: string;
@@ -11,6 +12,7 @@ export interface MarqueeTextProps {
 
 export const MarqueeText: FC<MarqueeTextProps> = ({
   text,
+  children,
   className = "",
   onClick,
   title,
@@ -134,7 +136,7 @@ export const MarqueeText: FC<MarqueeTextProps> = ({
               }
         }
       >
-        {text}
+        {children || text}
       </span>
     </div>
   );

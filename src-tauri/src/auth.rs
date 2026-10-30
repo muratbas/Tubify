@@ -681,6 +681,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
 
     let mut artist = "Unknown Artist".to_string();
     let mut artist_id: Option<String> = None;
+    let mut artist_list: Vec<crate::search::TrackArtist> = Vec::new();
     let mut album: Option<String> = None;
     let mut album_id: Option<String> = None;
     let mut duration: Option<String> = None;
@@ -701,6 +702,12 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
                 if bid.starts_with("UC") || bid.starts_with("FEmusic_artist") {
                     if artist_id.is_none() {
                         artist_id = Some(bid.to_string());
+                    }
+                    if !text.is_empty() && !artist_list.iter().any(|a| a.name == text) {
+                        artist_list.push(crate::search::TrackArtist {
+                            name: text.to_string(),
+                            id: Some(bid.to_string()),
+                        });
                     }
                 } else if bid.starts_with("MPREb_") || bid.starts_with("FEmusic_library_privately_owned_release") || bid.starts_with("OLAK5uy_") {
                     if album_id.is_none() {
@@ -872,6 +879,7 @@ pub fn parse_mrlir_item(mrlir: &serde_json::Value) -> Option<Track> {
         title,
         artist,
         artist_id,
+        artists: if !artist_list.is_empty() { Some(artist_list) } else { None },
         album,
         album_id,
         duration,
@@ -917,6 +925,7 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
         });
 
     let mut artist_id: Option<String> = None;
+    let mut artist_list: Vec<crate::search::TrackArtist> = Vec::new();
     let mut album: Option<String> = None;
     let mut album_id: Option<String> = None;
     let mut plays: Option<String> = None;
@@ -945,6 +954,12 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
                     }
                     if !artist_parts.contains(&text) {
                         artist_parts.push(text);
+                    }
+                    if !text.is_empty() && !artist_list.iter().any(|a| a.name == text) {
+                        artist_list.push(crate::search::TrackArtist {
+                            name: text.to_string(),
+                            id: Some(bid.to_string()),
+                        });
                     }
                 } else if bid.starts_with("MPREb_")
                     || bid.starts_with("FEmusic_library_privately_owned_release")
@@ -999,6 +1014,7 @@ pub fn parse_playlist_panel_video_renderer(ppvr: &serde_json::Value) -> Option<T
         title,
         artist,
         artist_id,
+        artists: if !artist_list.is_empty() { Some(artist_list) } else { None },
         album,
         album_id,
         duration,

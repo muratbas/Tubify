@@ -22,6 +22,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import type { Track, PlaybackStatus, RepeatMode } from "../types/music";
 import { MarqueeText } from "./MarqueeText";
+import { ArtistLinks } from "./ArtistLinks";
 
 interface PlayerBarProps {
   track?: Track | null;
@@ -188,15 +189,23 @@ export const PlayerBar: FC<PlayerBarProps> = (props) => {
               <MarqueeText
                 text={track.artist}
                 title={track.artist}
-                onClick={() => {
-                  if (props.onNavigateArtist) {
-                    props.onNavigateArtist(track.artist_id || track.artist, track.artist);
-                  }
-                }}
-                className={`text-xs leading-normal py-0.5 mt-0.5 hover:underline cursor-pointer ${
-                  isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                className={`text-xs leading-normal py-0.5 mt-0.5 ${
+                  isLight ? "text-neutral-500" : "text-neutral-400"
                 }`}
-              />
+              >
+                <ArtistLinks
+                  artist={track.artist}
+                  artistId={track.artist_id}
+                  artists={track.artists}
+                  onNavigateArtist={props.onNavigateArtist}
+                  linkClassName={
+                    isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-white"
+                  }
+                  separatorClassName={
+                    isLight ? "text-neutral-400" : "text-neutral-500"
+                  }
+                />
+              </MarqueeText>
             </div>
 
             <button
