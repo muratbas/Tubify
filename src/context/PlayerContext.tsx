@@ -384,6 +384,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const lastNextTimeRef = useRef(0);
   const lastPrevTimeRef = useRef(0);
+  const lastRewindTimeRef = useRef(0);
 
   // Next track resolver with debounce guard
   const nextTrack = useCallback(() => {
@@ -448,6 +449,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
       return;
     }
+
+    // Şarkı 4 saniye veya daha fazla oynamışsa başa al; 4 saniyeye kadar oynamamışsa (veya başa sarıldıktan sonra peş peşe basılmışsa) önceki şarkıya geç
+    const curTime = audioRef.current ? audioRef.current.currentTime : 0;
+    const isRecentlyRewound = now - lastRewindTimeRef.current < 2000;
+    if (curTime >= 4 && !isRecentlyRewound) {
+      lastRewindTimeRef.current = now;
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        setCurrentTime(0);
+      }
+      return;
+    }
+
+    lastRewindTimeRef.current = 0;
 
     // 1. In shuffle mode, prefer previous track from actual playback history
     if (isShuffleRef.current && playbackHistoryRef.current.length > 0) {
