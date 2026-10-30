@@ -4,6 +4,7 @@ import type {
   PlaybackTracking,
   AudioQualityPreference,
   UserProfile,
+  AccountInfo,
   Playlist,
   PlaylistTracksResult,
   ArtistDetails,
@@ -222,6 +223,30 @@ export async function logoutGoogle(): Promise<void> {
     return;
   }
   await fetch("/api/auth/logout", { method: "POST" });
+}
+
+export async function getAccounts(): Promise<AccountInfo[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<AccountInfo[]>("get_accounts");
+  }
+  return [];
+}
+
+export async function switchAccount(accountId: string): Promise<UserProfile> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<UserProfile>("switch_account", { accountId });
+  }
+  return { is_authenticated: false };
+}
+
+export async function removeAccount(accountId: string): Promise<UserProfile | null> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<UserProfile | null>("remove_account", { accountId });
+  }
+  return null;
 }
 
 export async function getYtLikedSongs(): Promise<Track[]> {

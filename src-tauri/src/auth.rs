@@ -95,11 +95,82 @@ pub struct AlbumDetails {
     pub tracks: Vec<Track>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SessionData {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredAccount {
+    pub id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub avatar_url: Option<String>,
     pub cookie: String,
     pub sapisid: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub avatar_url: Option<String>,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SessionData {
+    pub active_account_id: Option<String>,
+    #[serde(default)]
+    pub accounts: Vec<StoredAccount>,
+    #[serde(default)]
+    pub cookie: String,
+    #[serde(default)]
+    pub sapisid: Option<String>,
+    #[serde(default)]
     pub profile: Option<UserProfile>,
+}
+
+impl SessionData {
+    pub fn get_active_account(&self) -> Option<&StoredAccount> {
+        if let Some(ref active_id) = self.active_account_id {
+            if let Some(acc) = self.accounts.iter().find(|a| &a.id == active_id) {
+                return Some(acc);
+            }
+        }
+        self.accounts.first()
+    }
+
+    pub fn get_active_account_mut(&mut self) -> Option<&mut StoredAccount> {
+        if let Some(ref active_id) = self.active_account_id {
+            if let Some(pos) = self.accounts.iter().position(|a| &a.id == active_id) {
+                return self.accounts.get_mut(pos);
+            }
+        }
+        self.accounts.first_mut()
+    }
+
+    pub fn sync_legacy_fields(&mut self) {
+        if let Some(active) = self.get_active_account().cloned() {
+            self.cookie = active.cookie.clone();
+            self.sapisid = active.sapisid.clone();
+            self.profile = Some(UserProfile {
+                is_authenticated: true,
+                name: active.name.clone(),
+                email: active.email.clone(),
+                avatar_url: active.avatar_url.clone(),
+            });
+            if self.active_account_id.is_none() {
+                self.active_account_id = Some(active.id.clone());
+            }
+        } else {
+            self.cookie = String::new();
+            self.sapisid = None;
+            self.profile = Some(UserProfile {
+                is_authenticated: false,
+                name: None,
+                email: None,
+                avatar_url: None,
+            });
+            self.active_account_id = None;
+        }
+    }
 }
 
 // Global thread-safe session store
@@ -134,22 +205,55 @@ pub fn load_saved_session() {
     let file = get_session_file_path();
     if file.exists() {
         if let Ok(content) = fs::read_to_string(&file) {
-            if let Ok(data) = serde_json::from_str::<SessionData>(&content) {
-                let raw_cookie = data.cookie.clone();
-                let is_auth = data.profile.as_ref().map_or(false, |p| p.is_authenticated);
-                if raw_cookie.trim().is_empty() || !is_auth {
+            if let Ok(mut data) = serde_json::from_str::<SessionData>(&content) {
+                if data.accounts.is_empty() {
+                    let raw_cookie = data.cookie.clone();
+                    let is_auth = data.profile.as_ref().map_or(false, |p| p.is_authenticated);
+                    if !raw_cookie.trim().is_empty() && is_auth {
+                        let prof = data.profile.clone().unwrap_or(UserProfile {
+                            is_authenticated: true,
+                            name: None,
+                            email: None,
+                            avatar_url: None,
+                        });
+                        let acc_id = prof.email.clone().unwrap_or_else(|| {
+                            format!("acc_{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis())
+                        });
+                        data.accounts.push(StoredAccount {
+                            id: acc_id.clone(),
+                            name: prof.name,
+                            email: prof.email,
+                            avatar_url: prof.avatar_url,
+                            cookie: raw_cookie,
+                            sapisid: data.sapisid.clone(),
+                        });
+                        data.active_account_id = Some(acc_id);
+                    }
+                }
+
+                if data.accounts.is_empty() {
                     let mut lock = SESSION.lock().unwrap();
                     *lock = None;
                     return;
                 }
-                let should_refresh = match &data.profile {
-                    Some(p) => p.avatar_url.as_ref().map_or(true, |u| u.contains("=w1500-h844-") || u.is_empty()),
-                    None => true,
+
+                if data.active_account_id.is_none() || !data.accounts.iter().any(|a| Some(&a.id) == data.active_account_id.as_ref()) {
+                    data.active_account_id = data.accounts.first().map(|a| a.id.clone());
+                }
+
+                data.sync_legacy_fields();
+
+                let should_refresh = match data.get_active_account() {
+                    Some(a) => a.avatar_url.as_ref().map_or(true, |u| u.contains("=w1500-h844-") || u.is_empty()),
+                    None => false,
                 };
+                let raw_cookie = data.get_active_account().map(|a| a.cookie.clone()).unwrap_or_default();
+
                 {
                     let mut lock = SESSION.lock().unwrap();
                     *lock = Some(data);
                 }
+
                 if should_refresh && !raw_cookie.is_empty() {
                     tauri::async_runtime::spawn(async move {
                         let _ = verify_and_save_cookie(&raw_cookie).await;
@@ -161,7 +265,9 @@ pub fn load_saved_session() {
 }
 
 pub fn save_session_to_file(data: &SessionData) {
-    if let Ok(json) = serde_json::to_string_pretty(data) {
+    let mut to_save = data.clone();
+    to_save.sync_legacy_fields();
+    if let Ok(json) = serde_json::to_string_pretty(&to_save) {
         let file = get_session_file_path();
         let _ = fs::write(&file, &json);
         if let Ok(path) = std::env::current_dir() {
@@ -190,10 +296,11 @@ pub fn clear_session_file() {
 pub fn get_session_info() -> Option<(String, Option<String>)> {
     let lock = SESSION.lock().ok()?;
     let session = lock.as_ref()?;
-    if session.cookie.trim().is_empty() {
+    let active = session.get_active_account()?;
+    if active.cookie.trim().is_empty() {
         return None;
     }
-    Some((session.cookie.clone(), session.sapisid.clone()))
+    Some((active.cookie.clone(), active.sapisid.clone()))
 }
 
 pub fn extract_sapisid(cookies: &str) -> Option<String> {
@@ -335,21 +442,6 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
     let (acct_name, acct_avatar, acct_handle, is_logged_in) = fetch_account_profile(&client).await;
 
     if !is_logged_in && acct_name.is_none() && acct_avatar.is_none() {
-        let unauth_profile = UserProfile {
-            is_authenticated: false,
-            name: None,
-            email: None,
-            avatar_url: None,
-        };
-        {
-            let mut lock = SESSION.lock().unwrap();
-            *lock = Some(SessionData {
-                cookie: "".to_string(),
-                sapisid: None,
-                profile: Some(unauth_profile.clone()),
-            });
-        }
-        clear_session_file();
         return Err("Google oturumu geçerli değil veya süresi dolmuş.".to_string());
     }
 
@@ -388,19 +480,52 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
 
     let profile = UserProfile {
         is_authenticated: true,
-        name,
-        email,
-        avatar_url,
+        name: name.clone(),
+        email: email.clone(),
+        avatar_url: avatar_url.clone(),
     };
 
-    let session = SessionData {
-        cookie: raw_cookie.to_string(),
-        sapisid,
-        profile: Some(profile.clone()),
-    };
-
-    save_session_to_file(&session);
     let mut lock = SESSION.lock().unwrap();
+    let mut session = lock.take().unwrap_or_default();
+
+    let existing_idx = session.accounts.iter().position(|a| {
+        if let (Some(ref e1), Some(ref e2)) = (&a.email, &email) {
+            if !e1.is_empty() && !e2.is_empty() {
+                return e1 == e2;
+            }
+        }
+        if let (Some(ref n1), Some(ref n2)) = (&a.name, &name) {
+            return n1 == n2;
+        }
+        false
+    });
+
+    let target_id = if let Some(idx) = existing_idx {
+        let acc = &mut session.accounts[idx];
+        acc.cookie = raw_cookie.to_string();
+        acc.sapisid = sapisid.clone();
+        acc.name = name;
+        acc.email = email;
+        acc.avatar_url = avatar_url;
+        acc.id.clone()
+    } else {
+        let new_id = email.clone().unwrap_or_else(|| {
+            format!("acc_{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis())
+        });
+        session.accounts.push(StoredAccount {
+            id: new_id.clone(),
+            name,
+            email,
+            avatar_url,
+            cookie: raw_cookie.to_string(),
+            sapisid,
+        });
+        new_id
+    };
+
+    session.active_account_id = Some(target_id);
+    session.sync_legacy_fields();
+    save_session_to_file(&session);
     *lock = Some(session);
 
     Ok(profile)
@@ -409,8 +534,13 @@ pub async fn verify_and_save_cookie(raw_cookie: &str) -> Result<UserProfile, Str
 pub fn get_current_user_profile() -> UserProfile {
     let lock = SESSION.lock().unwrap();
     if let Some(session) = lock.as_ref() {
-        if let Some(prof) = &session.profile {
-            return prof.clone();
+        if let Some(active) = session.get_active_account() {
+            return UserProfile {
+                is_authenticated: true,
+                name: active.name.clone(),
+                email: active.email.clone(),
+                avatar_url: active.avatar_url.clone(),
+            };
         }
     }
     UserProfile {
@@ -419,6 +549,93 @@ pub fn get_current_user_profile() -> UserProfile {
         email: None,
         avatar_url: None,
     }
+}
+
+pub fn get_all_accounts() -> Vec<AccountInfo> {
+    let lock = SESSION.lock().unwrap();
+    if let Some(session) = lock.as_ref() {
+        let active_id = session.active_account_id.as_ref();
+        return session.accounts.iter().map(|acc| {
+            AccountInfo {
+                id: acc.id.clone(),
+                name: acc.name.clone(),
+                email: acc.email.clone(),
+                avatar_url: acc.avatar_url.clone(),
+                is_active: active_id == Some(&acc.id),
+            }
+        }).collect();
+    }
+    Vec::new()
+}
+
+pub fn switch_account(account_id: &str) -> Result<UserProfile, String> {
+    let mut lock = SESSION.lock().unwrap();
+    let session = lock.as_mut().ok_or_else(|| "Oturum bulunamadı".to_string())?;
+
+    if !session.accounts.iter().any(|a| a.id == account_id) {
+        return Err("Hesap bulunamadı".to_string());
+    }
+
+    session.active_account_id = Some(account_id.to_string());
+    session.sync_legacy_fields();
+    let profile = UserProfile {
+        is_authenticated: true,
+        name: session.get_active_account().and_then(|a| a.name.clone()),
+        email: session.get_active_account().and_then(|a| a.email.clone()),
+        avatar_url: session.get_active_account().and_then(|a| a.avatar_url.clone()),
+    };
+    save_session_to_file(session);
+    Ok(profile)
+}
+
+pub fn remove_account(account_id: &str) -> Result<Option<UserProfile>, String> {
+    let mut lock = SESSION.lock().unwrap();
+    let session = lock.as_mut().ok_or_else(|| "Oturum bulunamadı".to_string())?;
+
+    let pos = session.accounts.iter().position(|a| a.id == account_id);
+    if let Some(idx) = pos {
+        session.accounts.remove(idx);
+    } else {
+        return Err("Hesap bulunamadı".to_string());
+    }
+
+    if session.accounts.is_empty() {
+        session.active_account_id = None;
+        session.sync_legacy_fields();
+        let empty_session = session.clone();
+        save_session_to_file(&empty_session);
+        *lock = None;
+        clear_session_file();
+        return Ok(None);
+    }
+
+    if session.active_account_id.as_deref() == Some(account_id) {
+        session.active_account_id = session.accounts.first().map(|a| a.id.clone());
+    }
+    session.sync_legacy_fields();
+    save_session_to_file(session);
+
+    let active_profile = session.get_active_account().map(|a| UserProfile {
+        is_authenticated: true,
+        name: a.name.clone(),
+        email: a.email.clone(),
+        avatar_url: a.avatar_url.clone(),
+    });
+
+    Ok(active_profile)
+}
+
+pub fn logout_google() -> Result<(), String> {
+    let active_id = {
+        let lock = SESSION.lock().unwrap();
+        lock.as_ref().and_then(|s| s.active_account_id.clone())
+    };
+    if let Some(id) = active_id {
+        let _ = remove_account(&id);
+    } else {
+        clear_session_file();
+    }
+    Ok(())
 }
 
 fn is_play_count_metric(text: &str, accessibility: &str) -> bool {
@@ -2085,6 +2302,7 @@ pub async fn open_login_webview(app: AppHandle) -> Result<(), String> {
         .center()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
         .initialization_script("try { delete window.chrome.webview; } catch(e) {}")
+        .incognito(true)
         .build()
         .map_err(|e| format!("Giriş penceresi açılamadı: {}", e))?;
 
@@ -2100,6 +2318,7 @@ pub async fn open_login_webview(app: AppHandle) -> Result<(), String> {
 
             if let Ok(profile) = check_and_sync_cookies(&win_clone).await {
                 let _ = app_clone.emit("auth-success", profile);
+                let _ = app_clone.emit("accounts-updated", get_all_accounts());
                 let _ = win_clone.close();
                 break;
             }

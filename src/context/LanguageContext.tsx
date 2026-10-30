@@ -256,6 +256,13 @@ export interface Translations {
   connectGoogle: string;
   notConnectedTitle: string;
   notConnectedDesc: string;
+  switchAccount: string;
+  activeAccountBadge: string;
+  removeAccountTooltip: string;
+  toastAccountSwitched: string;
+  toastAccountRemoved: string;
+  manageAccounts: string;
+  addAnotherAccount: string;
 
   // Appearance
   appearanceSubtitle: string;
@@ -574,6 +581,13 @@ export const translations: Record<Language, Translations> = {
     connectGoogle: "Connect with Google",
     notConnectedTitle: "Google & YouTube Music Not Connected",
     notConnectedDesc: "Sign in with your Google account to access your playlists and liked songs.",
+    switchAccount: "Switch",
+    activeAccountBadge: "Active",
+    removeAccountTooltip: "Remove account",
+    toastAccountSwitched: "Switched account",
+    toastAccountRemoved: "Account removed",
+    manageAccounts: "Manage Accounts",
+    addAnotherAccount: "Add another account",
 
     appearanceSubtitle: "Manage theme, language, and motion preferences.",
     themeSelection: "Theme",
@@ -886,6 +900,13 @@ export const translations: Record<Language, Translations> = {
     connectGoogle: "Google ile Giriş Yap",
     notConnectedTitle: "Google & YouTube Music Bağlı Değil",
     notConnectedDesc: "Tüm çalma listelerinize ve beğendiğiniz şarkılara erişmek için Google hesabınızla giriş yapın.",
+    switchAccount: "Geçiş Yap",
+    activeAccountBadge: "Aktif",
+    removeAccountTooltip: "Hesabı kaldır",
+    toastAccountSwitched: "Hesaba geçiş yapıldı",
+    toastAccountRemoved: "Hesap kaldırıldı",
+    manageAccounts: "Hesapları Yönet",
+    addAnotherAccount: "Farklı bir hesap ekle",
 
     appearanceSubtitle: "Uygulama temasını, dilini ve hareket ayarlarını yönetin.",
     themeSelection: "Tema",

@@ -26,6 +26,9 @@ import {
   getUserProfile,
   openGoogleLogin,
   logoutGoogle,
+  getAccounts,
+  switchAccount,
+  removeAccount,
   getYtLikedSongs,
   getYtPlaylists,
   getPlaylistTracksPage,
@@ -38,7 +41,7 @@ import {
 } from "./services/api";
 import { CustomTooltip } from "./components/CustomTooltip";
 import { EditPlaylistModal, type PrivacyStatus } from "./components/EditPlaylistModal";
-import type { Track, UserProfile, Playlist, SettingsTab } from "./types/music";
+import type { Track, UserProfile, Playlist, SettingsTab, AccountInfo } from "./types/music";
 import { TrackContextMenu, type ContextMenuPosition } from "./components/TrackContextMenu";
 import { AlertCircle, Check } from "lucide-react";
 
@@ -337,6 +340,7 @@ export const App: FC = () => {
 
   // User Profile & Google Library
   const [userProfile, setUserProfile] = useState<UserProfile>({ is_authenticated: false });
+  const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>("account");
   const [likedSongs, setLikedSongs] = useState<Track[]>(() => {
     try {
@@ -386,7 +390,16 @@ export const App: FC = () => {
     setContextMenu(null);
   };
 
-  // Load User Profile on Startup
+  const loadAccounts = useCallback(async () => {
+    try {
+      const list = await getAccounts();
+      setAccounts(list);
+    } catch (err) {
+      console.error("Failed to load accounts:", err);
+    }
+  }, []);
+
+  // Load User Profile & Accounts on Startup
   useEffect(() => {
     getUserProfile()
       .then((prof) => {
@@ -396,7 +409,8 @@ export const App: FC = () => {
         }
       })
       .catch(console.error);
-  }, []);
+    loadAccounts();
+  }, [loadAccounts]);
 
   const loadUserData = async () => {
     try {
@@ -926,8 +940,45 @@ export const App: FC = () => {
 
   const handleLoginSuccess = (profile: UserProfile) => {
     setUserProfile(profile);
+    loadAccounts();
     loadUserData();
     player.showToast(t.toastGoogleConnected);
+  };
+
+  const handleSwitchAccount = async (accountId: string) => {
+    try {
+      const newProfile = await switchAccount(accountId);
+      setUserProfile(newProfile);
+      await loadAccounts();
+      await loadUserData();
+      player.showToast(t.toastAccountSwitched || "Hesap değiştirildi");
+    } catch (err) {
+      console.error("Failed to switch account:", err);
+      player.showToast("Hesap değiştirilemedi");
+    }
+  };
+
+  const handleRemoveAccount = async (accountId: string) => {
+    try {
+      const newProfile = await removeAccount(accountId);
+      await loadAccounts();
+      if (newProfile && newProfile.is_authenticated) {
+        setUserProfile(newProfile);
+        await loadUserData();
+      } else {
+        setUserProfile({ is_authenticated: false });
+        setLikedSongs([]);
+        setPlaylists([]);
+        try {
+          localStorage.removeItem("tubify_user_playlists_cache");
+          localStorage.removeItem("tubify_liked_tracks_cache");
+          localStorage.removeItem("tubify_liked_total_count");
+        } catch {}
+      }
+      player.showToast(t.toastAccountRemoved || "Hesap kaldırıldı");
+    } catch (err) {
+      console.error("Failed to remove account:", err);
+    }
   };
 
   const handleOpenLogin = async () => {
@@ -949,6 +1000,9 @@ export const App: FC = () => {
           handleLoginSuccess(event.payload);
         }).then((un) => {
           unlisten = un;
+        });
+        listen<AccountInfo[]>("accounts-updated", (event) => {
+          setAccounts(event.payload);
         });
       });
     }
@@ -1300,6 +1354,8 @@ export const App: FC = () => {
               }}
               onSearchSubmit={handleSearchSubmit}
               userProfile={userProfile}
+              accounts={accounts}
+              onSwitchAccount={handleSwitchAccount}
               currentView={currentNav.type}
               currentTabTitle={
                 currentNav.type === "playlist"
@@ -1352,6 +1408,9 @@ export const App: FC = () => {
               <SettingsView
                 initialTab={settingsInitialTab}
                 userProfile={userProfile}
+                accounts={accounts}
+                onSwitchAccount={handleSwitchAccount}
+                onRemoveAccount={handleRemoveAccount}
                 likedSongsCount={likedSongs.length}
                 playlistsCount={playlists.length}
                 onLogout={handleLogout}

@@ -78,6 +78,14 @@ export interface UserProfile {
   avatar_url?: string | null;
 }
 
+export interface AccountInfo {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  is_active: boolean;
+}
+
 export interface Playlist {
   id: string;
   title: string;

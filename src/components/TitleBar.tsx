@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ArrowDownToLine,
   User,
+  Plus,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { minimizeWindow, toggleMaximizeWindow, closeWindow } from "../services/api";
@@ -17,13 +18,15 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useDownload } from "../context/DownloadContext";
 import { DownloadsPopover } from "./DownloadsPopover";
-import type { UserProfile, SettingsTab } from "../types/music";
+import type { UserProfile, SettingsTab, AccountInfo } from "../types/music";
 
 interface TitleBarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onSearchSubmit: () => void;
   userProfile: UserProfile;
+  accounts?: AccountInfo[];
+  onSwitchAccount?: (accountId: string) => Promise<void>;
   currentView: "home" | "playlist" | "search" | "settings" | "artist" | "album" | "lyrics" | "downloads";
   currentTabTitle?: string;
   onOpenLogin: () => void;
@@ -42,6 +45,8 @@ export const TitleBar: FC<TitleBarProps> = ({
   onSearchChange,
   onSearchSubmit,
   userProfile,
+  accounts = [],
+  onSwitchAccount,
   onOpenLogin,
   onOpenSettings,
   onNavigateHome,
@@ -276,7 +281,58 @@ export const TitleBar: FC<TitleBarProps> = ({
                     </div>
                   </div>
 
+                  {/* Other accounts for quick 1-click switch */}
+                  {accounts.filter((a) => !a.is_active).length > 0 && (
+                    <>
+                      <div className={`my-1 border-t ${isLight ? "border-neutral-200" : "border-white/10"}`} />
+                      <div className="py-1">
+                        <p className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isLight ? "text-neutral-400" : "text-neutral-500"}`}>
+                          {t.accounts}
+                        </p>
+                        {accounts
+                          .filter((a) => !a.is_active)
+                          .map((acc) => (
+                            <button
+                              key={acc.id}
+                              onClick={() => {
+                                setIsAvatarMenuOpen(false);
+                                onSwitchAccount?.(acc.id);
+                              }}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                                isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {acc.avatar_url ? (
+                                  <img src={acc.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-[9px] shrink-0">
+                                    {acc.name?.[0] || "M"}
+                                  </div>
+                                )}
+                                <span className="truncate text-xs font-medium">{acc.name || "Google"}</span>
+                              </div>
+                              <span className="text-[10px] text-neutral-400 font-medium shrink-0 ml-1">{t.switchAccount}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </>
+                  )}
+
                   <div className={`my-1 border-t ${isLight ? "border-neutral-200" : "border-white/10"}`} />
+
+                  <button
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      onOpenLogin();
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      isLight ? "hover:bg-neutral-100 text-neutral-900" : "hover:bg-white/10 text-white"
+                    }`}
+                  >
+                    <Plus className="w-4 h-4 text-[#ff0000]" />
+                    <span>{t.addAccount}</span>
+                  </button>
 
                   <button
                     onClick={() => {

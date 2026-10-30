@@ -22,6 +22,8 @@ import {
   ChevronDown,
   Volume2,
   Download,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -31,11 +33,14 @@ import {
   installUpdate,
   type DownloadProgressPayload,
 } from "../services/api";
-import type { UserProfile, SettingsTab, AudioQualityPreference } from "../types/music";
+import type { UserProfile, SettingsTab, AudioQualityPreference, AccountInfo } from "../types/music";
 
 interface SettingsViewProps {
   initialTab?: SettingsTab;
   userProfile: UserProfile;
+  accounts?: AccountInfo[];
+  onSwitchAccount?: (accountId: string) => Promise<void>;
+  onRemoveAccount?: (accountId: string) => Promise<void>;
   likedSongsCount: number;
   playlistsCount: number;
   onLogout: () => Promise<void>;
@@ -74,10 +79,39 @@ function isVersionNewer(latest: string, current: string): boolean {
 export const SettingsView: FC<SettingsViewProps> = ({
   initialTab = "account",
   userProfile,
+  accounts = [],
+  onSwitchAccount,
+  onRemoveAccount,
   onLogout,
   onOpenLogin,
   onScroll,
 }) => {
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
+  const [removingAccountId, setRemovingAccountId] = useState<string | null>(null);
+
+  const handleSwitch = async (id: string) => {
+    if (!onSwitchAccount) return;
+    setSwitchingAccountId(id);
+    try {
+      await onSwitchAccount(id);
+    } finally {
+      setSwitchingAccountId(null);
+    }
+  };
+
+  const handleRemove = async (id: string, isActive: boolean) => {
+    if (isActive) {
+      handleLogoutClick();
+      return;
+    }
+    if (!onRemoveAccount) return;
+    setRemovingAccountId(id);
+    try {
+      await onRemoveAccount(id);
+    } finally {
+      setRemovingAccountId(null);
+    }
+  };
   const { theme, themeMode, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const isLight = theme === "light";
@@ -545,10 +579,10 @@ export const SettingsView: FC<SettingsViewProps> = ({
 
         {/* Right Cards Container */}
         <div className="flex-1 max-w-3xl space-y-6">
-          {/* TAB 1: ACCOUNT (Simplified: Profile Card Only) */}
+          {/* TAB 1: ACCOUNT (Multi-Account Support) */}
           {activeTab === "account" && (
             <div
-              className={`p-6 rounded-3xl border transition-all shadow-sm ${
+              className={`p-6 rounded-3xl border transition-all shadow-sm space-y-6 ${
                 isLight ? "bg-[#ffffff] border-[#e4e4e7]" : "bg-[#101010] border-[#222222]"
               }`}
             >
@@ -568,52 +602,187 @@ export const SettingsView: FC<SettingsViewProps> = ({
                   </div>
                 </div>
 
-                <span className="text-xs font-semibold text-[#ff0000]">
-                  {userProfile.is_authenticated ? t.connected : t.signedOut}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-[#ff0000]">
+                    {userProfile.is_authenticated ? t.connected : t.signedOut}
+                  </span>
+                  <button
+                    onClick={onOpenLogin}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#ff0000] hover:bg-[#e60000] text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t.addAccount}</span>
+                  </button>
+                </div>
               </div>
 
-              {userProfile.is_authenticated ? (
-                <div className="pt-5">
-                  {/* User Profile Card */}
+              {/* Accounts List or Empty State */}
+              {userProfile.is_authenticated || accounts.length > 0 ? (
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3.5">
-                      {userProfile.avatar_url ? (
-                        <img
-                          src={userProfile.avatar_url}
-                          alt="Avatar"
-                          className="w-12 h-12 rounded-full object-cover border border-[#e4e4e7] shadow-sm"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-base shadow-sm">
-                          {userProfile.name?.[0]?.toUpperCase() || "M"}
-                        </div>
-                      )}
-                      <div>
-                        <h4 className={`text-sm font-bold ${isLight ? "text-[#111111]" : "text-white"}`}>
-                          {userProfile.name || "Murat"}
-                        </h4>
-                        <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
-                          {t.sessionConfirmed}
-                        </p>
-                      </div>
-                    </div>
+                    <span className={`text-[11px] font-bold tracking-wider uppercase ${isLight ? "text-neutral-500" : "text-neutral-400"}`}>
+                      {t.accounts} ({accounts.length > 0 ? accounts.length : 1})
+                    </span>
+                  </div>
 
+                  <div className="space-y-2.5">
+                    {accounts.length > 0 ? (
+                      accounts.map((acc) => {
+                        const isActive = acc.is_active;
+                        const isSwitching = switchingAccountId === acc.id;
+                        const isRemoving = removingAccountId === acc.id;
+
+                        return (
+                          <div
+                            key={acc.id}
+                            onClick={() => {
+                              if (!isActive && !isSwitching && !isRemoving) {
+                                handleSwitch(acc.id);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                              isActive
+                                ? isLight
+                                  ? "bg-red-500/5 border-[#ff0000]/40 shadow-sm"
+                                  : "bg-[#ff0000]/10 border-[#ff0000]/50 shadow-sm"
+                                : isLight
+                                ? "bg-neutral-50 hover:bg-neutral-100 border-neutral-200 cursor-pointer hover:border-neutral-300"
+                                : "bg-[#181818] hover:bg-[#202020] border-[#262626] cursor-pointer hover:border-[#333333]"
+                            }`}
+                          >
+                            {/* Left: Avatar + Identity */}
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              {acc.avatar_url ? (
+                                <img
+                                  src={acc.avatar_url}
+                                  alt={acc.name || "Avatar"}
+                                  className="w-11 h-11 rounded-full object-cover border border-inherit shrink-0 shadow-sm"
+                                />
+                              ) : (
+                                <div className="w-11 h-11 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                  {acc.name?.[0]?.toUpperCase() || "M"}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className={`text-sm font-bold truncate ${isLight ? "text-[#111111]" : "text-white"}`}>
+                                    {acc.name || "Google Hesabım"}
+                                  </h4>
+                                  {isActive && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1 shrink-0">
+                                      <Check className="w-3 h-3" />
+                                      {t.activeAccountBadge}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-[11px] truncate ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                                  {acc.email || (isActive ? t.sessionConfirmed : "Google Account")}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Right: Actions */}
+                            <div className="flex items-center gap-2 shrink-0 ml-3" onClick={(e) => e.stopPropagation()}>
+                              {!isActive && (
+                                <button
+                                  onClick={() => handleSwitch(acc.id)}
+                                  disabled={isSwitching}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border active:scale-95 ${
+                                    isLight
+                                      ? "bg-white text-neutral-800 border-neutral-200 hover:bg-neutral-100 shadow-sm"
+                                      : "bg-[#222222] text-neutral-200 border-[#333333] hover:bg-[#2a2a2a] shadow-sm"
+                                  }`}
+                                >
+                                  {isSwitching ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff0000]" />
+                                  ) : (
+                                    <RefreshCw className="w-3.5 h-3.5 text-neutral-400" />
+                                  )}
+                                  <span>{t.switchAccount}</span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => handleRemove(acc.id, isActive)}
+                                disabled={isRemoving || (isActive && isLoggingOut)}
+                                title={t.removeAccountTooltip}
+                                className={`p-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                                  isLight
+                                    ? "bg-white text-neutral-500 border-neutral-200 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm"
+                                    : "bg-[#222222] text-neutral-400 border-[#333333] hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 shadow-sm"
+                                }`}
+                              >
+                                {isRemoving || (isActive && isLoggingOut) ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      /* Single Profile Card Fallback */
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl border bg-red-500/5 border-[#ff0000]/40">
+                        <div className="flex items-center gap-3.5">
+                          {userProfile.avatar_url ? (
+                            <img
+                              src={userProfile.avatar_url}
+                              alt="Avatar"
+                              className="w-11 h-11 rounded-full object-cover border border-[#e4e4e7] shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-full bg-[#ff0000] text-white flex items-center justify-center font-bold text-base shadow-sm">
+                              {userProfile.name?.[0]?.toUpperCase() || "M"}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className={`text-sm font-bold ${isLight ? "text-[#111111]" : "text-white"}`}>
+                                {userProfile.name || "Google Hesabım"}
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                {t.activeAccountBadge}
+                              </span>
+                            </div>
+                            <p className={`text-[11px] ${isLight ? "text-[#71717a]" : "text-[#888888]"}`}>
+                              {t.sessionConfirmed}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleLogoutClick}
+                          disabled={isLoggingOut}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                            isLight
+                              ? "bg-neutral-50 text-[#18181b] border-neutral-200 hover:bg-neutral-100"
+                              : "bg-[#181818] text-slate-200 border-[#2a2a2a] hover:bg-[#222]"
+                          }`}
+                        >
+                          {isLoggingOut ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff0000]" />
+                          ) : (
+                            <LogOut className="w-3.5 h-3.5" />
+                          )}
+                          <span>{t.signOut}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Add Another Account Card/Button */}
                     <button
-                      onClick={handleLogoutClick}
-                      disabled={isLoggingOut}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                      onClick={onOpenLogin}
+                      className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed transition-all cursor-pointer ${
                         isLight
-                          ? "bg-neutral-50 text-[#18181b] border-neutral-200 hover:bg-neutral-100"
-                          : "bg-[#181818] text-slate-200 border-[#2a2a2a] hover:bg-[#222]"
+                          ? "border-neutral-300 hover:border-[#ff0000] hover:bg-red-500/5 text-neutral-700 hover:text-[#ff0000]"
+                          : "border-[#2a2a2a] hover:border-[#ff0000]/60 hover:bg-[#ff0000]/5 text-neutral-300 hover:text-white"
                       }`}
                     >
-                      {isLoggingOut ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff0000]" />
-                      ) : (
-                        <LogOut className="w-3.5 h-3.5" />
-                      )}
-                      <span>{t.signOut}</span>
+                      <Plus className="w-4 h-4 text-[#ff0000]" />
+                      <span className="text-xs font-semibold">{t.addAnotherAccount}</span>
                     </button>
                   </div>
                 </div>

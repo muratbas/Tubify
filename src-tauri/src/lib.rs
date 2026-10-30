@@ -9,7 +9,7 @@ pub mod updater;
 use auth::{AlbumDetails, ArtistDetails, Playlist, PlaylistTracksResult, UserProfile};
 use search::Track;
 use stream::StreamInfo;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 
 
@@ -73,8 +73,22 @@ async fn save_google_cookie(cookie: String) -> Result<UserProfile, String> {
 
 #[tauri::command]
 fn logout_google() -> Result<(), String> {
-    auth::clear_session_file();
-    Ok(())
+    auth::logout_google()
+}
+
+#[tauri::command]
+fn get_accounts() -> Vec<auth::AccountInfo> {
+    auth::get_all_accounts()
+}
+
+#[tauri::command]
+fn switch_account(account_id: String) -> Result<UserProfile, String> {
+    auth::switch_account(&account_id)
+}
+
+#[tauri::command]
+fn remove_account(account_id: String) -> Result<Option<UserProfile>, String> {
+    auth::remove_account(&account_id)
 }
 
 #[tauri::command]
@@ -145,6 +159,7 @@ async fn open_google_login(app: AppHandle) -> Result<(), String> {
 async fn check_login_status(app: AppHandle) -> Result<UserProfile, String> {
     if let Some(win) = app.get_webview_window("google_login_window") {
         if let Ok(profile) = auth::check_and_sync_cookies(&win).await {
+            let _ = app.emit("accounts-updated", auth::get_all_accounts());
             let _ = win.close();
             return Ok(profile);
         }
@@ -278,6 +293,9 @@ pub fn run() {
             get_user_profile,
             save_google_cookie,
             logout_google,
+            get_accounts,
+            switch_account,
+            remove_account,
             get_yt_liked_songs,
             get_yt_playlists,
             get_playlist_tracks,
