@@ -1,6 +1,6 @@
 [package]
 name = "tubify"
-version = "0.1.1"
+version = "0.2.0"
 description = "Ultra-lightweight Standalone YouTube Music Client"
 authors = ["Tubify Team"]
 edition = "2021"
