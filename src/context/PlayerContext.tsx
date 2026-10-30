@@ -167,6 +167,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const queueRef = useRef<Track[]>([]);
   queueRef.current = queue;
 
+  const playbackHistoryRef = useRef<Track[]>([]);
+
   const queueSourceIdRef = useRef<string>("");
   queueSourceIdRef.current = queueSourceId;
 
@@ -386,7 +388,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Next track resolver with debounce guard
   const nextTrack = useCallback(() => {
     const now = Date.now();
-    if (now - lastNextTimeRef.current < 450) {
+    if (now - lastNextTimeRef.current < 250) {
       return;
     }
     lastNextTimeRef.current = now;
@@ -428,26 +430,58 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const prevTrack = useCallback(() => {
     const now = Date.now();
-    if (now - lastPrevTimeRef.current < 450) {
+    if (now - lastPrevTimeRef.current < 250) {
       return;
     }
     lastPrevTimeRef.current = now;
 
     const curQueue = queueRef.current;
     const curTrack = currentTrackRef.current;
-    if (!curTrack || curQueue.length === 0) return;
+    if (!curTrack && curQueue.length === 0) return;
 
-    // If currently playing track has played for more than 3 seconds, rewind to the beginning
-    if (audioRef.current && audioRef.current.currentTime > 3) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
+    // If repeat mode is 'one', restart current track
+    if (repeatModeRef.current === "one" && curTrack) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        setCurrentTime(0);
+        audioRef.current.play().catch(console.error);
+      }
       return;
     }
 
-    const idx = curQueue.findIndex((t) => t.id === curTrack.id);
+    // 1. In shuffle mode, prefer previous track from actual playback history
+    if (isShuffleRef.current && playbackHistoryRef.current.length > 0) {
+      const prev = playbackHistoryRef.current.pop();
+      if (prev) {
+        playTrackInternal(prev, true);
+        return;
+      }
+    }
+
+    // 2. Sequential queue navigation: if we are at track index > 0, go to previous track in queue
+    const idx = curTrack ? curQueue.findIndex((t) => t.id === curTrack.id) : -1;
     if (idx > 0) {
-      playTrackInternal(curQueue[idx - 1]);
-    } else if (audioRef.current) {
+      playTrackInternal(curQueue[idx - 1], true);
+      return;
+    }
+
+    // 3. Fallback to playback history if queue has reached beginning (idx <= 0)
+    if (playbackHistoryRef.current.length > 0) {
+      const prev = playbackHistoryRef.current.pop();
+      if (prev) {
+        playTrackInternal(prev, true);
+        return;
+      }
+    }
+
+    // 4. Wrap around in repeat all mode
+    if (repeatModeRef.current === "all" && curQueue.length > 1) {
+      playTrackInternal(curQueue[curQueue.length - 1], true);
+      return;
+    }
+
+    // 5. At very beginning of all playback: rewind current track to start
+    if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
     }
@@ -885,8 +919,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [syncDiscordRpc]);
 
-  const playTrackInternal = async (track: Track) => {
+  const playTrackInternal = async (track: Track, isFromPrev = false) => {
     if (!audioRef.current) return;
+
+    if (!isFromPrev && currentTrackRef.current && currentTrackRef.current.id !== track.id) {
+      playbackHistoryRef.current.push(currentTrackRef.current);
+      if (playbackHistoryRef.current.length > 50) {
+        playbackHistoryRef.current.shift();
+      }
+    }
+
+    currentTrackRef.current = track;
     setActiveTrack(track);
     setPlaybackError(null);
 
